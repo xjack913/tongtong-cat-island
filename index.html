@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="小一生桐桐拿鉛筆畫設計圖，做成一座 3D 貓貓島：50 隻貓比跳高，還有表演區、日記區和改數學作業的學習數學島。">
+<meta name="description" content="很愛貓的桐桐把流浪貓接到自己畫的島上照顧，大家一起跳高、表演、寫日記、上數學課。來當島主吧！">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://tong.xjack.tw/">
 <meta property="og:title" content="桐桐貓貓島">
-<meta property="og:description" content="小一生桐桐拿鉛筆畫設計圖，做成一座 3D 貓貓島：50 隻貓跳高、表演、寫日記、改數學作業。">
+<meta property="og:description" content="很愛貓的桐桐把流浪貓接到自己畫的島上照顧，大家一起跳高、表演、寫日記、上數學課。來當島主吧！">
 <meta property="og:locale" content="zh_TW">
 <meta property="og:image" content="https://tong.xjack.tw/og.jpg">
 <meta property="og:image:width" content="1200">
@@ -221,6 +221,17 @@
   .card__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
   .card__sub { margin-top: 16px; font-size: 15px; color: var(--ink-deep); }
 
+  /* 島的故事：「怎麼玩」最上面的完整故事，和第一次來的歡迎卡 */
+  .story-box { margin-top: 12px; padding: 12px 14px; border-radius: 16px; background: var(--sun-pale); }
+  .story-box__title { font-size: 17px; color: var(--ink-deep); }
+  .story-box p + p { margin-top: 6px; }
+  .story-box p:not(.story-box__title) { font-size: 16px; line-height: 1.7; color: var(--text); }
+  .story-chip { background: var(--rose-pale); color: var(--rose); }
+  .story { margin-top: 12px; padding: 12px 16px; border-radius: 18px; background: #FFFDF6; border: 2px solid #EFE4C8; }
+  .story p { font-size: var(--zy-2); line-height: 1.7; color: var(--text); }
+  .story p + p { margin-top: 8px; }
+  .story-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; margin-top: 14px; }
+  .story-actions .sticker { min-height: 60px; font-size: var(--zy-3); }
   .help-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
   .help-list li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 16px; color: var(--text-2); }
   .help-list b { display: block; font-weight: 400; font-size: 17px; color: var(--text); }
@@ -368,7 +379,7 @@
 
   /* 日記區、學習數學島的字都帶注音：國字改用注音粉圓（字的右邊直接畫好注音），數字照舊。
      注音只有字高的四分之一，字要放大小朋友才看得清楚：--zy 是內文、--zy-2 是提示和按鈕、--zy-3 是小字 */
-  #diary-card, #learn-card, #lesson-card {
+  #diary-card, #learn-card, #lesson-card, #story-card {
     --round: "Bpmf Huninn", "Huninn", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
     --num: "Fredoka", "Bpmf Huninn", "Huninn", "Arial Rounded MT Bold", Arial, sans-serif;
     --zy: 29px; --zy-2: calc(var(--zy) * 0.8); --zy-3: calc(var(--zy) * 0.66);
@@ -382,7 +393,7 @@
   .learn-side > .learn-unit { order: -1; }
   .learn-unit { margin-top: 8px; }
   @media (min-width: 900px) {
-    #diary-card { width: min(600px, calc(100% - 32px)); }
+    #diary-card, #story-card { width: min(600px, calc(100% - 32px)); }
     #learn-card, #lesson-card { width: min(800px, calc(100% - 32px)); }
     /* 黑板課也分兩欄：左邊黑板講重點，右邊白紙放圖和例題，翻頁不用捲就看得到「考考你」 */
     .board { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: auto auto 1fr; column-gap: 16px; align-items: start; }
@@ -402,8 +413,8 @@
     #learn-card .card__label { display: none; }
     #learn-card .sheet__fig svg { max-height: 140px; }
   }
-  #diary-card .card__label, #learn-card .card__label, #lesson-card .card__label { font-size: var(--zy-3); }
-  #diary-card .card__title, #learn-card .card__title, #lesson-card .card__title { font-size: var(--zy); }
+  #diary-card .card__label, #learn-card .card__label, #lesson-card .card__label, #story-card .card__label { font-size: var(--zy-3); }
+  #diary-card .card__title, #learn-card .card__title, #lesson-card .card__title, #story-card .card__title { font-size: var(--zy); }
   #diary-card .card__text, #diary-card .empty, #lesson-card .card__text { font-size: var(--zy-3); }
   /* 卡片很長要捲的時候，按鈕列固定在卡片底部 */
   .card__dock {
@@ -557,7 +568,7 @@
   }
   @media (max-width: 699px) {
     body { font-size: 16px; }
-    #diary-card, #learn-card, #lesson-card { --zy: 23px; }
+    #diary-card, #learn-card, #lesson-card, #story-card { --zy: 23px; }
     /* 手機太窄：翻頁和「唸給我聽」只留圖示，字還在、讀螢幕的軟體唸得到；「蓋掌印」留字 */
     #diary-prev span, #diary-next span, #diary-read span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .plate { padding: 4px 12px 4px 6px; gap: 6px; }
@@ -708,6 +719,29 @@
     <nav class="island-nav" id="island-nav" aria-label="去哪座島"></nav>
   </div>
 
+  <article class="card" id="story-card" hidden aria-labelledby="story-title">
+    <div class="card__head">
+      <span class="trophy-chip story-chip" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span>
+      <div>
+        <p class="card__label">島的故事</p>
+        <h2 class="card__title" id="story-title">歡迎來到桐桐貓貓島！</h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <div class="story" id="story-text">
+      <p>這裡住著 50 隻貓，牠們以前是家貓，被丟掉以後變成了流浪貓。</p>
+      <p>很愛貓的桐桐把牠們接到島上照顧，大家一起玩、一起遊戲、一起學習。</p>
+      <p>現在你就是島主桐桐，到每座島上看看大家在做什麼吧！</p>
+    </div>
+    <div class="story-actions">
+      <button class="sticker" id="story-read" type="button" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+        <span id="story-read-label">唸給我聽</span>
+      </button>
+      <button class="sticker sticker--solid" id="story-start" type="button" data-close>開始探險</button>
+    </div>
+  </article>
+
   <article class="card" id="help-card" hidden aria-labelledby="help-title">
     <div class="card__head">
       <div>
@@ -716,6 +750,12 @@
       </div>
       <button class="card__close" type="button" data-close aria-label="關閉">×</button>
     </div>
+    <section class="story-box" aria-labelledby="story-box-title">
+      <p class="story-box__title" id="story-box-title">島的故事</p>
+      <p>這是一座桐桐貓貓群島。來到這裡，你就是島主桐桐，可以在不同的島上做不同的事，自由探險。</p>
+      <p>桐桐很愛貓。有些人養了貓，養一養就不要牠了，家貓就變成了流浪貓。桐桐把這些流浪貓接到島上照顧，大家一起玩耍、一起遊戲、一起學習。</p>
+      <p>這座島是照桐桐自己畫的設計圖做的，在桐爸的幫忙下，變成一座真的可以玩的島，開放給大家一起來玩。</p>
+    </section>
     <ul class="help-list">
       <li><span class="help-icon" aria-hidden="true">1</span><span><b>選一座跳臺</b>點下面的低階、中階或高階跳臺，鏡頭會飛過去。</span></li>
       <li><span class="help-icon" aria-hidden="true">2</span><span><b>按住大按鈕，放開就跳</b>貓貓走到跳板前面，按鈕變藍色就可以按。</span></li>

@@ -6,7 +6,7 @@ import {
 import { MATH_UNITS, dayKey, dailyClass, dailyHomework, sanitizeLearnDay, sanitizeLearnStats } from './math.js';
 import { LESSONS } from './lessons.js';
 import { drawFigure } from './figures.js';
-import { zhuyin } from './zhuyin.js';
+import { zhuyin, plainText } from './zhuyin.js';
 import { createScene } from './scene.js';
 
 const STORE_KEY = 'tong-cat-island-v1';
@@ -264,8 +264,11 @@ function start(hotData = {}) {
 
   window.claude?.hot?.snapshot?.(() => ({ records, diaries }));
 
+  // 第一次來的人先看島的故事，看過就不再跳出來
+  let storySeen = !!stored.storySeen;
+
   function save() {
-    writeStore({ records, sound: sound.on, diaries, diarySeeded: true, learn: { day: learnDay, ...learnStats } });
+    writeStore({ records, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay, ...learnStats } });
   }
 
   // 成績太多時只留每隻貓在每座跳臺的最佳，加上最近 1000 跳
@@ -596,7 +599,7 @@ function start(hotData = {}) {
     if (c.type === 'characterData') markZhuyin(c.target);
     else c.addedNodes.forEach(markZhuyin);
   }));
-  ['diary-card', 'learn-card', 'lesson-card'].forEach((id) => {
+  ['diary-card', 'learn-card', 'lesson-card', 'story-card'].forEach((id) => {
     markZhuyin($(id));
     zhuyinWatch.observe($(id), { childList: true, characterData: true, subtree: true });
   });
@@ -1106,6 +1109,25 @@ function start(hotData = {}) {
     track('read_aloud', { what: 'lesson' });
   });
 
+  // ---------- 島的故事：第一次來的時候跳出歡迎卡（字有注音，可以唸出來） ----------
+  const storyReader = { button: $('story-read'), label: $('story-read-label'), idle: '唸給我聽' };
+  if (!synth) $('story-read').hidden = true;
+  function openStory() {
+    closeCards();
+    $('story-card').hidden = false;
+    $('story-card').scrollTop = 0;
+    storySeen = true;
+    save();
+  }
+  $('story-read').addEventListener('click', () => {
+    if (speaking === storyReader) {
+      stopSpeaking();
+      return;
+    }
+    speak(plainText(`${$('story-title').textContent}${$('story-text').textContent}`).replace(/\s+/g, ''), storyReader);
+    track('read_aloud', { what: 'story' });
+  });
+
   // ---------- 破紀錄橫幅 ----------
   function showToast(title, text) {
     const toast = $('toast');
@@ -1364,6 +1386,7 @@ function start(hotData = {}) {
 
   refreshBoards();
   updateNav();
+  if (!storySeen) openStory();
 }
 
 const hot = window.claude?.hot;
