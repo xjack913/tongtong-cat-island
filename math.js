@@ -1,4 +1,4 @@
-// 學習島的數學作業：照南一版一年級上學期的 9 個單元自己出題（不是抄課本），貓寫的答案有對有錯，
+// 學習數學島的數學作業：照南一版一年級上學期的 9 個單元自己出題（不是抄課本），貓寫的答案有對有錯，
 // 錯的都是一年級小朋友常犯的錯（少數一個、加減弄反、從右邊數、時針分針看反）。
 // 瀏覽器與 Node 共用，不 import 任何東西。
 
@@ -13,8 +13,6 @@ export const MATH_UNITS = [
   { n: 8, name: '減一減與加減應用' },
   { n: 9, name: '讀鐘錶' },
 ];
-// 115 學年度南一版的進度，十月底大約上到第 5 單元
-export const DEFAULT_UNITS = [1, 2, 3, 4, 5];
 // 貓寫錯的機率
 export const WRONG_RATE = 0.45;
 
@@ -311,14 +309,16 @@ function unit8(rand) {
       hint: '上下一條對一條排好，看多出來幾條。', why: `${a} − ${b} ＝ ${d}，${c1}多 ${d} 條。`,
     });
   }
-  // 要用加法還是減法：看東西變多還是變少
+  // 要用加法還是減法：看東西變多還是變少（變多的加起來不超過 10，一上只學 10 以內的加法）
   const add = rand() < 0.5;
+  const x = add ? Math.min(a, 8) : a;
+  const y = add ? Math.min(b, 10 - x) : b;
   const story = add
-    ? pick(rand, [`樹上有 ${a} 隻小鳥，又飛來 ${b} 隻。要算現在有幾隻，要用加法還是減法？`, `箱子裡有 ${a} 隻貓，又跳進 ${b} 隻。要算現在有幾隻，要用加法還是減法？`])
-    : pick(rand, [`樹上有 ${a} 隻小鳥，飛走了 ${b} 隻。要算還剩幾隻，要用加法還是減法？`, `箱子裡有 ${a} 隻貓，跳出去 ${b} 隻。要算還剩幾隻，要用加法還是減法？`]);
+    ? pick(rand, [`樹上有 ${x} 隻小鳥，又飛來 ${y} 隻。要算現在有幾隻，要用加法還是減法？`, `箱子裡有 ${x} 隻貓，又跳進 ${y} 隻。要算現在有幾隻，要用加法還是減法？`])
+    : pick(rand, [`樹上有 ${x} 隻小鳥，飛走了 ${y} 隻。要算還剩幾隻，要用加法還是減法？`, `箱子裡有 ${x} 隻貓，跳出去 ${y} 隻。要算還剩幾隻，要用加法還是減法？`]);
   return finish(rand, {
     unit: 8, text: story, answer: add ? '加法' : '減法', wrongs: [add ? '減法' : '加法'],
-    hint: '東西是變多了，還是變少了？', why: add ? `又來了 ${b} 隻，變多了，要用加法：${a} ＋ ${b} ＝ ${a + b}。` : `走了 ${b} 隻，變少了，要用減法：${a} − ${b} ＝ ${d}。`,
+    hint: '東西是變多了，還是變少了？', why: add ? `又來了 ${y} 隻，變多了，要用加法：${x} ＋ ${y} ＝ ${x + y}。` : `走了 ${y} 隻，變少了，要用減法：${x} − ${y} ＝ ${x - y}。`,
   });
 }
 
@@ -346,46 +346,66 @@ export function makeProblem(unit, rand = Math.random) {
   return maker ? maker(rand) : null;
 }
 
-// 從勾選的單元裡出一疊作業，同一疊裡盡量不出重複的題目
-export function makeStack(units, size = 5, rand = Math.random) {
-  const list = units.filter((u) => MAKERS[u]);
-  const pool = list.length ? list : DEFAULT_UNITS;
-  const stack = [];
-  let guard = 0;
-  while (stack.length < size && guard < size * 20) {
-    guard += 1;
-    const p = makeProblem(pool[Math.floor(rand() * pool.length)], rand);
-    if (stack.some((q) => q.text === p.text && JSON.stringify(q.fig) === JSON.stringify(p.fig))) continue;
-    stack.push(p);
-  }
-  return stack;
+// ---------- 每天的作業：每天換 10 隻貓來上課，每隻寫一張，9 個單元都會出到 ----------
+export const CLASS_SIZE = 10;
+
+// 今天是哪一天（裝置的當地日期），例如 '2026-10-27'
+export function dayKey(time = Date.now()) {
+  const d = new Date(time);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function sanitizeUnits(value) {
-  if (!Array.isArray(value)) return DEFAULT_UNITS.slice();
-  const units = [...new Set(value.filter((u) => Number.isInteger(u) && MAKERS[u]))].sort((a, b) => a - b);
-  return units.length ? units : DEFAULT_UNITS.slice();
+// 同一天、同一個 salt 算出來的亂數都一樣，重新整理也是同一批貓、同一批題目
+function dayRandom(key, salt) {
+  let h = 2166136261 ^ salt;
+  for (const c of key) h = Math.imul(h ^ c.codePointAt(0), 16777619);
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffle(list, rand) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
+// 今天來上課的貓（貓的編號）
+export function dailyClass(key, catCount, size = CLASS_SIZE) {
+  return shuffle(Array.from({ length: catCount }, (_, i) => i), dayRandom(key, 1)).slice(0, size);
+}
+
+// 今天的作業：9 個單元每個先出一張，剩下的再隨便挑單元，順序打亂；同一天不出一模一樣的題目
+export function dailyHomework(key, size = CLASS_SIZE) {
+  const rand = dayRandom(key, 2);
+  const units = MATH_UNITS.map((u) => u.n);
+  while (units.length < size) units.push(units[Math.floor(rand() * MATH_UNITS.length)]);
+  const list = [];
+  for (const unit of shuffle(units, rand).slice(0, size)) {
+    let p = makeProblem(unit, rand);
+    for (let k = 0; k < 20 && list.some((q) => q.text === p.text && JSON.stringify(q.fig) === JSON.stringify(p.fig)); k++) p = makeProblem(unit, rand);
+    list.push(p);
+  }
+  return list;
+}
+
+// 今天改到哪裡：results[i] 是第 i 張的結果（good 一次就改對、help 老師幫忙），還沒改是 null；換一天就重來
+export function sanitizeLearnDay(value, key, size = CLASS_SIZE) {
+  if (!value || value.key !== key || !Array.isArray(value.results) || value.results.length !== size) {
+    return { key, results: new Array(size).fill(null) };
+  }
+  return { key, results: value.results.map((r) => (r === 'good' || r === 'help' ? r : null)) };
 }
 
 export function sanitizeLearnStats(value) {
   const ok = (n) => Number.isInteger(n) && n >= 0 && n < 1e6;
   if (!value || !ok(value.graded) || !ok(value.right) || value.right > value.graded) return { graded: 0, right: 0 };
   return { graded: value.graded, right: value.right };
-}
-
-export function unitsText(units) {
-  if (!units.length) return '';
-  const runs = [];
-  let start = units[0];
-  let prev = units[0];
-  for (const u of units.slice(1).concat([null])) {
-    if (u === prev + 1) {
-      prev = u;
-      continue;
-    }
-    runs.push(start === prev ? `${start}` : `${start}～${prev}`);
-    start = u;
-    prev = u;
-  }
-  return runs.join('、');
 }

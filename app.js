@@ -1,9 +1,10 @@
-// 桐桐貓貓島：串起 3D 場景、跳臺大按鈕、表演區按鈕、貓貓日記、學習島改作業、排行榜與卡片。所有資料文字一律用 textContent。
+// 桐桐貓貓島：串起 3D 場景、跳臺大按鈕、表演區按鈕、貓貓日記、學習數學島改作業、排行榜與卡片。所有資料文字一律用 textContent。
 import {
   LEVELS, LEVEL_KEYS, PERFECT, TRICKS, DIARY_MAX, DIARY_SEED, makeCats, personality, sanitizeRecords, sanitizeDiaries, composeDiary, dateText,
   leaderboard, bestPerCat, topRecord, judgeJump, starsText, mulberry32,
 } from './logic.js';
-import { MATH_UNITS, makeStack, sanitizeUnits, sanitizeLearnStats, unitsText } from './math.js';
+import { MATH_UNITS, dayKey, dailyClass, dailyHomework, sanitizeLearnDay, sanitizeLearnStats } from './math.js';
+import { LESSONS } from './lessons.js';
 import { drawFigure } from './figures.js';
 import { zhuyin } from './zhuyin.js';
 import { createScene } from './scene.js';
@@ -17,7 +18,7 @@ const NAV = [
   { id: 'high', label: '高階跳臺', level: 'high' },
   { id: 'stage', label: '表演區' },
   { id: 'diary', label: '日記區' },
-  { id: 'learn', label: '學習島' },
+  { id: 'learn', label: '學習數學島' },
   { id: 'boxes', label: '多多紙箱區' },
   { id: 'combo', label: '合體公園' },
   { id: 'park1', label: '紙箱公園' },
@@ -243,8 +244,8 @@ function start(hotData = {}) {
   let followingCoach = false;
   let learnOpen = false;
 
-  // 學習島：勾選的單元、桐桐老師一共改了幾張、一次就改對幾張
-  let learnUnits = sanitizeUnits(stored.learn && stored.learn.units);
+  // 學習數學島：今天的作業改到哪裡、桐桐老師一共改了幾張、一次就改對幾張
+  let learnDay = sanitizeLearnDay(stored.learn && stored.learn.day, dayKey());
   const learnStats = sanitizeLearnStats(stored.learn);
 
   // 貓貓日記：舊到新排；第一次打開新版的島時先放三篇介紹新島的日記
@@ -264,7 +265,7 @@ function start(hotData = {}) {
   window.claude?.hot?.snapshot?.(() => ({ records, diaries }));
 
   function save() {
-    writeStore({ records, sound: sound.on, diaries, diarySeeded: true, learn: { units: learnUnits, ...learnStats } });
+    writeStore({ records, sound: sound.on, diaries, diarySeeded: true, learn: { day: learnDay, ...learnStats } });
   }
 
   // 成績太多時只留每隻貓在每座跳臺的最佳，加上最近 1000 跳
@@ -409,7 +410,8 @@ function start(hotData = {}) {
     return result;
   }
 
-  function goIsland(id) {
+  // quiet：從島上的東西點過來的（例如點黑板），不用再跳學習數學島的提示
+  function goIsland(id, quiet = false) {
     closeCards();
     focus = id;
     track('island_view', { island: id });
@@ -432,7 +434,8 @@ function start(hotData = {}) {
     } else if (id === 'diary') {
       openDiary(0);
     } else if (id === 'learn') {
-      openLearn();
+      // 讓桐桐自己選：點黑板上課，點老師或講台改作業
+      if (!quiet) showToast('學習數學島', '點黑板聽貓貓老師上課，點老師或講台改作業');
     } else if (ISLAND_COPY[id]) {
       openIsland(id);
     }
@@ -578,7 +581,7 @@ function start(hotData = {}) {
     track('stage_clap');
   });
 
-  // ---------- 注音：日記區、學習島卡片上的字都加注音 ----------
+  // ---------- 注音：日記區、學習數學島卡片上的字都加注音 ----------
   // 字型本身就帶注音，這裡只替破音字選讀音；卡片上的字一換就自動補上（題目圖裡的字也一樣）
   function markZhuyin(node) {
     if (node.nodeType === Node.TEXT_NODE) {
@@ -593,7 +596,7 @@ function start(hotData = {}) {
     if (c.type === 'characterData') markZhuyin(c.target);
     else c.addedNodes.forEach(markZhuyin);
   }));
-  ['diary-card', 'learn-card'].forEach((id) => {
+  ['diary-card', 'learn-card', 'lesson-card'].forEach((id) => {
     markZhuyin($(id));
     zhuyinWatch.observe($(id), { childList: true, characterData: true, subtree: true });
   });
@@ -818,31 +821,35 @@ function start(hotData = {}) {
     }
   });
 
-  // ---------- 學習島：桐桐老師改作業 ----------
-  // 一疊 5 張，每張是一隻貓寫的一題；桐桐按「寫對了／寫錯了」。改錯第一次老師給提示，第二次老師直接講解
+  // ---------- 學習數學島：桐桐老師改作業 ----------
+  // 每天換 10 隻貓來上課，每隻寫一張（9 個單元都會出到）；10 張改完今天就結束，明天換別的貓。
+  // 桐桐按「寫對了／寫錯了」，改錯第一次老師給提示，第二次老師直接講解
   let stack = [];
+  let stackKey = '';
   let sheetIndex = 0;
-  let lastAuthor = null;
 
-  function pickAuthor() {
-    const studying = scene.students().filter((i) => i !== lastAuthor);
-    let index = studying.length ? studying[Math.floor(Math.random() * studying.length)] : Math.floor(Math.random() * cats.length);
-    if (index === lastAuthor) index = (index + 1) % cats.length;
-    lastAuthor = index;
-    return index;
+  // 換一天就換一批貓和題目；同一天改到哪裡記在 learnDay，重新整理也接得下去
+  function loadDay() {
+    const key = dayKey();
+    if (learnDay.key !== key) {
+      learnDay = sanitizeLearnDay(null, key);
+      save();
+    }
+    if (stackKey === key) return;
+    const classCats = dailyClass(key, cats.length);
+    stack = dailyHomework(key).map((p, i) => ({ p, cat: classCats[i], tries: 0, done: learnDay.results[i] !== null, result: learnDay.results[i] }));
+    stackKey = key;
+    sheetIndex = stack.findIndex((s) => !s.done);
+    if (sheetIndex < 0) sheetIndex = stack.length;
+    scene.setClass(classCats);
   }
-
-  function newStack() {
-    stack = makeStack(learnUnits, 5).map((p) => ({ p, cat: pickAuthor(), tries: 0, done: false, result: null }));
-    sheetIndex = 0;
-  }
+  loadDay();
 
   function openLearn() {
     sound.unlock();
     closeCards();
     learnOpen = true;
-    if (!stack.length || sheetIndex >= stack.length) newStack();
-    renderUnits();
+    loadDay();
     renderLearn();
     $('learn-card').hidden = false;
     showSheetTop();
@@ -853,37 +860,6 @@ function start(hotData = {}) {
     $('learn-card').scrollTop = 0;
     if (!$('sheet-body').hidden) $('sheet-ans').scrollIntoView({ block: 'nearest' });
   }
-
-  // 單元勾選：至少要留一個
-  const unitPicker = $('unit-picker');
-  MATH_UNITS.forEach((u) => {
-    const chip = el('button', 'unit-chip');
-    chip.type = 'button';
-    chip.dataset.unit = String(u.n);
-    chip.append(el('b', '', String(u.n)), u.name);
-    chip.addEventListener('click', () => {
-      const on = learnUnits.includes(u.n);
-      if (on && learnUnits.length === 1) return;
-      learnUnits = sanitizeUnits(on ? learnUnits.filter((n) => n !== u.n) : learnUnits.concat([u.n]));
-      save();
-      track('homework_units', { units: unitsText(learnUnits) });
-      renderUnits();
-      newStack();
-      renderLearn();
-    });
-    unitPicker.append(chip);
-  });
-  function renderUnits() {
-    unitPicker.querySelectorAll('.unit-chip').forEach((chip) => {
-      chip.setAttribute('aria-pressed', String(learnUnits.includes(Number(chip.dataset.unit))));
-    });
-    $('learn-units-toggle').textContent = `單元：${unitsText(learnUnits)}`;
-  }
-  $('learn-units-toggle').addEventListener('click', () => {
-    const open = unitPicker.hidden;
-    unitPicker.hidden = !open;
-    $('learn-units-toggle').setAttribute('aria-expanded', String(open));
-  });
 
   function setTip(kind, text) {
     const tip = $('learn-tip');
@@ -917,10 +893,9 @@ function start(hotData = {}) {
       $('grade-ok').hidden = true;
       $('grade-no').hidden = true;
       const good = stack.filter((s) => s.result === 'good').length;
-      $('sheet-done-title').textContent = '這一疊改完了！';
-      $('sheet-done-text').textContent = good === stack.length ? `${stack.length} 張全部一次就改對，好棒喔！` : `一次就改對 ${good} 張，其他幾張是貓貓老師陪你一起改好的。`;
-      $('learn-next').hidden = false;
-      $('learn-next').textContent = '再改一疊';
+      $('sheet-done-title').textContent = '今天的作業改完了！';
+      $('sheet-done-text').textContent = `${good === stack.length ? `${stack.length} 張全部一次就改對，好棒喔！` : `一次就改對 ${good} 張，其他幾張是貓貓老師陪你一起改好的。`}明天會有別的貓來上課。`;
+      $('learn-next').hidden = true;
       setTip('', '');
       return;
     }
@@ -956,6 +931,7 @@ function start(hotData = {}) {
     if (saysRight === s.p.right) {
       s.done = true;
       s.result = s.tries === 0 ? 'good' : 'help';
+      learnDay.results[sheetIndex] = s.result;
       learnStats.graded += 1;
       if (s.tries === 0) learnStats.right += 1;
       save();
@@ -984,6 +960,7 @@ function start(hotData = {}) {
     s.tries = 2;
     s.done = true;
     s.result = 'help';
+    learnDay.results[sheetIndex] = s.result;
     learnStats.graded += 1;
     save();
     track('homework_grade', { unit: s.p.unit, result: 'explained', cat_right: s.p.right ? 'yes' : 'no' });
@@ -998,9 +975,10 @@ function start(hotData = {}) {
   $('grade-no').addEventListener('click', (event) => grade(false, event.currentTarget));
 
   $('learn-next').addEventListener('click', () => {
-    if (sheetIndex >= stack.length) newStack();
-    else sheetIndex += 1;
-    if (sheetIndex >= stack.length) track('homework_stack_done', { first_try: stack.filter((s) => s.result === 'good').length });
+    if (sheetIndex >= stack.length) return;
+    const next = stack.findIndex((s, i) => i > sheetIndex && !s.done);
+    sheetIndex = next < 0 ? stack.length : next;
+    if (sheetIndex >= stack.length) track('homework_day_done', { first_try: stack.filter((s) => s.result === 'good').length });
     stopSpeaking();
     setTip('', '');
     sound.play('page');
@@ -1018,6 +996,114 @@ function start(hotData = {}) {
     const name = cats[s.cat].name;
     speak(`${name}的作業。${s.p.speak}${name}寫：${s.p.catAnswer}。`, learnReader);
     track('read_aloud', { what: 'homework' });
+  });
+
+  // 點學習數學島上的東西：鏡頭還沒飛過去就先飛過去，再打開卡片
+  function atLearn(open) {
+    if (focus !== 'learn') goIsland('learn', true);
+    open();
+  }
+
+  // ---------- 學習數學島：點黑板，貓貓老師上課 ----------
+  // 這次考試的範圍是一上 9 個單元：先選單元，老師一頁一頁講（重點、圖、例題），翻到哪一頁就唸哪一頁
+  let lessonUnit = null;
+  let lessonPage = 0;
+  const lessonReader = { button: $('lesson-read'), label: $('lesson-read-label'), idle: '唸給我聽' };
+  if (!synth) $('lesson-read').hidden = true;
+  // 唸的時候把算式的符號換成字
+  const spoken = (text) => text.replace(/＋/g, '加').replace(/−/g, '減').replace(/＝/g, '等於').replace(/□/g, '框框');
+
+  const lessonUnits = $('lesson-units');
+  MATH_UNITS.forEach((u) => {
+    const chip = el('button', 'unit-chip');
+    chip.type = 'button';
+    chip.append(el('b', '', String(u.n)), u.name);
+    chip.addEventListener('click', () => {
+      track('lesson_open', { unit: u.n });
+      showLessonPage(u.n, 0);
+    });
+    lessonUnits.append(chip);
+  });
+
+  function openLesson() {
+    sound.unlock();
+    closeCards();
+    lessonUnit = null;
+    renderLesson();
+    $('lesson-card').hidden = false;
+    $('lesson-card').scrollTop = 0;
+    scene.teacherSay('我們來上課！', 2.2);
+  }
+
+  function showLessonPage(unit, page) {
+    lessonUnit = unit;
+    lessonPage = page;
+    renderLesson();
+    $('lesson-card').scrollTop = 0;
+    sound.play('page');
+    readLesson();
+  }
+
+  function backToUnits() {
+    stopSpeaking();
+    lessonUnit = null;
+    renderLesson();
+    $('lesson-card').scrollTop = 0;
+  }
+
+  function renderLesson() {
+    const picking = lessonUnit === null;
+    $('lesson-intro').hidden = !picking;
+    lessonUnits.hidden = !picking;
+    $('lesson-board').hidden = picking;
+    $('lesson-dock').hidden = picking;
+    if (picking) return;
+    const pages = LESSONS[lessonUnit];
+    const page = pages[lessonPage];
+    $('lesson-unit').textContent = `第 ${lessonUnit} 單元 ${MATH_UNITS[lessonUnit - 1].name}`;
+    $('lesson-dots').replaceChildren(...pages.map((_, i) => el('li', i === lessonPage ? 'is-now' : i < lessonPage ? 'is-good' : '')));
+    $('lesson-page-title').textContent = page.title;
+    $('lesson-lines').replaceChildren(...page.lines.map((line) => el('p', '', line)));
+    const fig = $('lesson-fig');
+    fig.replaceChildren();
+    if (page.fig) fig.append(drawFigure(page.fig));
+    fig.hidden = !page.fig;
+    $('lesson-ask').textContent = page.ask;
+    $('lesson-answer').textContent = page.answer;
+    $('lesson-answer').hidden = true;
+    $('lesson-reveal').hidden = false;
+    $('lesson-prev').disabled = lessonPage === 0;
+    $('lesson-next-label').textContent = lessonPage === pages.length - 1 ? '換單元' : '下一頁';
+  }
+
+  function readLesson() {
+    const page = LESSONS[lessonUnit][lessonPage];
+    speak(spoken(`${page.title}。${page.lines.join('')}考考你：${page.ask}`), lessonReader);
+  }
+
+  $('lesson-reveal').addEventListener('click', () => {
+    const page = LESSONS[lessonUnit][lessonPage];
+    $('lesson-answer').hidden = false;
+    $('lesson-reveal').hidden = true;
+    sound.play('pop');
+    speak(spoken(`答案是：${page.answer}`), lessonReader);
+    $('lesson-answer').scrollIntoView({ block: 'nearest' });
+  });
+  $('lesson-prev').addEventListener('click', () => {
+    if (lessonPage > 0) showLessonPage(lessonUnit, lessonPage - 1);
+  });
+  $('lesson-next').addEventListener('click', () => {
+    if (lessonPage < LESSONS[lessonUnit].length - 1) showLessonPage(lessonUnit, lessonPage + 1);
+    else backToUnits();
+  });
+  $('lesson-back').addEventListener('click', backToUnits);
+  $('lesson-read').addEventListener('click', () => {
+    if (speaking === lessonReader) {
+      stopSpeaking();
+      return;
+    }
+    readLesson();
+    track('read_aloud', { what: 'lesson' });
   });
 
   // ---------- 破紀錄橫幅 ----------
@@ -1250,7 +1336,8 @@ function start(hotData = {}) {
     if (pick.type === 'island') goIsland(pick.id);
     else if (pick.type === 'cat') openCat(pick.index);
     else if (pick.type === 'coach') openCoach();
-    else if (pick.type === 'teacher') goIsland('learn');
+    else if (pick.type === 'teacher' || pick.type === 'podium') atLearn(openLearn);
+    else if (pick.type === 'board') atLearn(openLesson);
     else if (pick.type === 'box') {
       const who = scene.peekBox(pick.spot);
       if (who !== null) openCat(who);

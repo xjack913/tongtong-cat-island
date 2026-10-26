@@ -1,4 +1,4 @@
-// 學習島作業上的圖：魚、毛線球、緞帶、分合圖、一捆一捆的棒子、形狀、時鐘。全部用 SVG 畫，文字一律走 textContent。
+// 學習數學島作業上的圖：魚、毛線球、緞帶、分合圖、一捆一捆的棒子、形狀、時鐘。全部用 SVG 畫，文字一律走 textContent。
 const NS = 'http://www.w3.org/2000/svg';
 const W = 360;
 const INK = '#2A3490';
@@ -229,6 +229,22 @@ const DRAW = {
     else if (f.shape === 'circle') node('circle', { cx: W / 2, cy: 75, r: 60, ...attrs }, el);
     else if (f.shape === 'square') node('rect', { x: W / 2 - 60, y: 15, width: 120, height: 120, ...attrs }, el);
     else node('rect', { x: W / 2 - 100, y: 35, width: 200, height: 80, ...attrs }, el);
+    return el;
+  },
+
+  // 黑板課用：三角形、正方形、長方形、圓形排一排，底下寫名字
+  shapes() {
+    const el = svg(140);
+    const slot = W / 4;
+    ['triangle', 'square', 'rect', 'circle'].forEach((key, i) => {
+      const x = slot * i + slot / 2;
+      const attrs = { fill: SHAPE_COLOR[key], stroke: INK, 'stroke-width': 2.5, 'stroke-linejoin': 'round' };
+      if (key === 'triangle') node('polygon', { points: `${x},18 ${x + 34},78 ${x - 34},78`, ...attrs }, el);
+      else if (key === 'square') node('rect', { x: x - 30, y: 18, width: 60, height: 60, ...attrs }, el);
+      else if (key === 'rect') node('rect', { x: x - 38, y: 30, width: 76, height: 40, ...attrs }, el);
+      else node('circle', { cx: x, cy: 48, r: 31, ...attrs }, el);
+      text(el, x, 112, { triangle: '三角形', square: '正方形', rect: '長方形', circle: '圓形' }[key], { 'font-size': 17, 'font-family': ZY, 'font-weight': 400, fill: '#4A4F6E' });
+    });
     return el;
   },
 

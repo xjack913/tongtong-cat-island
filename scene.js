@@ -1,7 +1,7 @@
-// 桐桐貓貓島 3D 場景：十一座島的形狀、位置和二十座木板橋照桐桐的兩張草稿描，學習島是她後來說要加的。
+// 桐桐貓貓島 3D 場景：十一座島的形狀、位置和二十座木板橋照桐桐的兩張草稿描，學習數學島是她後來說要加的。
 // 50 隻 Q 版貓在島上散步、排隊上跳臺比跳高、上表演區表演、躲紙箱、寫日記、寫數學作業、去公園休息、回貓貓之家睡覺；
 // 這一輪跳最高的三隻會走上排行榜島的頒獎臺。兩腳走路、綁頭帶的貓貓教練會去找晃來晃去的貓，叫牠去跳臺跳；
-// 戴眼鏡的貓貓老師站在學習島的黑板前，桐桐改錯作業時會提醒她。
+// 戴眼鏡的貓貓老師站在學習數學島的黑板前，桐桐改錯作業時會提醒她。
 // 島上的樹是開白花的油桐樹（桐桐的「桐」）。所有文字一律走 textContent。
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -1516,8 +1516,10 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     island.labelY = TOP + 1.7;
   }
 
-  // ---------- 學習島：黑板、講桌上一疊作業、一排課桌，貓貓老師站在黑板前 ----------
-  const learn = { island: null, teacherPos: null, faceClass: 0.15, faceBoard: 1.98 };
+  // ---------- 學習數學島：黑板、講桌上一疊作業、一排課桌，貓貓老師站在黑板前 ----------
+  // classCats：今天來上課的貓（app 每天換一批），只有牠們會去課桌寫作業
+  const learn = { island: null, teacherPos: null, faceClass: 0.15, faceBoard: 1.98, classCats: null };
+  const inClass = (cat) => !learn.classCats || learn.classCats.has(cat.index);
   function buildLearn(island) {
     const g = island.group;
     const bx = 0.4;
@@ -1580,13 +1582,14 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       ctx.font = `68px ${FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('學習島', w / 2, h / 2 + 4);
+      ctx.fillText('學習數學島', w / 2, h / 2 + 4);
     });
     put(board, new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.35), new THREE.MeshBasicMaterial({ map: signTexture, transparent: true, toneMapped: false })), 0, 2.0, 0.06);
-    pickable(board, { type: 'island', id: island.id });
+    // 點黑板：貓貓老師上課
+    pickable(board, { type: 'board' });
     island.obstacles.push({ x: bx, z: bz, w: 3.4, d: 0.4 });
 
-    // 講桌：一疊作業、一支紅筆、一顆蘋果，點了就開始改作業
+    // 講桌（講台）：一疊作業、一支紅筆、一顆蘋果，點了就開始改作業
     const desk = new THREE.Group();
     desk.position.set(-2.1, TOP, -0.75);
     g.add(desk);
@@ -1600,7 +1603,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     pen.rotation.set(Math.PI / 2, 0, 0.6);
     put(desk, makeMesh(new THREE.SphereGeometry(0.075, 12, 10), mat(0xe85d5d, { flatShading: false })), 0.32, 0.62, -0.06);
     put(desk, makeMesh(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 5), mat(C.trunk), false), 0.32, 0.71, -0.06);
-    pickable(desk, { type: 'island', id: island.id });
+    pickable(desk, { type: 'podium' });
     island.obstacles.push({ x: -2.1, z: -0.75, w: 1.1, d: 0.6 });
     learn.island = island;
     learn.teacherPos = W(island, -1.0, TOP + 0.005, -0.8);
@@ -1616,7 +1619,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       studyDesk.position.set(x, TOP, 0.3);
       studyDesk.rotation.y = Math.PI;
       g.add(studyDesk);
-      addSpot(island, { approach: [x, 1.08], pos: [x, TOP + 0.005, 0.67], face: Math.PI, poses: ['write'], kind: 'study', doing: '在學習島寫數學作業', event: { type: 'study' } });
+      addSpot(island, { approach: [x, 1.08], pos: [x, TOP + 0.005, 0.67], face: Math.PI, poses: ['write'], kind: 'study', doing: '在學習數學島寫作業', event: { type: 'study' } });
     });
     island.obstacles.push({ x: 0, z: 0.45, w: 6.0, d: 0.9 });
 
@@ -1923,10 +1926,10 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     { purpose: 'patrol', doing: '在島上巡邏', target: null, talkLevel: null, sent: 0, scanT: 0 },
   );
 
-  // 貓貓老師：戴圓眼鏡，站在學習島的黑板前，桐桐改錯作業時會提醒她
+  // 貓貓老師：戴圓眼鏡，站在學習數學島的黑板前，桐桐改錯作業時會提醒她
   const teacher = Object.assign(
     makeHelper({ index: -2, name: '貓貓老師', coat: { label: '老師', body: '#A4A9B1', stripe: '#7F858E', muzzle: '#E6E8EC' }, size: 1.1, chubby: 1.05, speed: 0.8 }, addGlasses, 'cat-tag--teacher', 'teacher'),
-    { mode: 'class', timer: 4, sayT: 0, doing: '在學習島上課' },
+    { mode: 'class', timer: 4, sayT: 0, doing: '在學習數學島上課' },
   );
   if (learn.teacherPos) {
     teacher.pos.copy(learn.teacherPos);
@@ -2141,7 +2144,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       ['perform', show.waiting === null ? 0.04 + 0.06 * cat.sporty : 0],
       ['diary', cat.news >= 3 ? 0.12 : 0.02],
       ['lost', lostCount < 2 ? 0.06 : 0],
-      ['study', learn.island ? 0.06 : 0],
+      ['study', learn.island && inClass(cat) ? 0.25 : 0],
     ];
     let r = random() * weights.reduce((sum, [, w]) => sum + w, 0);
     for (const [kind, w] of weights) {
@@ -2495,7 +2498,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     }
   }
 
-  // ---------- 學習島：桐桐在改作業時，課桌前至少坐 4 隻貓；老師輪流看黑板、看大家 ----------
+  // ---------- 學習數學島：桐桐在改作業時，課桌前至少坐 4 隻貓；老師輪流看黑板、看大家 ----------
   let studyTimer = 0;
   function stepLearn(dt) {
     if (focusId !== 'learn' || !learn.island) return;
@@ -2505,7 +2508,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     const studying = cats.filter((c) => (c.state === 'rest' && c.spot && c.spot.kind === 'study') || (c.state === 'walk' && c.purpose === 'study')).length;
     if (studying >= 4) return;
     const target = learn.teacherPos;
-    const free = cats.filter((c) => (c.state === 'idle' || c.state === 'rest') && c.model.root.visible && championSlot(c) === null
+    const free = cats.filter((c) => (c.state === 'idle' || c.state === 'rest') && c.model.root.visible && championSlot(c) === null && inClass(c)
       && !(c.spot && (c.spot.kind === 'diary' || c.spot.kind === 'study')))
       .sort((a, b) => a.pos.distanceTo(target) - b.pos.distanceTo(target));
     if (free[0]) {
@@ -2620,7 +2623,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     eat: (name) => `要去${name}吃東西`,
     audience: () => '要去表演區看表演',
     diary: () => '要去日記區寫日記',
-    study: () => '要去學習島寫數學作業',
+    study: () => '要去學習數學島寫作業',
   };
 
   function goSpot(cat, kind, filter = () => true, speed = cat.speed) {
@@ -3301,7 +3304,8 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
     const hit = raycaster.intersectObjects(pickables, false).find((h) => h.object.visible && (h.object.userData.pick.type !== 'cat' || cats[h.object.userData.pick.index].model.root.visible));
-    if (hit && ['cat', 'coach', 'teacher'].includes(hit.object.userData.pick.type)) {
+    // 直接點到貓、教練、老師、黑板或講台就算數；黑板、講台不用讓給旁邊的貓
+    if (hit && ['cat', 'coach', 'teacher', 'board', 'podium'].includes(hit.object.userData.pick.type)) {
       pickHandlers.forEach((cb) => cb(hit.object.userData.pick));
       return;
     }
@@ -3680,8 +3684,8 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     note(index, data) {
       if (cats[index]) emit(cats[index], data);
     },
-    students() {
-      return cats.filter((c) => c.state === 'rest' && c.spot && c.spot.kind === 'study').map((c) => c.index);
+    setClass(indices) {
+      learn.classCats = new Set(indices);
     },
     onPick(cb) {
       pickHandlers.push(cb);

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="小一生桐桐拿鉛筆畫設計圖，做成一座 3D 貓貓島：50 隻貓比跳高，還有表演區、日記區和改數學作業的學習島。">
+<meta name="description" content="小一生桐桐拿鉛筆畫設計圖，做成一座 3D 貓貓島：50 隻貓比跳高，還有表演區、日記區和改數學作業的學習數學島。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://tong.xjack.tw/">
 <meta property="og:title" content="桐桐貓貓島">
@@ -366,27 +366,33 @@
   .trick.is-nope .trick__icon { animation: nope 300ms; }
   @keyframes nope { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 
-  /* 日記區、學習島的字都帶注音：國字改用注音粉圓（字的右邊直接畫好注音），數字照舊。
+  /* 日記區、學習數學島的字都帶注音：國字改用注音粉圓（字的右邊直接畫好注音），數字照舊。
      注音只有字高的四分之一，字要放大小朋友才看得清楚：--zy 是內文、--zy-2 是提示和按鈕、--zy-3 是小字 */
-  #diary-card, #learn-card {
+  #diary-card, #learn-card, #lesson-card {
     --round: "Bpmf Huninn", "Huninn", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
     --num: "Fredoka", "Bpmf Huninn", "Huninn", "Arial Rounded MT Bold", Arial, sans-serif;
     --zy: 29px; --zy-2: calc(var(--zy) * 0.8); --zy-3: calc(var(--zy) * 0.66);
     font-family: var(--round);
   }
-  /* 學習島卡：窄的螢幕由上往下是進度、單元、作業紙、老師的話；
+  /* 學習數學島卡：窄的螢幕由上往下是進度、單元、作業紙、老師的話；
      橫放的 iPad、電腦分成左右兩欄，作業紙在左、其他在右，看提示的時候題目還在旁邊 */
   .learn-main { display: flex; flex-direction: column; }
   .learn-side { display: contents; }
   .learn-side > .learn-bar { order: -2; }
-  .learn-side > .learn-unit, .learn-side > .unit-picker { order: -1; }
+  .learn-side > .learn-unit { order: -1; }
   .learn-unit { margin-top: 8px; }
   @media (min-width: 900px) {
     #diary-card { width: min(600px, calc(100% - 32px)); }
-    #learn-card { width: min(800px, calc(100% - 32px)); }
+    #learn-card, #lesson-card { width: min(800px, calc(100% - 32px)); }
+    /* 黑板課也分兩欄：左邊黑板講重點，右邊白紙放圖和例題，翻頁不用捲就看得到「考考你」 */
+    .board { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: auto auto 1fr; column-gap: 16px; align-items: start; }
+    .board__head { grid-column: 1 / -1; }
+    .board__paper { grid-column: 2; grid-row: 2 / 4; }
+    .board__title { grid-column: 1; grid-row: 2; }
+    .board__lines { grid-column: 1; grid-row: 3; }
+    .board .sheet__fig svg { max-height: 140px; }
     .learn-main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 0 16px; align-items: start; }
     .learn-side { display: block; }
-    .learn-side .unit-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     /* 右欄比較窄：老師的頭和名字一行，說的話在下面整行 */
     .learn-side .tip { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 4px 8px; }
     .learn-side .tip > div { display: contents; }
@@ -396,9 +402,9 @@
     #learn-card .card__label { display: none; }
     #learn-card .sheet__fig svg { max-height: 140px; }
   }
-  #diary-card .card__label, #learn-card .card__label { font-size: var(--zy-3); }
-  #diary-card .card__title, #learn-card .card__title { font-size: var(--zy); }
-  #diary-card .card__text, #diary-card .empty { font-size: var(--zy-3); }
+  #diary-card .card__label, #learn-card .card__label, #lesson-card .card__label { font-size: var(--zy-3); }
+  #diary-card .card__title, #learn-card .card__title, #lesson-card .card__title { font-size: var(--zy); }
+  #diary-card .card__text, #diary-card .empty, #lesson-card .card__text { font-size: var(--zy-3); }
   /* 卡片很長要捲的時候，按鈕列固定在卡片底部 */
   .card__dock {
     position: sticky; z-index: 1; bottom: calc(-1 * var(--pad-b)); margin-bottom: calc(-1 * var(--pad-b)); padding-bottom: var(--pad-b);
@@ -406,6 +412,7 @@
   }
   /* 老師的話、剛蓋的掌印要捲到看得到的地方，不要躲在按鈕列後面 */
   #learn-tip, #diary-paw-count, #sheet-ans { scroll-margin-bottom: 104px; }
+  #lesson-answer { scroll-margin-bottom: 130px; }
   /* 貓貓日記：橫線紙、右下角蓋貓掌印 */
   .book-chip { background: var(--ink-pale); color: var(--ink); }
   .coach-chip { background: var(--rose-pale); color: var(--rose); }
@@ -439,8 +446,8 @@
     transition: transform 120ms var(--ease), box-shadow 120ms var(--ease);
   }
   .paw-btn svg { width: 30px; height: 30px; }
-  #diary-prev svg { transform: rotate(-90deg); }
-  #diary-next svg { transform: rotate(90deg); }
+  #diary-prev svg, #lesson-prev svg { transform: rotate(-90deg); }
+  #diary-next svg, #lesson-next svg { transform: rotate(90deg); }
   .paw-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink-deep); }
   .paw-btn:disabled { opacity: 0.4; cursor: default; }
   .paw-btn--stamp { flex: 1; border-color: var(--rose-deep); background: var(--rose); color: #fff; font-size: var(--zy-2); box-shadow: 0 4px 0 var(--rose-deep); }
@@ -449,7 +456,7 @@
   .paw-btn[aria-pressed="true"] { background: var(--ink); color: #fff; }
   .diary-index { margin-left: auto; font-size: var(--zy-3); color: var(--text-2); }
 
-  /* 學習島：桐桐老師改作業（作業紙是數學簿的方格紙，批改用紅筆） */
+  /* 學習數學島：桐桐老師改作業（作業紙是數學簿的方格紙，批改用紅筆） */
   .cat-tag--teacher { background: var(--ink); color: #fff; font-size: 14px; }
   .learn-chip { background: var(--low-pale); color: var(--low-deep); }
   .learn-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
@@ -459,9 +466,9 @@
   .learn-dots li.is-good { background: var(--low); }
   .learn-dots li.is-help { background: var(--mid); }
   .link-btn { min-height: 36px; padding: 0 4px; border: 0; background: transparent; color: var(--ink); font-size: var(--zy-3); text-decoration: underline; text-underline-offset: 3px; }
-  .unit-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+  .unit-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
   .unit-chip {
-    min-height: 42px; padding: 4px 8px; border: 2px solid var(--line); border-radius: 12px; background: var(--paper);
+    min-height: 56px; padding: 4px 8px; border: 2px solid var(--line); border-radius: 12px; background: var(--paper);
     color: var(--text-2); font-size: var(--zy-3); line-height: 1.25; text-align: left;
   }
   .unit-chip b { margin-right: 4px; color: var(--ink); font: 600 var(--zy-3) var(--num); }
@@ -521,6 +528,21 @@
   .tip__who { font-size: calc(var(--zy) * 0.6); color: var(--text-2); }
   .tip__text { font-size: var(--zy-2); line-height: 1.6; color: var(--text); }
   .grade-next { grid-column: 1 / -1; min-height: 60px; font-size: var(--zy-2); }
+  /* 黑板課：深綠色黑板寫標題和重點，圖和例題貼在白紙上 */
+  .board { margin-top: 12px; padding: 12px 16px 16px; border: 6px solid #9C6B3F; border-radius: 16px; background: #2F5D50; color: #F4F1E8; }
+  .board__head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+  .board__head .learn-dots li { background: rgba(244, 241, 232, 0.3); }
+  .board__head .learn-dots li.is-now { background: #2F5D50; box-shadow: inset 0 0 0 3px #FFE08A; }
+  .board__head .learn-dots li.is-good { background: #FFE08A; }
+  .board .link-btn { margin-left: auto; color: #FFE08A; }
+  .board__title { margin-top: 6px; font-weight: 400; font-size: var(--zy); line-height: 1.5; color: #FFE08A; }
+  .board__lines p { margin-top: 2px; font-size: var(--zy-2); line-height: 1.6; }
+  .board__paper { margin-top: 12px; padding: 8px 12px 12px; border-radius: 12px; background: #FFFEF8; color: var(--text); }
+  .board__ask { margin-top: 6px; font-size: var(--zy-2); line-height: 1.6; }
+  .board__tag { display: inline-block; margin-right: 8px; padding: 0 10px; border-radius: 999px; background: var(--sun-pale); color: var(--ink-deep); font-weight: 400; font-size: var(--zy-3); }
+  .board__reveal { margin-top: 10px; font-size: var(--zy-3); }
+  .board__answer { margin-top: 10px; padding: 8px 12px; border-radius: 12px; background: var(--low-pale); color: var(--low-deep); font-size: var(--zy-2); line-height: 1.6; }
+  .lesson-controls .paw-btn--read { flex: 1; }
   .learn-stats { margin-top: 10px; font-size: var(--zy-3); color: var(--text-2); }
 
   @media (max-width: 1000px) {
@@ -535,7 +557,7 @@
   }
   @media (max-width: 699px) {
     body { font-size: 16px; }
-    #diary-card, #learn-card { --zy: 23px; }
+    #diary-card, #learn-card, #lesson-card { --zy: 23px; }
     /* 手機太窄：翻頁和「唸給我聽」只留圖示，字還在、讀螢幕的軟體唸得到；「蓋掌印」留字 */
     #diary-prev span, #diary-next span, #diary-read span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .plate { padding: 4px 12px 4px 6px; gap: 6px; }
@@ -585,7 +607,7 @@
 </head>
 <body>
 <div class="app" id="app">
-  <div class="scene" id="scene" role="img" aria-label="桐桐貓貓島 3D 地圖：中間是貓貓之家，左上是高階跳臺、上面中間是表演區、右上是中階跳臺和多多紙箱區、右邊是低階跳臺和日記區，最左上角是有黑板的學習島，下面有紙箱公園、魚池公園和合體公園，左下是排行榜島，島和島之間用木板橋連起來，島上全都是貓，還有一隻綁頭帶、兩腳走路的貓貓教練，和一隻戴眼鏡的貓貓老師。"></div>
+  <div class="scene" id="scene" role="img" aria-label="桐桐貓貓島 3D 地圖：中間是貓貓之家，左上是高階跳臺、上面中間是表演區、右上是中階跳臺和多多紙箱區、右邊是低階跳臺和日記區，最左上角是有黑板的學習數學島，下面有紙箱公園、魚池公園和合體公園，左下是排行榜島，島和島之間用木板橋連起來，島上全都是貓，還有一隻綁頭帶、兩腳走路的貓貓教練，和一隻戴眼鏡的貓貓老師。"></div>
 
   <header class="hud">
     <div class="plate">
@@ -702,7 +724,7 @@
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v6a5 5 0 0 1-10 0zM11 14h2v3h3v4H8v-4h3z"/></svg></span><span><b>排行榜</b>每隻貓只算牠跳最高的那一次。頒獎臺上站的是這次前三名，第一名戴皇冠。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 4.5l11-2v13.2a3 3 0 1 1-2-2.8V6.1l-7 1.3v10.3a3 3 0 1 1-2-2.8z"/></svg></span><span><b>表演區</b>點轉圈圈、揮手、翻跟斗、唱歌，臺上的貓就會表演；按拍手，臺下的貓一起拍。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>日記區</b>貓貓會把今天做的事寫成日記。按貓掌幫日記蓋掌印，按「唸給我聽」就會唸出來。</span></li>
-      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習島</b>貓貓寫了數學作業（南一版一年級上學期的單元），桐桐當老師按「寫對了」或「寫錯了」；改錯了，戴眼鏡的貓貓老師會提醒你。</span></li>
+      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。點老師或講台就改作業：每天有 10 隻貓來上課、各寫一張，桐桐當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
       <li><span class="help-icon" aria-hidden="true">？</span><span><b>貓貓教練</b>頭上綁頭帶、用兩隻腳走路。看到晃來晃去、頭上冒「？」的貓，就會叫牠去跳臺跳。</span></li>
       <li><span class="help-icon" aria-hidden="true">z</span><span><b>累了就休息</b>貓貓會去公園休息、躲進多多紙箱區的紙箱，也會回貓貓之家睡覺。點一下貓貓或紙箱，牠會跟你打招呼。</span></li>
     </ul>
@@ -711,7 +733,7 @@
         <svg viewBox="0 0 120 120" aria-hidden="true"><g fill="#fff" stroke="currentColor" stroke-width="5" stroke-linejoin="round"><circle cx="37" cy="24" r="11"/><circle cx="83" cy="24" r="11"/><path d="M30 52a30 30 0 0 1 60 0z"/></g><g fill="currentColor"><circle cx="49" cy="41" r="3.6"/><circle cx="71" cy="41" r="3.6"/></g><rect x="10" y="50" width="100" height="58" rx="29" fill="#fff" stroke="currentColor" stroke-width="5"/><text x="60" y="81" text-anchor="middle" dominant-baseline="middle" font-size="44" fill="currentColor" font-family="Huninn, PingFang TC, sans-serif">桐</text></svg>
         島主兼設計師：桐桐
       </p>
-      <p>這座島照桐桐畫的設計圖做：十一座島的形狀和位置、二十座木板橋，都跟她畫的一樣。第二次她又加了表演區、多多紙箱區、日記區、合體公園，還有貓貓教練；後來又說要一座學習島，放在高階跳臺上面。島上的樹是開白花的油桐樹。</p>
+      <p>這座島照桐桐畫的設計圖做：十一座島的形狀和位置、二十座木板橋，都跟她畫的一樣。第二次她又加了表演區、多多紙箱區、日記區、合體公園，還有貓貓教練；後來又說要一座學習數學島，放在高階跳臺上面。島上的樹是開白花的油桐樹。</p>
       <figure>
         <img src="sketch.jpg" alt="桐桐用鉛筆畫的貓貓島設計圖：中間是有「桐」字招牌的房子，周圍有三座跳臺、有階梯舞臺的表演區、畫滿小紙箱的多多紙箱區、有書桌的日記區、有魚池的合體公園、兩座公園和 1、2、3 名的頒獎臺，用木板橋連起來，到處都是貓。" width="1200" height="786" loading="lazy">
         <figcaption>桐桐畫的設計圖（第二版）</figcaption>
@@ -806,7 +828,7 @@
     <div class="card__head">
       <span class="trophy-chip learn-chip" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span>
       <div>
-        <p class="card__label">學習島</p>
+        <p class="card__label">學習數學島</p>
         <h2 class="card__title" id="learn-title">桐桐老師改作業</h2>
       </div>
       <button class="card__close" type="button" data-close aria-label="關閉">×</button>
@@ -832,11 +854,9 @@
       </section>
       <div class="learn-side">
         <div class="learn-bar">
-          <ol class="learn-dots" id="learn-dots" aria-label="這一疊作業"></ol>
-          <button class="link-btn" id="learn-units-toggle" type="button" aria-expanded="false" aria-controls="unit-picker"></button>
+          <ol class="learn-dots" id="learn-dots" aria-label="今天的作業"></ol>
         </div>
         <p class="learn-unit" id="learn-unit"><span class="sheet__unit" id="sheet-unit"></span></p>
-        <div class="unit-picker" id="unit-picker" hidden role="group" aria-label="出哪些單元的題目（南一版一年級上學期）"></div>
         <div class="tip" id="learn-tip" hidden>
           <span class="tip__face" aria-hidden="true">
             <svg viewBox="0 0 64 64">
@@ -869,6 +889,50 @@
           <span>寫錯了</span>
         </button>
         <button class="sticker sticker--solid grade-next" id="learn-next" type="button" hidden>下一張</button>
+      </div>
+    </div>
+  </article>
+
+  <article class="card" id="lesson-card" hidden aria-labelledby="lesson-title">
+    <div class="card__head">
+      <span class="trophy-chip learn-chip" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20l2-4M16 20l-2-4M7 9h5M7 12h8"/></svg></span>
+      <div>
+        <p class="card__label">學習數學島</p>
+        <h2 class="card__title" id="lesson-title">貓貓老師上課</h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <p class="card__text" id="lesson-intro">這次考試的範圍是一年級上學期的 9 個單元。想先學哪一個？</p>
+    <div class="unit-grid" id="lesson-units" role="group" aria-label="選一個單元"></div>
+    <section class="board" id="lesson-board" hidden aria-live="polite">
+      <header class="board__head">
+        <span class="sheet__unit" id="lesson-unit"></span>
+        <ol class="learn-dots" id="lesson-dots" aria-label="這個單元的頁數"></ol>
+        <button class="link-btn" id="lesson-back" type="button">換單元</button>
+      </header>
+      <h3 class="board__title" id="lesson-page-title"></h3>
+      <div class="board__lines" id="lesson-lines"></div>
+      <div class="board__paper">
+        <div class="sheet__fig" id="lesson-fig"></div>
+        <p class="board__ask"><b class="board__tag">考考你</b><span id="lesson-ask"></span></p>
+        <button class="sticker sticker--solid board__reveal" id="lesson-reveal" type="button">看答案</button>
+        <p class="board__answer" id="lesson-answer" hidden></p>
+      </div>
+    </section>
+    <div class="card__dock" id="lesson-dock" hidden>
+      <div class="diary-controls lesson-controls">
+        <button class="paw-btn" id="lesson-prev" type="button">
+          <svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg>
+          <span>上一頁</span>
+        </button>
+        <button class="paw-btn paw-btn--read" id="lesson-read" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+          <span id="lesson-read-label">唸給我聽</span>
+        </button>
+        <button class="paw-btn" id="lesson-next" type="button">
+          <svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg>
+          <span id="lesson-next-label">下一頁</span>
+        </button>
       </div>
     </div>
   </article>

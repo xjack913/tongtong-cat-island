@@ -11,7 +11,7 @@ export function fromSketch([px, py]) {
 
 // 十二座島：outline 是草稿上的島形頂點；ring 是島上環狀步道離中心的比例。
 // 表演區到合體公園四座是桐桐第二張草稿加的，那張照片的角度不一樣，先用兩張照片上相同的角點對齊，再換成第一張的座標；
-// 學習島是桐桐後來說要加的，草稿上沒畫，放在高階跳臺上面那塊空地
+// 學習數學島是桐桐後來說要加的，草稿上沒畫，放在高階跳臺上面那塊空地
 export const ISLANDS = [
   { id: 'home', kind: 'home', name: '貓貓之家', ring: 0.7, outline: [[560, 700], [593, 527], [895, 520], [960, 680], [860, 800], [640, 800]] },
   { id: 'high', kind: 'jump', level: 'high', name: '高階跳臺', ring: 0.7, outline: [[183, 398], [248, 248], [565, 222], [633, 410], [535, 556], [270, 530]] },
@@ -24,7 +24,7 @@ export const ISLANDS = [
   { id: 'boxes', kind: 'boxes', name: '多多紙箱區', ring: 0.84, outline: [[1200, 201], [1385, 139], [1423, 329], [1323, 357]] },
   { id: 'diary', kind: 'diary', name: '日記區', ring: 0.8, outline: [[1231, 447], [1397, 408], [1387, 580], [1320, 596], [1232, 501]] },
   { id: 'combo', kind: 'combo', name: '合體公園', ring: 0.68, outline: [[1181, 707], [1307, 653], [1366, 760], [1241, 884], [1177, 782]] },
-  { id: 'learn', kind: 'learn', name: '學習島', ring: 0.8, outline: [[262, 120], [330, 40], [590, 28], [648, 110], [600, 182], [300, 190]] },
+  { id: 'learn', kind: 'learn', name: '學習數學島', ring: 0.8, outline: [[262, 120], [330, 40], [590, 28], [648, 110], [600, 182], [300, 190]] },
 ];
 
 // 二十二座木板橋：points 是草稿上的橋頭、轉折與橋尾（第一點靠 a 島、最後一點靠 b 島）。
@@ -304,7 +304,7 @@ export function composeDiary(cat, events, pick = 0.5) {
     else if (e.type === 'sleep') line = `我在${e.place}睡了一個好覺。`;
     else if (e.type === 'podium') line = `我站上頒獎臺，是第 ${e.rank} 名${e.rank === 1 ? '，還戴了皇冠' : ''}！`;
     else if (e.type === 'watchJump') line = `我在${levelName(e.level)}看大家跳高。`;
-    else if (e.type === 'study') line = '我在學習島寫數學作業。';
+    else if (e.type === 'study') line = '我在學習數學島寫作業。';
     else if (e.type === 'homework') line = e.right ? '桐桐老師改了我的數學作業，我寫對了！' : '我的數學作業寫錯了，下次要更仔細。';
     if (!line) continue;
     seen.add(e.type);
