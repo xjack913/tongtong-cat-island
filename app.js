@@ -48,6 +48,11 @@ function el(tag, className, text) {
   return node;
 }
 
+// GA4 玩法事件：只有 tong.xjack.tw 會載 GA（ga.js），其他地方沒有 gtag 就什麼都不做
+function track(name, params = {}) {
+  if (typeof window.gtag === 'function') window.gtag('event', name, params);
+}
+
 function readStore() {
   try {
     return JSON.parse(localStorage.getItem(STORE_KEY) || '{}') || {};
@@ -300,6 +305,10 @@ function start(hotData = {}) {
     const name = cats[info.cat].name;
     const level = LEVELS[info.level];
     if (info.tong) {
+      track('tong_jump', {
+        level: info.level, cm: info.cm, perfect: info.perfect ? 'yes' : 'no',
+        record: judge.island ? 'island' : judge.platform ? 'platform' : judge.personal ? 'personal' : 'none',
+      });
       let note = '';
       if (judge.island && !judge.first) note = '全島新紀錄！';
       else if (judge.platform) note = `${level.short}跳臺新紀錄！`;
@@ -403,6 +412,7 @@ function start(hotData = {}) {
   function goIsland(id) {
     closeCards();
     focus = id;
+    track('island_view', { island: id });
     followingCoach = false;
     const level = LEVELS[id];
     const dock = $('dock');
@@ -552,7 +562,10 @@ function start(hotData = {}) {
   }
   trickButtons.forEach((button) => button.addEventListener('click', () => {
     sound.unlock();
-    if (scene.stageTrick(button.dataset.trick)) return;
+    if (scene.stageTrick(button.dataset.trick)) {
+      track('stage_trick', { trick: button.dataset.trick });
+      return;
+    }
     // 上一個動作還沒做完：鈕抖一下
     button.classList.remove('is-nope');
     void button.offsetWidth;
@@ -562,6 +575,7 @@ function start(hotData = {}) {
     sound.unlock();
     scene.stageClap();
     sound.play('clap');
+    track('stage_clap');
   });
 
   // ---------- 注音：日記區、學習島卡片上的字都加注音 ----------
@@ -681,6 +695,7 @@ function start(hotData = {}) {
     $('diary-paw-count').scrollIntoView({ block: 'nearest' });
     sound.play('stamp');
     scene.meow(diary.cat);
+    track('diary_stamp');
   });
   $('diary-prev').addEventListener('click', () => {
     diaryPage -= 1;
@@ -753,6 +768,7 @@ function start(hotData = {}) {
       return;
     }
     speak(`${cats[diary.cat].name}的日記。${diary.date}。${diary.lines.join('')}`, diaryReader);
+    track('read_aloud', { what: 'diary' });
   });
 
   // ---------- 貓貓教練卡 ----------
@@ -785,6 +801,7 @@ function start(hotData = {}) {
 
   // 導覽列的「貓貓教練」：打開教練卡，鏡頭跟著教練走
   function findCoach() {
+    track('island_view', { island: 'coach' });
     openCoach();
     followCoach();
   }
@@ -849,6 +866,7 @@ function start(hotData = {}) {
       if (on && learnUnits.length === 1) return;
       learnUnits = sanitizeUnits(on ? learnUnits.filter((n) => n !== u.n) : learnUnits.concat([u.n]));
       save();
+      track('homework_units', { units: unitsText(learnUnits) });
       renderUnits();
       newStack();
       renderLearn();
@@ -941,6 +959,7 @@ function start(hotData = {}) {
       learnStats.graded += 1;
       if (s.tries === 0) learnStats.right += 1;
       save();
+      track('homework_grade', { unit: s.p.unit, result: s.tries === 0 ? 'first_try' : 'after_hint', cat_right: s.p.right ? 'yes' : 'no' });
       // 先畫好紅筆批改（作業紙會變高），再出現老師的話，捲動位置才算得準
       renderLearn();
       setTip('good', s.p.right ? `改對了！${name}寫對了。` : `改對了！${name}寫錯了，答案應該是 ${s.p.answer}。`);
@@ -967,6 +986,7 @@ function start(hotData = {}) {
     s.result = 'help';
     learnStats.graded += 1;
     save();
+    track('homework_grade', { unit: s.p.unit, result: 'explained', cat_right: s.p.right ? 'yes' : 'no' });
     const text = `${s.p.why}${name}寫「${s.p.catAnswer}」，${s.p.right ? '是寫對的' : '是寫錯的'}。`;
     renderLearn();
     setTip('explain', text);
@@ -980,6 +1000,7 @@ function start(hotData = {}) {
   $('learn-next').addEventListener('click', () => {
     if (sheetIndex >= stack.length) newStack();
     else sheetIndex += 1;
+    if (sheetIndex >= stack.length) track('homework_stack_done', { first_try: stack.filter((s) => s.result === 'good').length });
     stopSpeaking();
     setTip('', '');
     sound.play('page');
@@ -996,6 +1017,7 @@ function start(hotData = {}) {
     }
     const name = cats[s.cat].name;
     speak(`${name}的作業。${s.p.speak}${name}寫：${s.p.catAnswer}。`, learnReader);
+    track('read_aloud', { what: 'homework' });
   });
 
   // ---------- 破紀錄橫幅 ----------
