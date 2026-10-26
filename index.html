@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="桐桐自己畫設計圖的 3D 貓貓島：50 隻貓比跳高，還有表演區、日記區和改數學作業的學習島。">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<title>桐桐貓貓島</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bpmf+Huninn&display=swap">
+<style>
+  /* 桐桐貓貓島：滿版 3D 群島，介面像貼紙一樣浮在上面（粗墨線、圓角、底下一條實心陰影）。
+     主色是桐桐印章的藍紫墨色，成績用陽光黃，三座跳臺綠、橘、珊瑚紅。
+     給小朋友玩的島，刻意只做亮色一套，所有顏色與背景都明確指定。 */
+  :root {
+    color-scheme: light;
+    --ink: #3E4BB8;
+    --ink-deep: #2A3490;
+    --ink-pale: #ECEEFC;
+    --sun: #FFC93C;
+    --sun-pale: #FFF4D1;
+    --blush: #E8466E;
+    --text: #22253A;
+    --text-2: #4A4F6E;
+    --line: #DCE0F3;
+    --paper: #FFFFFF;
+    --sky: #DDF3F5;
+    --sky-top: #BFE6F2;
+    --low: #3FA45B;
+    --low-deep: #1F6B35;
+    --low-pale: #E3F4E7;
+    --mid: #E8922A;
+    --mid-deep: #8E4C06;
+    --mid-pale: #FDF0DD;
+    --high: #E85D5D;
+    --high-deep: #A82A2A;
+    --high-pale: #FDE6E6;
+    --rose: #C9325B;
+    --rose-deep: #8E1F3E;
+    --rose-pale: #FFE3EA;
+    --red-pen: #D42A37;
+    --gold: #F2B200;
+    --silver: #AEB7C4;
+    --bronze: #CC8448;
+    --shadow: 0 14px 34px rgba(42, 52, 144, 0.18);
+    --round: "Huninn", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    --num: "Fredoka", "Huninn", "Arial Rounded MT Bold", Arial, sans-serif;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+    --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; overflow: hidden; background: var(--sky); color: var(--text);
+    font-family: var(--round); font-size: 17px; line-height: 1.6;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+  :focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+  h1, h2, h3, p { margin: 0; }
+  h1, h2 { font-weight: 400; text-wrap: balance; }
+
+  .app { position: relative; height: 100%; overflow: hidden; background: linear-gradient(var(--sky-top), var(--sky) 55%); }
+  .scene { position: absolute; inset: 0; z-index: 0; }
+  .scene canvas { display: block; }
+  .scene-labels { position: absolute; inset: 0; pointer-events: none; }
+
+  /* 貼紙按鈕 */
+  .sticker {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; padding: 0 16px;
+    border: 2.5px solid var(--ink); border-radius: 999px; background: var(--paper); color: var(--ink-deep);
+    font-size: 17px; white-space: nowrap; box-shadow: 0 4px 0 var(--ink-deep);
+    transition: transform 120ms var(--ease), box-shadow 120ms var(--ease), background-color 160ms var(--ease);
+  }
+  .sticker:hover { background: var(--ink-pale); }
+  .sticker:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink-deep); }
+  .sticker[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .sticker svg { width: 20px; height: 20px; flex: none; }
+  .sticker--solid { background: var(--ink); color: #fff; }
+  .sticker--solid:hover { background: var(--ink-deep); }
+
+  /* 左上：島名牌 */
+  .hud {
+    position: absolute; z-index: 3; top: 12px; left: var(--gutter-l); display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  }
+  .plate {
+    display: flex; align-items: center; gap: 10px; padding: 6px 16px 6px 8px; border: 2.5px solid var(--ink); border-radius: 22px;
+    background: var(--paper); box-shadow: 0 4px 0 var(--ink-deep);
+  }
+  .stamp { width: 54px; height: 54px; flex: none; color: var(--ink); }
+  .plate__name { font-size: 27px; line-height: 1.2; color: var(--ink-deep); letter-spacing: 0.04em; }
+  .plate__sub { font-size: 14px; color: var(--text-2); }
+  .toolbar { display: flex; gap: 8px; }
+
+  /* 右上：這次跳最高 */
+  .mini-board {
+    position: absolute; z-index: 3; top: 12px; right: var(--gutter-r); width: 268px; box-sizing: border-box; padding: 10px 14px 12px;
+    display: flex; flex-direction: column; gap: 6px; text-align: left;
+    border: 2.5px solid var(--ink); border-radius: 22px; background: var(--paper); box-shadow: 0 4px 0 var(--ink-deep);
+  }
+  .mini-board:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink-deep); }
+  .mini-board__title { display: flex; align-items: center; gap: 6px; font-size: 17px; color: var(--ink-deep); }
+  .mini-board__title svg { width: 22px; height: 22px; color: var(--gold); }
+  .mini-board__more { margin-left: auto; font-size: 13px; color: var(--ink); }
+  .mini-board__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .mini-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+  .mini-row__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; }
+  .mini-row__cm { font: 600 20px/1 var(--num); color: var(--ink-deep); font-variant-numeric: tabular-nums; }
+  .mini-row__cm small { margin-left: 2px; font: 12px var(--round); color: var(--text-2); }
+  .mini-board__empty { font-size: 14px; color: var(--text-2); }
+  .medal {
+    display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+    font: 600 15px/1 var(--num); color: var(--text); background: var(--ink-pale);
+  }
+  .medal--1 { background: var(--gold); }
+  .medal--2 { background: var(--silver); }
+  .medal--3 { background: var(--bronze); color: #fff; }
+
+  /* 破紀錄的大橫幅 */
+  .toast {
+    position: absolute; z-index: 6; top: 12px; left: 50%; transform: translateX(-50%); pointer-events: none;
+    width: max-content; max-width: calc(100% - 32px); box-sizing: border-box; padding: 10px 22px 12px; text-align: center;
+    border: 3px solid var(--gold); border-radius: 22px; background: var(--sun-pale); box-shadow: 0 5px 0 #C99000, var(--shadow);
+    animation: toast-in 420ms var(--pop);
+  }
+  .toast__title { font-size: 26px; color: var(--ink-deep); }
+  .toast__text { font-size: 17px; color: var(--text); }
+  @keyframes toast-in { from { transform: translate(-50%, -16px) scale(0.85); opacity: 0; } to { transform: translate(-50%, 0) scale(1); opacity: 1; } }
+
+  /* 底部：跳臺控制＋島嶼導覽 */
+  .bottom {
+    position: absolute; z-index: 4; left: 0; right: 0; bottom: 12px; padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    display: flex; flex-direction: column; align-items: center; gap: 12px; pointer-events: none;
+  }
+  .bottom > * { pointer-events: auto; }
+  .island-nav {
+    display: flex; gap: 8px; max-width: 100%; overflow-x: auto; padding: 4px 4px 8px; scrollbar-width: none; box-sizing: border-box;
+  }
+  .island-nav::-webkit-scrollbar { display: none; }
+  .nav-chip { flex: none; }
+  .nav-chip__stars { font-size: 13px; letter-spacing: -1px; }
+  .nav-chip--low .nav-chip__stars { color: var(--low); }
+  .nav-chip--mid .nav-chip__stars { color: var(--mid); }
+  .nav-chip--high .nav-chip__stars { color: var(--high); }
+  .nav-chip[aria-pressed="true"] .nav-chip__stars { color: var(--sun); }
+
+  .dock {
+    width: min(780px, 100%); box-sizing: border-box; padding: 14px 20px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center; gap: 18px; border: 3px solid var(--level, var(--ink)); border-radius: 28px; background: var(--paper);
+    box-shadow: 0 5px 0 var(--level-deep, var(--ink-deep)), var(--shadow);
+  }
+  .dock--low { --level: var(--low); --level-deep: var(--low-deep); --level-pale: var(--low-pale); }
+  .dock--mid { --level: var(--mid); --level-deep: var(--mid-deep); --level-pale: var(--mid-pale); }
+  .dock--high { --level: var(--high); --level-deep: var(--high-deep); --level-pale: var(--high-pale); }
+  .dock__info, .dock__side { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .dock__level { display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; padding: 0 12px; border-radius: 999px; background: var(--level-pale); color: var(--level-deep); font-size: 15px; }
+  .dock__who { font-size: 24px; line-height: 1.3; color: var(--text); }
+  .dock__who b { font-weight: 400; color: var(--ink-deep); }
+  .dock__next, .dock__hint { font-size: 15px; color: var(--text-2); }
+  .dock__best { font-size: 15px; color: var(--text); }
+  .dock__best b { font: 600 19px var(--num); color: var(--ink-deep); }
+  .dock__result { min-height: 1.6em; font-size: 18px; color: var(--blush); }
+
+  .jump {
+    position: relative; width: 132px; height: 132px; padding: 0; border: 0; border-radius: 50%; background: transparent;
+    -webkit-user-select: none; user-select: none; touch-action: none;
+  }
+  .jump__ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .jump__ring circle { fill: none; stroke-width: 10; }
+  .jump__track { stroke: var(--line); }
+  .jump__perfect { stroke: var(--sun); stroke-dasharray: 23.75 400; stroke-dashoffset: -315.5; }
+  .jump__fill { stroke: var(--level, var(--ink)); stroke-linecap: round; stroke-dasharray: 339.3; stroke-dashoffset: 339.3; }
+  .jump.is-perfect .jump__fill { stroke: var(--gold); }
+  .jump__face {
+    position: absolute; inset: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+    border-radius: 50%; background: var(--ink); color: #fff; box-shadow: 0 6px 0 var(--ink-deep);
+    transition: transform 120ms var(--ease), box-shadow 120ms var(--ease), background-color 160ms var(--ease);
+  }
+  .jump__face svg { width: 42px; height: 42px; }
+  .jump__label { font-size: 20px; line-height: 1.2; }
+  .jump.is-holding .jump__face { transform: translateY(5px) scale(0.96); box-shadow: 0 1px 0 var(--ink-deep); background: var(--ink-deep); }
+  .jump:disabled .jump__face { background: #9AA0BE; box-shadow: 0 6px 0 #7A80A0; }
+  .jump:disabled { cursor: default; }
+
+  /* 浮出卡 */
+  .card {
+    position: absolute; z-index: 5; top: 152px; left: var(--gutter-l); box-sizing: border-box; width: min(410px, calc(100% - 32px));
+    --pad-b: 20px; max-height: calc(100% - 168px - var(--bottom-h, 80px)); overflow-y: auto; padding: 18px 20px var(--pad-b);
+    border: 3px solid var(--ink); border-radius: 26px; background: var(--paper); box-shadow: 0 5px 0 var(--ink-deep), var(--shadow);
+    animation: card-in 280ms var(--ease); -webkit-user-select: text; user-select: text;
+  }
+  @keyframes card-in { from { transform: translateY(12px); } to { transform: none; } }
+  .card__head { display: flex; align-items: flex-start; gap: 12px; }
+  .card__head > div { flex: 1 1 auto; min-width: 0; }
+  .card__label { font-size: 14px; color: var(--ink); letter-spacing: 0.06em; }
+  .card__title { font-size: 28px; line-height: 1.25; color: var(--text); }
+  .card__lede { margin-top: 10px; font-size: 18px; color: var(--ink-deep); }
+  .card__text { margin-top: 8px; font-size: 16px; color: var(--text-2); }
+  .card__close {
+    flex: none; width: 44px; height: 44px; margin: -4px -8px 0 0; border: 0; border-radius: 50%; background: var(--ink-pale);
+    color: var(--ink-deep); font-size: 26px; line-height: 1;
+  }
+  .card__close:hover { background: var(--line); }
+  .card__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .card__sub { margin-top: 16px; font-size: 15px; color: var(--ink-deep); }
+
+  .help-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .help-list li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 16px; color: var(--text-2); }
+  .help-list b { display: block; font-weight: 400; font-size: 17px; color: var(--text); }
+  .help-icon { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: var(--ink-pale); color: var(--ink-deep); font: 600 16px var(--num); }
+  .help-icon svg { width: 20px; height: 20px; }
+  .designer { margin-top: 18px; padding-top: 16px; border-top: 2px dashed var(--line); display: flex; flex-direction: column; gap: 8px; }
+  .designer__name { display: flex; align-items: center; gap: 8px; font-size: 18px; color: var(--ink-deep); }
+  .designer__name svg { width: 40px; height: 40px; color: var(--ink); }
+  .designer p { font-size: 15px; color: var(--text-2); }
+  .designer figure { margin: 4px 0 0; }
+  .designer img { display: block; width: 100%; height: auto; border-radius: 14px; border: 2px solid var(--line); }
+  .designer figcaption { margin-top: 4px; font-size: 13px; color: var(--text-2); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px 0 8px; border: 2px solid var(--line);
+    border-radius: 999px; background: var(--paper); font-size: 15px;
+  }
+  .chip:hover { border-color: var(--ink); }
+  .chip small { font-size: 12px; color: var(--text-2); }
+  .dot { flex: none; width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(34, 37, 58, 0.25); }
+  .empty { margin-top: 8px; font-size: 15px; color: var(--text-2); }
+
+  .cat-swatch { flex: none; width: 52px; height: 52px; border-radius: 50%; box-shadow: inset 0 0 0 3px rgba(34, 37, 58, 0.18); display: grid; place-items: center; }
+  .cat-swatch svg { width: 30px; height: 30px; }
+  .facts { margin: 14px 0 0; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; }
+  .facts dt, .facts dd { margin: 0; padding: 9px 0; border-top: 2px solid var(--ink-pale); font-size: 16px; }
+  .facts dt { color: var(--ink-deep); white-space: nowrap; }
+  .facts dd b { font: 600 20px var(--num); color: var(--ink-deep); }
+  .level-bests { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+  .level-best { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 14px; font-size: 14px; }
+  .level-best b { font: 600 20px var(--num); }
+  .level-best--low { background: var(--low-pale); color: var(--low-deep); }
+  .level-best--mid { background: var(--mid-pale); color: var(--mid-deep); }
+  .level-best--high { background: var(--high-pale); color: var(--high-deep); }
+
+  .trophy-chip { flex: none; display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: var(--sun); color: var(--ink-deep); }
+  .trophy-chip svg { width: 30px; height: 30px; }
+  .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
+  .tab { min-height: 42px; border: 2px solid var(--line); border-radius: 14px; background: var(--paper); font-size: 15px; color: var(--text-2); }
+  .tab[aria-selected="true"] { border-color: var(--ink); background: var(--ink); color: #fff; }
+  .ranks { list-style: none; margin: 10px 0 0; padding: 0; }
+  .rank-row { display: grid; grid-template-columns: 30px 16px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 9px 2px; border-bottom: 2px solid var(--ink-pale); }
+  .rank-row__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; }
+  .rank-row__cm { font: 600 20px/1 var(--num); color: var(--ink-deep); font-variant-numeric: tabular-nums; text-align: right; }
+  .rank-row__cm small { margin-left: 2px; font: 12px var(--round); color: var(--text-2); }
+  .level-tag { padding: 1px 8px; border-radius: 999px; font-size: 13px; white-space: nowrap; }
+  .level-tag--low { background: var(--low-pale); color: var(--low-deep); }
+  .level-tag--mid { background: var(--mid-pale); color: var(--mid-deep); }
+  .level-tag--high { background: var(--high-pale); color: var(--high-deep); }
+  .tong-badge {
+    display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: 4px; vertical-align: 2px;
+    border: 2px solid var(--ink); border-radius: 8px; color: var(--ink); font-size: 13px; line-height: 1;
+  }
+  .reset { margin-top: 16px; padding-top: 14px; border-top: 2px dashed var(--line); display: flex; flex-direction: column; gap: 10px; }
+  .reset p { font-size: 15px; color: var(--text-2); }
+  .reset__row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+  /* 3D 場景上的標籤（外層位置由 CSS2D 控制，動畫寫在內層） */
+  .island-pill {
+    pointer-events: auto; display: inline-flex; align-items: center; gap: 6px; padding: 4px 14px; white-space: nowrap;
+    border: 2.5px solid var(--ink); border-radius: 999px; background: var(--paper); color: var(--ink-deep);
+    font: 17px var(--round); box-shadow: 0 3px 0 var(--ink-deep);
+  }
+  .island-pill:active { transform: translateY(2px); }
+  .island-pill--jump { border-color: var(--level); }
+  .island-pill__stars { color: var(--level); font-size: 14px; letter-spacing: -1px; }
+  .island-pill--home, .island-pill--rank { background: var(--ink); color: #fff; }
+  .cat-tag {
+    display: inline-flex; align-items: center; gap: 4px; max-width: 120px; padding: 0 8px 0 5px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.94); color: var(--text); font: 13px/1.6 var(--round); white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(42, 52, 144, 0.18);
+  }
+  .cat-tag i { flex: none; width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(34, 37, 58, 0.3); }
+  .cat-tag span { overflow: hidden; text-overflow: ellipsis; }
+  .cat-tag--gold { background: #FFE9A6; box-shadow: 0 0 0 2px var(--gold); }
+  .cat-tag--silver { background: #EEF1F5; box-shadow: 0 0 0 2px var(--silver); }
+  .cat-tag--bronze { background: #F7E3D1; box-shadow: 0 0 0 2px var(--bronze); }
+  .cat-tag--strong { background: var(--ink); color: #fff; font-size: 15px; }
+  .peak-tag {
+    display: flex; flex-direction: column; align-items: center; padding: 4px 14px 6px; border: 3px solid var(--ink); border-radius: 18px;
+    background: var(--paper); box-shadow: 0 4px 0 var(--ink-deep); animation: peak 2.6s var(--ease) forwards;
+  }
+  .peak-tag b { font: 700 32px/1.05 var(--num); color: var(--ink-deep); }
+  .peak-tag span { font-size: 13px; color: var(--text-2); }
+  .peak-tag em { margin-bottom: 2px; padding: 0 10px; border-radius: 999px; background: var(--blush); color: #fff; font-size: 14px; font-style: normal; }
+  .peak-tag--record { border-color: var(--gold); box-shadow: 0 4px 0 #C99000; }
+  .peak-tag--island { border-color: var(--gold); background: var(--sun-pale); box-shadow: 0 4px 0 #C99000; }
+  @keyframes peak {
+    0% { transform: translateY(10px) scale(0.5); opacity: 0; }
+    10% { transform: translateY(0) scale(1.12); opacity: 1; }
+    18% { transform: scale(1); }
+    78% { transform: translateY(-12px); opacity: 1; }
+    100% { transform: translateY(-26px); opacity: 0; }
+  }
+  .ruler-tag { padding: 0 7px; border: 2px solid #FF6F91; border-radius: 9px; background: var(--paper); color: var(--blush); font: 600 15px/1.4 var(--num); white-space: nowrap; }
+  .ruler-tag--best { border-color: var(--gold); background: var(--sun-pale); color: var(--ink-deep); font-family: var(--round); font-size: 13px; }
+  .meow {
+    padding: 2px 12px; border: 2.5px solid var(--ink); border-radius: 16px 16px 16px 4px; background: var(--paper); color: var(--ink-deep);
+    font-size: 17px; white-space: nowrap; animation: meow 1.6s var(--ease) forwards;
+  }
+  @keyframes meow { 0% { transform: scale(0.4); opacity: 0; } 15% { transform: scale(1.1); opacity: 1; } 25% { transform: scale(1); } 80% { opacity: 1; } 100% { transform: translateY(-10px); opacity: 0; } }
+  .zzz { font: 600 15px var(--num); color: var(--ink); letter-spacing: 2px; animation: zzz 2.4s ease-in-out infinite; }
+  @keyframes zzz { 0%, 100% { transform: translate(0, 0); opacity: 0.55; } 50% { transform: translate(4px, -6px); opacity: 1; } }
+  .island-pill--stage { background: var(--rose-pale); }
+  .cat-tag--coach { background: var(--rose); color: #fff; font-size: 14px; }
+  /* 迷路的貓頭上的問號；教練來了就變驚嘆號 */
+  .lost-mark { font: 700 30px/1 var(--num); color: var(--ink); text-shadow: 0 2px 0 #fff, 0 0 6px #fff; animation: lost 1.4s ease-in-out infinite; }
+  .lost-mark--got { color: var(--rose); animation: none; transform: scale(1.15); }
+  @keyframes lost { 0%, 100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-5px) rotate(8deg); } }
+  .speech {
+    padding: 4px 14px; border: 2.5px solid var(--rose); border-radius: 16px 16px 16px 4px; background: var(--paper); color: var(--rose-deep);
+    font-size: 18px; white-space: nowrap; box-shadow: 0 3px 0 var(--rose-deep); animation: meow 2.1s var(--ease) forwards;
+  }
+  .speech--small { font-size: 15px; border-color: var(--ink); color: var(--ink-deep); box-shadow: 0 3px 0 var(--ink-deep); animation-duration: 1.4s; }
+  .trick-tag { padding: 2px 12px; border-radius: 999px; background: var(--sun); color: var(--ink-deep); font-size: 17px; white-space: nowrap; box-shadow: 0 3px 0 #C99000; animation: meow 1.7s var(--ease) forwards; }
+  .heart { color: var(--rose); font-size: 26px; line-height: 1; text-shadow: 0 0 4px #fff; animation: heart 1.5s var(--ease) forwards; }
+  @keyframes heart { 0% { transform: translateY(6px) scale(0.4); opacity: 0; } 20% { transform: scale(1.2); opacity: 1; } 100% { transform: translateY(-30px) scale(1); opacity: 0; } }
+  .notes { color: var(--ink); font: 600 22px var(--num); letter-spacing: 4px; white-space: nowrap; animation: notes 2.6s ease-out forwards; }
+  @keyframes notes { 0% { transform: translate(0, 6px); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(14px, -26px); opacity: 0; } }
+
+  /* 導覽鈕上的新日記數字 */
+  .nav-chip__badge { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; background: var(--rose); color: #fff; font: 600 13px/1 var(--num); }
+
+  /* 表演區按鈕列 */
+  .dock--stage { --level: var(--rose); --level-deep: var(--rose-deep); --level-pale: var(--rose-pale); grid-template-columns: minmax(0, 1fr) auto; }
+  .tricks { display: flex; gap: 10px; }
+  .trick {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; width: 76px; padding: 0; border: 0; background: transparent;
+    color: var(--ink-deep); font-size: 15px; line-height: 1.3;
+  }
+  .trick__icon {
+    display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--ink); color: #fff; box-shadow: 0 5px 0 var(--ink-deep);
+    transition: transform 120ms var(--ease), box-shadow 120ms var(--ease), background-color 160ms var(--ease);
+  }
+  .trick__icon svg { width: 32px; height: 32px; }
+  .trick:active .trick__icon { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink-deep); }
+  .trick.is-on .trick__icon { background: var(--sun); color: var(--ink-deep); box-shadow: 0 5px 0 #C99000; }
+  .trick:disabled { color: var(--text-2); cursor: default; }
+  .trick:disabled .trick__icon { background: #9AA0BE; box-shadow: 0 5px 0 #7A80A0; }
+  .trick--clap .trick__icon { background: var(--rose); box-shadow: 0 5px 0 var(--rose-deep); }
+  .trick--clap:active .trick__icon { box-shadow: 0 1px 0 var(--rose-deep); }
+  .trick.is-nope .trick__icon { animation: nope 300ms; }
+  @keyframes nope { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+  /* 日記區、學習島的字都帶注音：國字改用注音粉圓（字的右邊直接畫好注音），數字照舊。
+     注音只有字高的四分之一，字要放大小朋友才看得清楚：--zy 是內文、--zy-2 是提示和按鈕、--zy-3 是小字 */
+  #diary-card, #learn-card {
+    --round: "Bpmf Huninn", "Huninn", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    --num: "Fredoka", "Bpmf Huninn", "Huninn", "Arial Rounded MT Bold", Arial, sans-serif;
+    --zy: 29px; --zy-2: calc(var(--zy) * 0.8); --zy-3: calc(var(--zy) * 0.66);
+    font-family: var(--round);
+  }
+  /* 學習島卡：窄的螢幕由上往下是進度、單元、作業紙、老師的話；
+     橫放的 iPad、電腦分成左右兩欄，作業紙在左、其他在右，看提示的時候題目還在旁邊 */
+  .learn-main { display: flex; flex-direction: column; }
+  .learn-side { display: contents; }
+  .learn-side > .learn-bar { order: -2; }
+  .learn-side > .learn-unit, .learn-side > .unit-picker { order: -1; }
+  .learn-unit { margin-top: 8px; }
+  @media (min-width: 900px) {
+    #diary-card { width: min(600px, calc(100% - 32px)); }
+    #learn-card { width: min(800px, calc(100% - 32px)); }
+    .learn-main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 0 16px; align-items: start; }
+    .learn-side { display: block; }
+    .learn-side .unit-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* 右欄比較窄：老師的頭和名字一行，說的話在下面整行 */
+    .learn-side .tip { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 4px 8px; }
+    .learn-side .tip > div { display: contents; }
+    .learn-side .tip__face { width: 40px; height: 40px; }
+    .learn-side .tip__text { grid-column: 1 / -1; }
+    /* 卡片頭只留標題、圖小一點，作業紙整張放得下 */
+    #learn-card .card__label { display: none; }
+    #learn-card .sheet__fig svg { max-height: 140px; }
+  }
+  #diary-card .card__label, #learn-card .card__label { font-size: var(--zy-3); }
+  #diary-card .card__title, #learn-card .card__title { font-size: var(--zy); }
+  #diary-card .card__text, #diary-card .empty { font-size: var(--zy-3); }
+  /* 卡片很長要捲的時候，按鈕列固定在卡片底部 */
+  .card__dock {
+    position: sticky; z-index: 1; bottom: calc(-1 * var(--pad-b)); margin-bottom: calc(-1 * var(--pad-b)); padding-bottom: var(--pad-b);
+    background: var(--paper); box-shadow: 0 -14px 12px -6px var(--paper);
+  }
+  /* 老師的話、剛蓋的掌印要捲到看得到的地方，不要躲在按鈕列後面 */
+  #learn-tip, #diary-paw-count, #sheet-ans { scroll-margin-bottom: 104px; }
+  /* 貓貓日記：橫線紙、右下角蓋貓掌印 */
+  .book-chip { background: var(--ink-pale); color: var(--ink); }
+  .coach-chip { background: var(--rose-pale); color: var(--rose); }
+  .page {
+    position: relative; margin-top: 12px; padding: 12px 16px 10px 22px; border: 2px solid #EFE4C8; border-radius: 18px;
+    background: #FFFDF6; box-shadow: inset 6px 0 0 #FFD6DE;
+  }
+  .page__head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+  .page__who { display: inline-flex; align-items: center; gap: 6px; font-size: var(--zy-3); color: var(--ink-deep); }
+  .page__who b { font-weight: 400; }
+  .page__new { padding: 0 10px; border-radius: 999px; background: var(--rose); color: #fff; font-size: var(--zy-3); }
+  .page__date { margin-left: auto; font-size: var(--zy-3); color: var(--text-2); }
+  .page__lines {
+    --row: calc(var(--zy) * 1.8); margin-top: 6px;
+    background-image: linear-gradient(transparent calc(var(--row) - 2px), #E3E0F2 calc(var(--row) - 2px), #E3E0F2 var(--row)); background-size: 100% var(--row);
+  }
+  .page__lines p { font-size: var(--zy); line-height: var(--row); color: var(--text); }
+  .page__paws { position: relative; height: 64px; margin-top: 8px; border-top: 2px dashed #F3D3DC; pointer-events: none; }
+  .paw-print {
+    position: absolute; width: 34px; height: 34px; transform: translate(-50%, -50%) rotate(var(--turn, 0deg)); opacity: 0.82;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='%23E8466E'%3E%3Cellipse cx='24' cy='31' rx='10' ry='8.5'/%3E%3Cellipse cx='11.5' cy='20' rx='4.3' ry='5.3'/%3E%3Cellipse cx='19.5' cy='12.5' rx='4.3' ry='5.5'/%3E%3Cellipse cx='28.5' cy='12.5' rx='4.3' ry='5.5'/%3E%3Cellipse cx='36.5' cy='20' rx='4.3' ry='5.3'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .paw-print--new { animation: stamp 420ms var(--pop); }
+  @keyframes stamp { from { transform: translate(-50%, -50%) rotate(var(--turn, 0deg)) scale(2.2); opacity: 0; } to { transform: translate(-50%, -50%) rotate(var(--turn, 0deg)) scale(1); opacity: 0.82; } }
+  .page__foot { position: relative; display: flex; align-items: baseline; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; margin-top: 4px; }
+  .page__count { font-size: var(--zy-3); color: var(--rose-deep); }
+  .diary-controls { display: flex; align-items: stretch; gap: 10px; padding-top: 14px; }
+  .paw-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 78px; min-height: 64px; padding: 6px 10px;
+    border: 2.5px solid var(--ink); border-radius: 20px; background: var(--paper); color: var(--ink-deep); font-size: var(--zy-3); box-shadow: 0 4px 0 var(--ink-deep);
+    transition: transform 120ms var(--ease), box-shadow 120ms var(--ease);
+  }
+  .paw-btn svg { width: 30px; height: 30px; }
+  #diary-prev svg { transform: rotate(-90deg); }
+  #diary-next svg { transform: rotate(90deg); }
+  .paw-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink-deep); }
+  .paw-btn:disabled { opacity: 0.4; cursor: default; }
+  .paw-btn--stamp { flex: 1; border-color: var(--rose-deep); background: var(--rose); color: #fff; font-size: var(--zy-2); box-shadow: 0 4px 0 var(--rose-deep); }
+  .paw-btn--stamp svg { width: 38px; height: 38px; }
+  .paw-btn--stamp:active { box-shadow: 0 1px 0 var(--rose-deep); }
+  .paw-btn[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .diary-index { margin-left: auto; font-size: var(--zy-3); color: var(--text-2); }
+
+  /* 學習島：桐桐老師改作業（作業紙是數學簿的方格紙，批改用紅筆） */
+  .cat-tag--teacher { background: var(--ink); color: #fff; font-size: 14px; }
+  .learn-chip { background: var(--low-pale); color: var(--low-deep); }
+  .learn-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+  .learn-dots { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; }
+  .learn-dots li { width: 16px; height: 16px; border-radius: 50%; background: var(--ink-pale); }
+  .learn-dots li.is-now { background: var(--paper); box-shadow: inset 0 0 0 3px var(--ink); }
+  .learn-dots li.is-good { background: var(--low); }
+  .learn-dots li.is-help { background: var(--mid); }
+  .link-btn { min-height: 36px; padding: 0 4px; border: 0; background: transparent; color: var(--ink); font-size: var(--zy-3); text-decoration: underline; text-underline-offset: 3px; }
+  .unit-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+  .unit-chip {
+    min-height: 42px; padding: 4px 8px; border: 2px solid var(--line); border-radius: 12px; background: var(--paper);
+    color: var(--text-2); font-size: var(--zy-3); line-height: 1.25; text-align: left;
+  }
+  .unit-chip b { margin-right: 4px; color: var(--ink); font: 600 var(--zy-3) var(--num); }
+  .unit-chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink-pale); color: var(--ink-deep); }
+  .sheet {
+    position: relative; margin-top: 10px; padding: 12px 14px 14px; border: 2px solid #E6E1CF; border-radius: 16px; background-color: #FFFEF8;
+    background-image: linear-gradient(#EDEFFA 1px, transparent 1px), linear-gradient(90deg, #EDEFFA 1px, transparent 1px); background-size: 22px 22px;
+  }
+  .sheet__head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+  .sheet__who { display: inline-flex; align-items: center; gap: 6px; font-size: var(--zy-3); color: var(--ink-deep); }
+  .sheet__who b { font-weight: 400; }
+  .sheet__unit { display: inline-block; padding: 0 10px; border-radius: 999px; background: var(--ink-pale); color: var(--ink-deep); font-size: calc(var(--zy) * 0.6); }
+  .sheet__q { margin-top: 6px; font-size: var(--zy); line-height: 1.55; color: var(--text); }
+  .read-btn {
+    flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 40px; margin-left: auto; padding: 0 12px 0 8px; border: 2px solid var(--ink); border-radius: 999px;
+    background: var(--paper); color: var(--ink-deep); font-size: calc(var(--zy) * 0.6); box-shadow: 0 3px 0 var(--ink-deep);
+  }
+  .read-btn svg { width: 20px; height: 20px; }
+  .read-btn[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .sheet__fig svg { display: block; width: 100%; height: auto; max-height: 150px; margin: 4px auto 0; }
+  .sheet__ans { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 10px; font-size: var(--zy-3); color: var(--text-2); }
+  .pencil {
+    position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 60px; min-height: 46px; padding: 0 14px;
+    border: 2px dashed #B9BED6; border-radius: 12px; background: #fff; color: #4A4F6E; font: 600 var(--zy) var(--num); transform: rotate(-2deg);
+  }
+  .pencil.is-right::after, .pencil.is-wrong::after { content: ""; position: absolute; pointer-events: none; animation: mark 360ms var(--pop); }
+  @keyframes mark { from { transform: scale(1.8); opacity: 0; } to { transform: none; opacity: 1; } }
+  .pencil.is-right::after { inset: -10px -14px; border: 4px solid var(--red-pen); border-radius: 50%; }
+  .pencil.is-wrong::after {
+    inset: -6px -8px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' preserveAspectRatio='none'%3E%3Cpath d='M4 4l32 32M36 4L4 36' stroke='%23D42A37' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  }
+  .sheet__fix { color: var(--red-pen); font-size: var(--zy-2); }
+  .sheet__seal {
+    flex: none; margin-left: auto; width: 38px; height: 38px; box-sizing: border-box; border: 3px solid var(--red-pen); border-radius: 9px;
+    color: var(--red-pen); font: 23px/32px "Huninn", "PingFang TC", sans-serif; text-align: center; transform: rotate(-12deg); opacity: 0.85; animation: seal 420ms var(--pop);
+  }
+  @keyframes seal { from { transform: rotate(-12deg) scale(2); opacity: 0; } to { transform: rotate(-12deg) scale(1); opacity: 0.85; } }
+  .sheet__done { padding: 26px 6px; text-align: center; }
+  .sheet__done-title { font-size: var(--zy); color: var(--ink-deep); }
+  .sheet__done-text { margin-top: 6px; font-size: var(--zy-2); color: var(--text-2); }
+  .grade-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 10px; }
+  .grade {
+    display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 58px; border: 3px solid var(--ink); border-radius: 20px;
+    background: var(--paper); color: var(--ink-deep); font-size: var(--zy-2); box-shadow: 0 4px 0 var(--ink-deep);
+    transition: transform 120ms var(--ease), box-shadow 120ms var(--ease);
+  }
+  .grade svg { width: 32px; height: 32px; color: var(--red-pen); }
+  .grade:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink-deep); }
+  .grade:disabled { opacity: 0.4; cursor: default; }
+  .grade.is-nope { animation: nope 300ms; }
+  .tip { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; padding: 10px 12px; border: 2px solid var(--gold); border-radius: 16px; background: var(--sun-pale); animation: card-in 240ms var(--ease); }
+  .tip--good { border-color: var(--low); background: var(--low-pale); }
+  .tip--explain { border-color: var(--rose); background: var(--rose-pale); }
+  .tip__face { flex: none; width: 52px; height: 52px; }
+  .tip__face svg { width: 100%; height: 100%; }
+  .tip__who { font-size: calc(var(--zy) * 0.6); color: var(--text-2); }
+  .tip__text { font-size: var(--zy-2); line-height: 1.6; color: var(--text); }
+  .grade-next { grid-column: 1 / -1; min-height: 60px; font-size: var(--zy-2); }
+  .learn-stats { margin-top: 10px; font-size: var(--zy-3); color: var(--text-2); }
+
+  @media (max-width: 1000px) {
+    .toast { top: 140px; }
+  }
+  @media (max-width: 899px) {
+    .card {
+      position: fixed; z-index: 30; top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 72%;
+      border-width: 3px 0 0; border-radius: 26px 26px 0 0; box-shadow: 0 -6px 24px rgba(42, 52, 144, 0.2);
+      --pad-b: calc(20px + env(safe-area-inset-bottom, 0px)); padding-left: var(--gutter-l); padding-right: var(--gutter-r); padding-bottom: var(--pad-b);
+    }
+  }
+  @media (max-width: 699px) {
+    body { font-size: 16px; }
+    #diary-card, #learn-card { --zy: 23px; }
+    /* 手機太窄：翻頁和「唸給我聽」只留圖示，字還在、讀螢幕的軟體唸得到；「蓋掌印」留字 */
+    #diary-prev span, #diary-next span, #diary-read span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .plate { padding: 4px 12px 4px 6px; gap: 6px; }
+    .stamp { width: 40px; height: 40px; }
+    .plate__name { font-size: 20px; }
+    .plate__sub { display: none; }
+    .tool__label { display: none; }
+    .toolbar .sticker { padding: 0 12px; }
+    .mini-board { width: 156px; padding: 8px 10px 10px; }
+    .mini-board__title { font-size: 14px; }
+    .mini-board__more { display: none; }
+    .mini-row { grid-template-columns: 24px minmax(0, 1fr); }
+    .mini-row .medal { width: 24px; height: 24px; }
+    .mini-row__cm { grid-column: 2; font-size: 16px; }
+    .mini-row:nth-child(n + 2) { display: none; }
+    .toast { top: 124px; }
+    .toast__title { font-size: 21px; }
+    .dock { grid-template-columns: minmax(0, 1fr) auto; gap: 10px 14px; padding: 12px 14px; border-radius: 24px; }
+    .dock__side { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; column-gap: 12px; }
+    .dock__who { font-size: 20px; }
+    .dock__hint { display: none; }
+    .jump { width: 108px; height: 108px; }
+    .jump__face svg { width: 34px; height: 34px; }
+    .jump__label { font-size: 17px; }
+    .sticker { min-height: 42px; font-size: 16px; padding: 0 14px; }
+    .dock--stage { grid-template-columns: minmax(0, 1fr); }
+    .tricks { justify-content: space-between; gap: 6px; }
+    .trick { flex: 1 1 0; width: auto; min-width: 0; font-size: 14px; }
+    .trick__icon { width: 52px; height: 52px; }
+    .trick__icon svg { width: 26px; height: 26px; }
+    .paw-btn { min-width: 60px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card, .toast, .peak-tag, .meow { animation: none; }
+    .zzz, .lost-mark, .speech, .trick-tag, .heart, .notes, .paw-print--new, .trick.is-nope .trick__icon, .sheet__seal, .pencil::after, .tip, .grade.is-nope { animation: none; }
+    .sticker, .jump__face, .trick__icon, .paw-btn { transition: none; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="scene" id="scene" role="img" aria-label="桐桐貓貓島 3D 地圖：中間是貓貓之家，左上是高階跳臺、上面中間是表演區、右上是中階跳臺和多多紙箱區、右邊是低階跳臺和日記區，最左上角是有黑板的學習島，下面有紙箱公園、魚池公園和合體公園，左下是排行榜島，島和島之間用木板橋連起來，島上全都是貓，還有一隻綁頭帶、兩腳走路的貓貓教練，和一隻戴眼鏡的貓貓老師。"></div>
+
+  <header class="hud">
+    <div class="plate">
+      <svg class="stamp" viewBox="0 0 120 120" aria-hidden="true">
+        <g fill="#fff" stroke="currentColor" stroke-width="5" stroke-linejoin="round">
+          <circle cx="37" cy="24" r="11"/><circle cx="83" cy="24" r="11"/>
+          <path d="M30 52a30 30 0 0 1 60 0z"/>
+        </g>
+        <g fill="currentColor"><circle cx="49" cy="41" r="3.6"/><circle cx="71" cy="41" r="3.6"/><circle cx="60" cy="31" r="2.2"/><circle cx="51" cy="29" r="1.8"/><circle cx="69" cy="29" r="1.8"/></g>
+        <rect x="10" y="50" width="100" height="58" rx="29" fill="#fff" stroke="currentColor" stroke-width="5"/>
+        <text x="60" y="81" text-anchor="middle" dominant-baseline="middle" font-size="44" fill="currentColor" font-family="Huninn, PingFang TC, sans-serif">桐</text>
+      </svg>
+      <div>
+        <h1 class="plate__name">桐桐貓貓島</h1>
+        <p class="plate__sub">50 隻貓貓的跳高比賽</p>
+      </div>
+    </div>
+    <div class="toolbar" role="toolbar" aria-label="島上工具">
+      <button class="sticker" id="help-open" type="button" aria-label="怎麼玩">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.4c-.7.3-1 .8-1 1.5v.5M12 17v.1"/></svg>
+        <span class="tool__label">怎麼玩</span>
+      </button>
+      <button class="sticker" id="sound-toggle" type="button" aria-pressed="true" aria-label="聲音">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path id="sound-wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+        <span class="tool__label" id="sound-label">聲音開</span>
+      </button>
+    </div>
+  </header>
+
+  <button class="mini-board" id="mini-board" type="button" aria-label="打開排行榜">
+    <span class="mini-board__title">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 3h10v6a5 5 0 0 1-10 0zM5 4h2v2.5A3.5 3.5 0 0 1 4 10a3 3 0 0 1-2-3V4zm14 0h3v3a3 3 0 0 1-2 3 3.5 3.5 0 0 1-3-3.5V4zM11 14h2v3h3v4H8v-4h3z"/></svg>
+      這次跳最高
+      <span class="mini-board__more">看全部</span>
+    </span>
+    <ol class="mini-board__list" id="mini-list"></ol>
+    <span class="mini-board__empty" id="mini-empty">貓貓正在暖身，馬上就有成績</span>
+  </button>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+    <p class="toast__title" id="toast-title"></p>
+    <p class="toast__text" id="toast-text"></p>
+  </div>
+
+  <div class="bottom" id="bottom">
+    <section class="dock" id="dock" hidden aria-label="跳臺按鈕">
+      <div class="dock__info">
+        <p class="dock__level" id="dock-level"></p>
+        <p class="dock__who" id="dock-who"></p>
+        <p class="dock__next" id="dock-next"></p>
+      </div>
+      <button class="jump" id="jump-btn" type="button" disabled aria-label="按住蓄力，放開就跳">
+        <svg class="jump__ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="jump__track" cx="60" cy="60" r="54"/>
+          <circle class="jump__perfect" cx="60" cy="60" r="54"/>
+          <circle class="jump__fill" id="jump-fill" cx="60" cy="60" r="54"/>
+        </svg>
+        <span class="jump__face">
+          <svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg>
+          <span class="jump__label" id="jump-label">等一下</span>
+        </span>
+      </button>
+      <div class="dock__side">
+        <p class="dock__hint" id="dock-hint"></p>
+        <p class="dock__best" id="dock-best"></p>
+        <p class="dock__result" id="dock-result" aria-live="polite"></p>
+      </div>
+    </section>
+    <section class="dock dock--stage" id="stage-dock" hidden aria-label="表演區按鈕">
+      <div class="dock__info">
+        <p class="dock__level">★ 表演區</p>
+        <p class="dock__who" id="stage-who" aria-live="polite"></p>
+        <p class="dock__next" id="stage-next"></p>
+      </div>
+      <div class="tricks" role="group" aria-label="叫臺上的貓表演">
+        <button class="trick" type="button" data-trick="spin" disabled>
+          <span class="trick__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M19 4.5v4h-4"/></svg></span>
+          <span class="trick__label">轉圈圈</span>
+        </button>
+        <button class="trick" type="button" data-trick="wave" disabled>
+          <span class="trick__icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span>
+          <span class="trick__label">揮手</span>
+        </button>
+        <button class="trick" type="button" data-trick="flip" disabled>
+          <span class="trick__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18c0-7 3-12 7-12s6 3 6 6-2.5 4-4.5 4S10 14.5 10 12.5"/><path d="M3 15l2 3 3-2"/></svg></span>
+          <span class="trick__label">翻跟斗</span>
+        </button>
+        <button class="trick" type="button" data-trick="sing" disabled>
+          <span class="trick__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 4.5l11-2v13.2a3 3 0 1 1-2-2.8V6.1l-7 1.3v10.3a3 3 0 1 1-2-2.8z"/></svg></span>
+          <span class="trick__label">唱歌</span>
+        </button>
+        <button class="trick trick--clap" type="button" id="clap-btn">
+          <span class="trick__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7.7a4.2 4.2 0 0 1 7.5 2.8c0 5.6-7.5 10-7.5 10z"/></svg></span>
+          <span class="trick__label">拍手</span>
+        </button>
+      </div>
+    </section>
+    <nav class="island-nav" id="island-nav" aria-label="去哪座島"></nav>
+  </div>
+
+  <article class="card" id="help-card" hidden aria-labelledby="help-title">
+    <div class="card__head">
+      <div>
+        <p class="card__label">桐桐貓貓島</p>
+        <h2 class="card__title" id="help-title">怎麼玩</h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <ul class="help-list">
+      <li><span class="help-icon" aria-hidden="true">1</span><span><b>選一座跳臺</b>點下面的低階、中階或高階跳臺，鏡頭會飛過去。</span></li>
+      <li><span class="help-icon" aria-hidden="true">2</span><span><b>按住大按鈕，放開就跳</b>貓貓走到跳板前面，按鈕變藍色就可以按。</span></li>
+      <li><span class="help-icon" aria-hidden="true">3</span><span><b>能量條要抓時機</b>低階一直按住就會滿；中階和高階的能量條會上上下下，最滿的時候放開跳最高。</span></li>
+      <li><span class="help-icon" aria-hidden="true">4</span><span><b>完美跳會翻跟斗</b>能量條碰到黃色那一段放開，貓貓會在空中翻一圈。</span></li>
+      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v6a5 5 0 0 1-10 0zM11 14h2v3h3v4H8v-4h3z"/></svg></span><span><b>排行榜</b>每隻貓只算牠跳最高的那一次。頒獎臺上站的是這次前三名，第一名戴皇冠。</span></li>
+      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 4.5l11-2v13.2a3 3 0 1 1-2-2.8V6.1l-7 1.3v10.3a3 3 0 1 1-2-2.8z"/></svg></span><span><b>表演區</b>點轉圈圈、揮手、翻跟斗、唱歌，臺上的貓就會表演；按拍手，臺下的貓一起拍。</span></li>
+      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>日記區</b>貓貓會把今天做的事寫成日記。按貓掌幫日記蓋掌印，按「唸給我聽」就會唸出來。</span></li>
+      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習島</b>貓貓寫了數學作業（南一版一年級上學期的單元），桐桐當老師按「寫對了」或「寫錯了」；改錯了，戴眼鏡的貓貓老師會提醒你。</span></li>
+      <li><span class="help-icon" aria-hidden="true">？</span><span><b>貓貓教練</b>頭上綁頭帶、用兩隻腳走路。看到晃來晃去、頭上冒「？」的貓，就會叫牠去跳臺跳。</span></li>
+      <li><span class="help-icon" aria-hidden="true">z</span><span><b>累了就休息</b>貓貓會去公園休息、躲進多多紙箱區的紙箱，也會回貓貓之家睡覺。點一下貓貓或紙箱，牠會跟你打招呼。</span></li>
+    </ul>
+    <section class="designer" aria-labelledby="designer-title">
+      <p class="designer__name" id="designer-title">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><g fill="#fff" stroke="currentColor" stroke-width="5" stroke-linejoin="round"><circle cx="37" cy="24" r="11"/><circle cx="83" cy="24" r="11"/><path d="M30 52a30 30 0 0 1 60 0z"/></g><g fill="currentColor"><circle cx="49" cy="41" r="3.6"/><circle cx="71" cy="41" r="3.6"/></g><rect x="10" y="50" width="100" height="58" rx="29" fill="#fff" stroke="currentColor" stroke-width="5"/><text x="60" y="81" text-anchor="middle" dominant-baseline="middle" font-size="44" fill="currentColor" font-family="Huninn, PingFang TC, sans-serif">桐</text></svg>
+        島主兼設計師：桐桐
+      </p>
+      <p>這座島照桐桐畫的設計圖做：十一座島的形狀和位置、二十座木板橋，都跟她畫的一樣。第二次她又加了表演區、多多紙箱區、日記區、合體公園，還有貓貓教練；後來又說要一座學習島，放在高階跳臺上面。島上的樹是開白花的油桐樹。</p>
+      <figure>
+        <img src="sketch.jpg" alt="桐桐用鉛筆畫的貓貓島設計圖：中間是有「桐」字招牌的房子，周圍有三座跳臺、有階梯舞臺的表演區、畫滿小紙箱的多多紙箱區、有書桌的日記區、有魚池的合體公園、兩座公園和 1、2、3 名的頒獎臺，用木板橋連起來，到處都是貓。" width="1200" height="786" loading="lazy">
+        <figcaption>桐桐畫的設計圖（第二版）</figcaption>
+      </figure>
+    </section>
+  </article>
+
+  <article class="card" id="island-card" hidden aria-labelledby="island-title">
+    <div class="card__head">
+      <div>
+        <p class="card__label" id="island-label"></p>
+        <h2 class="card__title" id="island-title"></h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <p class="card__lede" id="island-lede"></p>
+    <p class="card__text" id="island-text"></p>
+    <p class="card__sub" id="island-count"></p>
+    <div class="chips" id="island-cats"></div>
+  </article>
+
+  <article class="card" id="cat-card" hidden aria-labelledby="cat-name">
+    <div class="card__head">
+      <span class="cat-swatch" id="cat-swatch" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="rgba(34,37,58,0.55)"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg>
+      </span>
+      <div>
+        <p class="card__label" id="cat-coat"></p>
+        <h2 class="card__title" id="cat-name"></h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <dl class="facts">
+      <dt>個性</dt><dd id="cat-personality"></dd>
+      <dt>現在</dt><dd id="cat-doing"></dd>
+      <dt>最高紀錄</dt><dd id="cat-best"></dd>
+    </dl>
+    <div class="level-bests" id="cat-levels"></div>
+    <div class="card__actions">
+      <button class="sticker sticker--solid" id="cat-follow" type="button">跟著牠走</button>
+      <button class="sticker" id="cat-diary" type="button" hidden>看牠的日記</button>
+    </div>
+  </article>
+
+  <article class="card" id="diary-card" hidden aria-labelledby="diary-title">
+    <div class="card__head">
+      <span class="trophy-chip book-chip" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5C5.5 4 8.6 4 11 5.6V20c-2.4-1.4-5.5-1.4-8 0zM21 5.5C18.5 4 15.4 4 13 5.6V20c2.4-1.4 5.5-1.4 8 0z"/></svg></span>
+      <div>
+        <p class="card__label">日記區</p>
+        <h2 class="card__title" id="diary-title">貓貓日記</h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <p class="card__text" id="diary-writers"></p>
+    <p class="empty" id="diary-empty" hidden>還沒有日記。貓貓正在書桌前寫，寫好就會出現在這裡。</p>
+    <section class="page" id="diary-page" aria-live="polite">
+      <header class="page__head">
+        <span class="page__who"><i class="dot" id="diary-dot"></i><span><b id="diary-cat"></b>的日記</span></span>
+        <span class="page__new" id="diary-new" hidden>新的！</span>
+        <span class="page__date" id="diary-date"></span>
+      </header>
+      <div class="page__lines" id="diary-lines"></div>
+      <div class="page__paws" id="diary-paws" aria-hidden="true"></div>
+      <div class="page__foot">
+        <p class="page__count" id="diary-paw-count"></p>
+        <span class="diary-index" id="diary-index"></span>
+      </div>
+    </section>
+    <div class="card__dock">
+      <div class="diary-controls" id="diary-controls">
+        <button class="paw-btn" id="diary-prev" type="button" aria-label="上一篇">
+          <svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg>
+          <span>上一篇</span>
+        </button>
+        <button class="paw-btn paw-btn--stamp" id="diary-stamp" type="button">
+          <svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg>
+          <span>蓋掌印</span>
+        </button>
+        <button class="paw-btn paw-btn--read" id="diary-read" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+          <span id="diary-read-label">唸給我聽</span>
+        </button>
+        <button class="paw-btn" id="diary-next" type="button" aria-label="下一篇">
+          <svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg>
+          <span>下一篇</span>
+        </button>
+      </div>
+    </div>
+  </article>
+
+  <article class="card card--learn" id="learn-card" hidden aria-labelledby="learn-title">
+    <div class="card__head">
+      <span class="trophy-chip learn-chip" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span>
+      <div>
+        <p class="card__label">學習島</p>
+        <h2 class="card__title" id="learn-title">桐桐老師改作業</h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <div class="learn-main">
+      <section class="sheet" id="sheet" aria-live="polite">
+        <div id="sheet-body">
+          <header class="sheet__head">
+            <span class="sheet__who"><i class="dot" id="sheet-dot"></i><span><b id="sheet-cat"></b>的作業</span></span>
+            <button class="read-btn" id="learn-read" type="button" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+              <span id="learn-read-label">唸題目</span>
+            </button>
+          </header>
+          <p class="sheet__q" id="sheet-q"></p>
+          <div class="sheet__fig" id="sheet-fig"></div>
+          <p class="sheet__ans"><span id="sheet-ans-label"></span><b class="pencil" id="sheet-ans"></b><span class="sheet__fix" id="sheet-fix" hidden></span><span class="sheet__seal" id="sheet-seal" hidden aria-hidden="true">桐</span></p>
+        </div>
+        <div class="sheet__done" id="sheet-done" hidden>
+          <p class="sheet__done-title" id="sheet-done-title"></p>
+          <p class="sheet__done-text" id="sheet-done-text"></p>
+        </div>
+      </section>
+      <div class="learn-side">
+        <div class="learn-bar">
+          <ol class="learn-dots" id="learn-dots" aria-label="這一疊作業"></ol>
+          <button class="link-btn" id="learn-units-toggle" type="button" aria-expanded="false" aria-controls="unit-picker"></button>
+        </div>
+        <p class="learn-unit" id="learn-unit"><span class="sheet__unit" id="sheet-unit"></span></p>
+        <div class="unit-picker" id="unit-picker" hidden role="group" aria-label="出哪些單元的題目（南一版一年級上學期）"></div>
+        <div class="tip" id="learn-tip" hidden>
+          <span class="tip__face" aria-hidden="true">
+            <svg viewBox="0 0 64 64">
+              <path d="M12 26 9 6l17 11zM52 26l3-20-17 11z" fill="#A4A9B1"/>
+              <circle cx="32" cy="36" r="22" fill="#A4A9B1"/>
+              <path d="M22 18c3 3 3 7 0 10M42 18c-3 3-3 7 0 10" stroke="#7F858E" stroke-width="3" fill="none" stroke-linecap="round"/>
+              <ellipse cx="32" cy="45" rx="11" ry="8" fill="#E6E8EC"/>
+              <circle cx="23" cy="35" r="3" fill="#2B2730"/><circle cx="41" cy="35" r="3" fill="#2B2730"/>
+              <g fill="none" stroke="#2B2730" stroke-width="2.4"><circle cx="23" cy="35" r="7"/><circle cx="41" cy="35" r="7"/><path d="M30 34h4"/></g>
+              <path d="M30 42h4l-2 2.5z" fill="#F08497"/>
+              <path d="M28 47q4 3 8 0" stroke="#2B2730" stroke-width="2" fill="none" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <div>
+            <p class="tip__who">貓貓老師</p>
+            <p class="tip__text" id="learn-tip-text"></p>
+          </div>
+        </div>
+        <p class="learn-stats" id="learn-stats"></p>
+      </div>
+    </div>
+    <div class="card__dock">
+      <div class="grade-row" id="grade-row">
+        <button class="grade" id="grade-ok" type="button">
+          <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="5" aria-hidden="true"><circle cx="20" cy="20" r="14"/></svg>
+          <span>寫對了</span>
+        </button>
+        <button class="grade" id="grade-no" type="button">
+          <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" aria-hidden="true"><path d="M9 9l22 22M31 9L9 31"/></svg>
+          <span>寫錯了</span>
+        </button>
+        <button class="sticker sticker--solid grade-next" id="learn-next" type="button" hidden>下一張</button>
+      </div>
+    </div>
+  </article>
+
+  <article class="card" id="coach-card" hidden aria-labelledby="coach-title">
+    <div class="card__head">
+      <span class="trophy-chip coach-chip" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M3.5 10.5c5-3.2 12-3.2 17 0"/><path d="M19 10l2.5 4M19.5 10.5l-1 4.5"/></svg></span>
+      <div>
+        <p class="card__label">島上的教練</p>
+        <h2 class="card__title" id="coach-title">貓貓教練</h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <p class="card__lede">頭上綁著頭帶，用兩隻腳走路的貓。</p>
+    <p class="card__text">看到晃來晃去、頭上冒「？」的貓，教練就會走過去，叫牠去低階、中階或高階跳臺跳。</p>
+    <dl class="facts">
+      <dt>現在</dt><dd id="coach-doing"></dd>
+      <dt>叫去跳的貓</dt><dd id="coach-sent"></dd>
+    </dl>
+    <div class="card__actions">
+      <button class="sticker sticker--solid" id="coach-follow" type="button">跟著教練走</button>
+    </div>
+  </article>
+
+  <article class="card" id="rank-card" hidden aria-labelledby="rank-title">
+    <div class="card__head">
+      <span class="trophy-chip" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v6a5 5 0 0 1-10 0zM5 4h2v2.5A3.5 3.5 0 0 1 4 10a3 3 0 0 1-2-3V4zm14 0h3v3a3 3 0 0 1-2 3 3.5 3.5 0 0 1-3-3.5V4zM11 14h2v3h3v4H8v-4h3z"/></svg></span>
+      <div>
+        <p class="card__label">排行榜島</p>
+        <h2 class="card__title" id="rank-title">這次誰跳最高？</h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <p class="card__text">每隻貓只算牠跳最高的那一次。名字旁邊蓋了「桐」字章的，是桐桐幫忙按的。</p>
+    <div class="tabs" role="tablist" aria-label="看哪一座跳臺">
+      <button class="tab" type="button" role="tab" data-level="all" aria-selected="true">全部</button>
+      <button class="tab" type="button" role="tab" data-level="low" aria-selected="false">低階</button>
+      <button class="tab" type="button" role="tab" data-level="mid" aria-selected="false">中階</button>
+      <button class="tab" type="button" role="tab" data-level="high" aria-selected="false">高階</button>
+    </div>
+    <ol class="ranks" id="rank-list"></ol>
+    <p class="empty" id="rank-empty" hidden>這座跳臺還沒有成績，貓貓正在排隊。</p>
+    <div class="reset">
+      <p id="rank-summary"></p>
+      <div class="reset__row" id="reset-ask">
+        <button class="sticker" id="reset-open" type="button">重新比一次</button>
+      </div>
+      <div class="reset__row" id="reset-confirm" hidden>
+        <p>確定要清空這次的成績嗎？</p>
+        <button class="sticker sticker--solid" id="reset-yes" type="button">清空成績</button>
+        <button class="sticker" id="reset-no" type="button">先不要</button>
+      </div>
+    </div>
+  </article>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
