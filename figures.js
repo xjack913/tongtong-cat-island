@@ -62,6 +62,53 @@ function svg(height) {
   return node('svg', { viewBox: `0 0 ${W} ${height}`, role: 'img' });
 }
 
+// 一個立體形狀，畫在寬 W、高 160 的格子正中間；縮小的時候 width 要放大，線才不會太細
+function drawSolid(el, kind, width) {
+  const cx = W / 2;
+  const line = { stroke: INK, 'stroke-width': width, 'stroke-linejoin': 'round' };
+  if (kind === 'ball') {
+    node('ellipse', { cx, cy: 146, rx: 50, ry: 8, fill: '#DCE0F3' }, el);
+    node('circle', { cx, cy: 80, r: 62, fill: '#FF8FAB', ...line }, el);
+    node('path', { d: `M${cx - 60} 72 Q${cx} 100 ${cx + 60} 72`, fill: 'none', stroke: '#E8466E', 'stroke-width': width * 1.2 }, el);
+    node('ellipse', { cx: cx - 22, cy: 52, rx: 14, ry: 9, fill: '#FFFFFF', opacity: 0.75 }, el);
+  } else if (kind === 'cylinder') {
+    node('path', { d: `M${cx - 50} 34 V126 A50 16 0 0 0 ${cx + 50} 126 V34`, fill: '#7FC6E8', ...line }, el);
+    node('ellipse', { cx, cy: 34, rx: 50, ry: 16, fill: '#B9E3F5', ...line }, el);
+  } else {
+    const wide = kind === 'box' ? 150 : 90;
+    const h = 90;
+    const d = 34;
+    const x0 = cx - (wide + d) / 2;
+    const y0 = 40;
+    node('polygon', { points: `${x0},${y0} ${x0 + d},${y0 - d * 0.7} ${x0 + d + wide},${y0 - d * 0.7} ${x0 + wide},${y0}`, fill: '#FFE08A', ...line }, el);
+    node('polygon', { points: `${x0 + wide},${y0} ${x0 + wide + d},${y0 - d * 0.7} ${x0 + wide + d},${y0 + h - d * 0.7} ${x0 + wide},${y0 + h}`, fill: '#E0A400', ...line }, el);
+    node('rect', { x: x0, y: y0, width: wide, height: h, fill: '#FFC93C', ...line }, el);
+  }
+}
+
+// 一個鐘面：(cx, cy) 是中心、r 是半徑，短針（時針）粗短、長針（分針）細長；k 讓小時鐘的線和字跟著縮
+function dial(el, cx, cy, r, h, m) {
+  const k = r / 80;
+  node('circle', { cx, cy, r: r + 6 * k, fill: '#8D9CF0' }, el);
+  node('circle', { cx, cy, r, fill: '#FFFFFF', stroke: INK, 'stroke-width': 3 * k }, el);
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * Math.PI * 2;
+    const long = i % 5 === 0;
+    const r1 = r - (long ? 10 : 5) * k;
+    node('line', { x1: cx + Math.sin(a) * r1, y1: cy - Math.cos(a) * r1, x2: cx + Math.sin(a) * (r - 2 * k), y2: cy - Math.cos(a) * (r - 2 * k), stroke: long ? INK : '#B9BED6', 'stroke-width': (long ? 2.5 : 1.2) * k }, el);
+  }
+  for (let n = 1; n <= 12; n++) {
+    const a = (n / 12) * Math.PI * 2;
+    text(el, cx + Math.sin(a) * (r - 24 * k), cy - Math.cos(a) * (r - 24 * k), n, { 'font-size': Math.max(14, 17 * k) });
+  }
+  const hourA = (((h % 12) + m / 60) / 12) * Math.PI * 2;
+  const minA = (m / 60) * Math.PI * 2;
+  const hand = (a, len, width, color) => node('line', { x1: cx, y1: cy, x2: cx + Math.sin(a) * len, y2: cy - Math.cos(a) * len, stroke: color, 'stroke-width': width, 'stroke-linecap': 'round' }, el);
+  hand(minA, r - 16 * k, 4 * k, '#4A4F6E');
+  hand(hourA, r - 38 * k, 8 * k, INK);
+  node('circle', { cx, cy, r: 6 * k, fill: RED }, el);
+}
+
 function plate(parent, cx, cy, rx, ry) {
   node('ellipse', { cx, cy: cy + 4, rx, ry, fill: '#DCE0F3' }, parent);
   node('ellipse', { cx, cy, rx, ry, fill: '#FFFFFF', stroke: '#B9BED6', 'stroke-width': 2 }, parent);
@@ -251,26 +298,19 @@ const DRAW = {
   // 立體：球、圓柱、正方體、長方體，用三種深淺畫出面
   solid(f) {
     const el = svg(160);
-    const cx = W / 2;
-    const line = { stroke: INK, 'stroke-width': 2.5, 'stroke-linejoin': 'round' };
-    if (f.solid === 'ball') {
-      node('ellipse', { cx, cy: 146, rx: 50, ry: 8, fill: '#DCE0F3' }, el);
-      node('circle', { cx, cy: 80, r: 62, fill: '#FF8FAB', ...line }, el);
-      node('path', { d: `M${cx - 60} 72 Q${cx} 100 ${cx + 60} 72`, fill: 'none', stroke: '#E8466E', 'stroke-width': 3 }, el);
-      node('ellipse', { cx: cx - 22, cy: 52, rx: 14, ry: 9, fill: '#FFFFFF', opacity: 0.75 }, el);
-    } else if (f.solid === 'cylinder') {
-      node('path', { d: `M${cx - 50} 34 V126 A50 16 0 0 0 ${cx + 50} 126 V34`, fill: '#7FC6E8', ...line }, el);
-      node('ellipse', { cx, cy: 34, rx: 50, ry: 16, fill: '#B9E3F5', ...line }, el);
-    } else {
-      const wide = f.solid === 'box' ? 150 : 90;
-      const h = 90;
-      const d = 34;
-      const x0 = cx - (wide + d) / 2;
-      const y0 = 40;
-      node('polygon', { points: `${x0},${y0} ${x0 + d},${y0 - d * 0.7} ${x0 + d + wide},${y0 - d * 0.7} ${x0 + wide},${y0}`, fill: '#FFE08A', ...line }, el);
-      node('polygon', { points: `${x0 + wide},${y0} ${x0 + wide + d},${y0 - d * 0.7} ${x0 + wide + d},${y0 + h - d * 0.7} ${x0 + wide},${y0 + h}`, fill: '#E0A400', ...line }, el);
-      node('rect', { x: x0, y: y0, width: wide, height: h, fill: '#FFC93C', ...line }, el);
-    }
+    drawSolid(el, f.solid, 2.5);
+    return el;
+  },
+
+  // 黑板課用：球、圓柱、正方體、長方體縮小排一排，底下寫名字
+  solids() {
+    const el = svg(116);
+    const k = 0.45;
+    // 長方體和三個字的名字比較寬，不平均分格，免得名字黏在一起
+    [['ball', 42, '球'], ['cylinder', 112, '圓柱'], ['cube', 196, '正方體'], ['box', 300, '長方體']].forEach(([key, x, name]) => {
+      drawSolid(node('g', { transform: `translate(${x - (W / 2) * k} 1) scale(${k})` }, el), key, 2.5 / k);
+      text(el, x, 98, name, { 'font-size': 19, 'font-family': ZY, 'font-weight': 400, fill: '#4A4F6E' });
+    });
     return el;
   },
 
@@ -294,30 +334,21 @@ const DRAW = {
     return el;
   },
 
-  // 時鐘：短針（時針）粗短、長針（分針）細長
+  // 時鐘
   clock(f) {
     const el = svg(180);
-    const cx = W / 2;
-    const cy = 90;
-    const r = 80;
-    node('circle', { cx, cy, r: r + 6, fill: '#8D9CF0' }, el);
-    node('circle', { cx, cy, r, fill: '#FFFFFF', stroke: INK, 'stroke-width': 3 }, el);
-    for (let i = 0; i < 60; i++) {
-      const a = (i / 60) * Math.PI * 2;
-      const long = i % 5 === 0;
-      const r1 = r - (long ? 10 : 5);
-      node('line', { x1: cx + Math.sin(a) * r1, y1: cy - Math.cos(a) * r1, x2: cx + Math.sin(a) * (r - 2), y2: cy - Math.cos(a) * (r - 2), stroke: long ? INK : '#B9BED6', 'stroke-width': long ? 2.5 : 1.2 }, el);
-    }
-    for (let n = 1; n <= 12; n++) {
-      const a = (n / 12) * Math.PI * 2;
-      text(el, cx + Math.sin(a) * (r - 24), cy - Math.cos(a) * (r - 24), n, { 'font-size': 17 });
-    }
-    const hourA = (((f.h % 12) + f.m / 60) / 12) * Math.PI * 2;
-    const minA = (f.m / 60) * Math.PI * 2;
-    const hand = (a, len, width, color) => node('line', { x1: cx, y1: cy, x2: cx + Math.sin(a) * len, y2: cy - Math.cos(a) * len, stroke: color, 'stroke-width': width, 'stroke-linecap': 'round' }, el);
-    hand(minA, r - 16, 4, '#4A4F6E');
-    hand(hourA, r - 38, 8, INK);
-    node('circle', { cx, cy, r: 6, fill: RED }, el);
+    dial(el, W / 2, 90, 80, f.h, f.m);
+    return el;
+  },
+
+  // 兩個小時鐘並排，底下寫那時候做的事（比先後用）
+  clocks(f) {
+    const el = svg(178);
+    f.items.forEach((item, i) => {
+      const cx = W / 4 + (i * W) / 2;
+      dial(el, cx, 74, 62, item.h, item.m);
+      text(el, cx, 161, item.label, { 'font-size': 21, 'font-family': ZY, 'font-weight': 400, fill: '#4A4F6E' });
+    });
     return el;
   },
 };

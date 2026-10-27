@@ -322,10 +322,76 @@ function unit8(rand) {
   });
 }
 
+// 一天裡的什麼時間：時鐘上的 7 點一天有兩次，要看做的是什麼事。alt 是貓最容易寫錯的那一個
+const DAY_TIMES = [
+  { h: 7, act: '起床吃早餐', ans: '上午', alt: '晚上', hint: '時鐘上的 7 點一天有兩次。起床吃早餐，是早上的事，還是天黑以後的事？', why: '起床吃早餐是早上的事，所以是上午 7 點。' },
+  { h: 10, act: '在教室上課', ans: '上午', alt: '下午', hint: '吃午餐以前是上午，吃完午餐以後是下午。10 點上課，吃過午餐了沒有？', why: '10 點在教室上課，還沒吃午餐，所以是上午 10 點。' },
+  { h: 12, act: '吃午餐', ans: '中午', alt: '下午', hint: '想一想，午餐是一天裡的什麼時間吃的？', why: '吃午餐是中午的事，所以是中午 12 點。' },
+  { h: 4, act: '放學回家', ans: '下午', alt: '上午', hint: '放學回家，是在吃午餐以前，還是吃完午餐以後？', why: '吃完午餐以後才放學，所以是下午 4 點。' },
+  { h: 7, act: '吃晚餐', ans: '晚上', alt: '上午', hint: '時鐘上的 7 點一天有兩次。吃晚餐，是早上的事，還是天黑以後的事？', why: '吃晚餐是天黑以後的事，所以是晚上 7 點。' },
+  { h: 9, act: '上床睡覺', ans: '晚上', alt: '上午', hint: '上床睡覺，是早上的事，還是天黑以後的事？', why: '上床睡覺是天黑以後的事，所以是晚上 9 點。' },
+];
+// 先做的、後做的：貓在島上會做的事
+const ISLAND_EVENTS = [
+  { label: '看魚', act: '去魚池看魚' },
+  { label: '表演', act: '上臺表演' },
+  { label: '跳高', act: '去跳臺跳高' },
+  { label: '躲紙箱', act: '躲進紙箱' },
+  { label: '寫日記', act: '寫日記' },
+];
+// 時間長短：[一下子就做完的事, 要花比較久的事]
+const QUICK_LONG = [['洗手', '睡覺'], ['喝一杯水', '看一部卡通'], ['穿鞋子', '去動物園玩'], ['刷牙', '吃一頓晚餐']];
+
+const clockText = (h, m) => (m === 0 ? `${h} 點` : `${h} 點半`);
+
 function unit9(rand) {
   const h = int(rand, 1, 12);
   const next = (h % 12) + 1;
-  if (rand() < 0.5) {
+  const type = rand();
+  if (type < 0.2) {
+    const d = pick(rand, DAY_TIMES);
+    const [c1] = pick(rand, NAMES);
+    const [a, b] = rand() < 0.5 ? [d.ans, d.alt] : [d.alt, d.ans];
+    return finish(rand, {
+      unit: 9, text: `${c1}每天 ${d.h} 點${d.act}，是${a}還是${b}？`, fig: { type: 'clock', h: d.h, m: 0 },
+      answer: d.ans, wrongs: [d.alt], hint: d.hint, why: d.why,
+    });
+  }
+  if (type < 0.3) {
+    // 先後：兩件事都在下午，早的那件可能寫在前面，也可能寫在後面
+    const [c1] = pick(rand, NAMES);
+    const first = pick(rand, ISLAND_EVENTS);
+    let second = pick(rand, ISLAND_EVENTS);
+    while (second === first) second = pick(rand, ISLAND_EVENTS);
+    const h1 = int(rand, 1, 4);
+    const early = { ...first, h: h1, m: 0 };
+    const late = rand() < 0.3 ? { ...second, h: h1, m: 30 } : { ...second, h: h1 + int(rand, 1, 2), m: 0 };
+    const order = rand() < 0.5 ? [early, late] : [late, early];
+    const askEarly = rand() < 0.7;
+    const want = askEarly ? early : late;
+    const other = askEarly ? late : early;
+    return finish(rand, {
+      unit: 9, text: `${c1}下午 ${clockText(order[0].h, order[0].m)}${order[0].act}，${clockText(order[1].h, order[1].m)}${order[1].act}。哪一件事${askEarly ? '先做' : '比較晚做'}？`,
+      fig: { type: 'clocks', items: order.map((e) => ({ h: e.h, m: e.m, label: e.label })) },
+      answer: want.act, wrongs: [other.act],
+      hint: '兩個時鐘都讀一讀，再比一比，哪一個時間先到？',
+      why: askEarly
+        ? `${clockText(early.h, early.m)}比 ${clockText(late.h, late.m)}早，所以先${early.act}，答案是${early.act}。`
+        : `${clockText(late.h, late.m)}比 ${clockText(early.h, early.m)}晚，所以${late.act}比較晚做，答案是${late.act}。`,
+    });
+  }
+  if (type < 0.4) {
+    const [quick, long] = pick(rand, QUICK_LONG);
+    const [a, b] = rand() < 0.5 ? [quick, long] : [long, quick];
+    const askLong = rand() < 0.5;
+    return finish(rand, {
+      unit: 9, text: `「${a}」和「${b}」，哪一件事${askLong ? '要花比較久的時間' : '比較快做完'}？`,
+      answer: askLong ? long : quick, wrongs: [askLong ? quick : long],
+      hint: '想一想，自己做這兩件事，哪一件一下子就做完了？',
+      why: `${quick}一下子就做完了，${long}要花比較久的時間，答案是${askLong ? long : quick}。`,
+    });
+  }
+  if (type < 0.7) {
     return finish(rand, {
       unit: 9, text: '時鐘上是幾點？', fig: { type: 'clock', h, m: 0 },
       answer: `${h} 點`, wrongs: h === 12 ? [`${h} 點半`, '6 點'] : ['12 點', `${h} 點半`],
