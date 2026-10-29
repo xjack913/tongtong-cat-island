@@ -412,8 +412,8 @@ export function makeProblem(unit, rand = Math.random) {
   return maker ? maker(rand) : null;
 }
 
-// ---------- 每天的作業：每天換 10 隻貓來上課，每隻寫一張，9 個單元都會出到 ----------
-export const CLASS_SIZE = 10;
+// ---------- 每天的作業：每天換 20 隻貓來上課，每隻寫一張，9 個單元都會出到 ----------
+export const CLASS_SIZE = 20;
 
 // 今天是哪一天（裝置的當地日期），例如 '2026-10-27'
 export function dayKey(time = Date.now()) {
@@ -448,11 +448,14 @@ export function dailyClass(key, catCount, size = CLASS_SIZE) {
   return shuffle(Array.from({ length: catCount }, (_, i) => i), dayRandom(key, 1)).slice(0, size);
 }
 
-// 今天的作業：9 個單元每個先出一張，剩下的再隨便挑單元，順序打亂；同一天不出一模一樣的題目
+// 今天的作業：9 個單元每個先出一樣多張（20 張就是每個 2 張），剩下的再挑不同的單元各加一張，順序打亂；
+// 所以每個單元一天是 2 到 3 張，不會擠在同一個單元。同一天不出一模一樣的題目
 export function dailyHomework(key, size = CLASS_SIZE) {
   const rand = dayRandom(key, 2);
-  const units = MATH_UNITS.map((u) => u.n);
-  while (units.length < size) units.push(units[Math.floor(rand() * MATH_UNITS.length)]);
+  const units = [];
+  for (let k = 0; k < Math.floor(size / MATH_UNITS.length); k++) units.push(...MATH_UNITS.map((u) => u.n));
+  const extra = MATH_UNITS.map((u) => u.n);
+  while (units.length < size) units.push(extra.splice(Math.floor(rand() * extra.length), 1)[0]);
   const list = [];
   for (const unit of shuffle(units, rand).slice(0, size)) {
     let p = makeProblem(unit, rand);

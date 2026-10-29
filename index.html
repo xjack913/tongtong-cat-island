@@ -476,6 +476,8 @@
   .learn-dots li.is-now { background: var(--paper); box-shadow: inset 0 0 0 3px var(--ink); }
   .learn-dots li.is-good { background: var(--low); }
   .learn-dots li.is-help { background: var(--mid); }
+  /* 一天 20 張：圓點排兩列，每列 10 顆 */
+  #learn-dots { flex-wrap: wrap; max-width: calc(16px * 10 + 6px * 9); }
   .link-btn { min-height: 36px; padding: 0 4px; border: 0; background: transparent; color: var(--ink); font-size: var(--zy-3); text-decoration: underline; text-underline-offset: 3px; }
   .unit-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
   .unit-chip {
@@ -793,7 +795,7 @@
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v6a5 5 0 0 1-10 0zM11 14h2v3h3v4H8v-4h3z"/></svg></span><span><b>排行榜</b>每隻貓只算牠跳最高的那一次。頒獎臺上站的是這次前三名，第一名戴皇冠。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 4.5l11-2v13.2a3 3 0 1 1-2-2.8V6.1l-7 1.3v10.3a3 3 0 1 1-2-2.8z"/></svg></span><span><b>表演區</b>點轉圈圈、揮手、翻跟斗、唱歌，臺上的貓就會表演；按拍手，臺下的貓一起拍。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>日記區</b>貓貓會把今天做的事寫成日記。按貓掌幫日記蓋掌印，按「唸給我聽」就會唸出來。</span></li>
-      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。點老師或講台就改作業：每天有 10 隻貓來上課、各寫一張，桐桐當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
+      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。點老師或講台就改作業：每天有 20 隻貓來上課、各寫一張，桐桐當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
       <li><span class="help-icon" aria-hidden="true">？</span><span><b>貓貓教練</b>頭上綁頭帶、用兩隻腳走路。看到晃來晃去、頭上冒「？」的貓，就會叫牠去跳臺跳。</span></li>
       <li><span class="help-icon" aria-hidden="true">z</span><span><b>累了就休息</b>貓貓會去公園休息、躲進多多紙箱區的紙箱，也會回貓貓之家睡覺。點一下貓貓或紙箱，牠會跟你打招呼。</span></li>
     </ul>
