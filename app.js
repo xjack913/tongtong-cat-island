@@ -512,6 +512,7 @@ function start(hotData = {}) {
   document.addEventListener('keydown', (event) => {
     if ((event.code === 'Space' || event.code === 'Enter') && !$('dock').hidden && !event.repeat) {
       const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === 'TEXTAREA') return;
       if (event.code === 'Enter' && tag === 'BUTTON' && document.activeElement !== jumpBtn) return;
       event.preventDefault();
       pressJump();
@@ -599,7 +600,7 @@ function start(hotData = {}) {
     if (c.type === 'characterData') markZhuyin(c.target);
     else c.addedNodes.forEach(markZhuyin);
   }));
-  ['diary-card', 'learn-card', 'lesson-card', 'story-card'].forEach((id) => {
+  ['diary-card', 'learn-card', 'lesson-card', 'story-card', 'report-card'].forEach((id) => {
     markZhuyin($(id));
     zhuyinWatch.observe($(id), { childList: true, characterData: true, subtree: true });
   });
@@ -1058,6 +1059,7 @@ function start(hotData = {}) {
     const picking = lessonUnit === null;
     $('lesson-intro').hidden = !picking;
     lessonUnits.hidden = !picking;
+    $('lesson-report').hidden = !picking;
     $('lesson-board').hidden = picking;
     $('lesson-dock').hidden = picking;
     if (picking) return;
@@ -1128,6 +1130,128 @@ function start(hotData = {}) {
     track('read_aloud', { what: 'story' });
   });
 
+  // ---------- 問題回報：送到桐爸的 Google 表單（不用登入，回報不公開） ----------
+  // 回報卡疊在正在看的卡片上面，自動附上看到哪裡：黑板課哪一頁、哪一張作業、哪一篇日記。
+  // 畫面上的字有注音，送出去的是不帶選擇子的原文
+  const REPORT_FORM = 'https://docs.google.com/forms/d/e/1FAIpQLSdOJtSk4mTgL5d_P8hrdcaBHFs1EMEMRwvMbjmfVhGza_CUuw';
+  const REPORT_FIELDS = { kind: 'entry.2056357624', where: 'entry.1964930136', text: 'entry.1806888704', device: 'entry.754595705' };
+  const reportReader = { button: $('report-read'), label: $('report-read-label'), idle: '唸給我聽' };
+  if (!synth) $('report-read').hidden = true;
+  const reportKinds = [...document.querySelectorAll('.report-kind')];
+  let reportKind = null;
+  let reportWhere = null;
+
+  function reportContext() {
+    if (!$('lesson-card').hidden) {
+      if (lessonUnit === null) return { from: 'lesson', show: '黑板課的單元選單', detail: '黑板課的單元選單' };
+      const page = LESSONS[lessonUnit][lessonPage];
+      const show = `黑板課：第 ${lessonUnit} 單元 ${MATH_UNITS[lessonUnit - 1].name}，第 ${lessonPage + 1} 頁`;
+      return { from: 'lesson', show, detail: `${show}「${page.title}」｜考考你：${page.ask}｜答案：${page.answer}` };
+    }
+    if (!$('learn-card').hidden) {
+      const s = stack[sheetIndex];
+      if (!s) return { from: 'learn', show: '改作業：今天的作業改完了', detail: '改作業：今天的作業改完了' };
+      const name = cats[s.cat].name;
+      const show = `改作業：第 ${s.p.unit} 單元 ${MATH_UNITS[s.p.unit - 1].name}，${name}的作業`;
+      return { from: 'learn', show, detail: `${show}｜題目：${s.p.text}｜${name}寫：${s.p.catAnswer}｜正確答案：${s.p.answer}` };
+    }
+    if (!$('diary-card').hidden) {
+      const diary = currentDiary();
+      if (!diary) return { from: 'diary', show: '日記：還沒有日記', detail: '日記：還沒有日記' };
+      const show = `日記：${cats[diary.cat].name}的日記，${diary.date}`;
+      return { from: 'diary', show, detail: `${show}｜${diary.lines.join('')}` };
+    }
+    const place = NAV.find((n) => n.id === focus);
+    const show = `島上：${place ? place.label : '桐桐貓貓島'}`;
+    return { from: 'island', show, detail: show };
+  }
+
+  function openReport(via) {
+    sound.unlock();
+    stopSpeaking();
+    reportWhere = reportContext();
+    reportKind = null;
+    reportKinds.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+    $('report-where').textContent = reportWhere.show;
+    $('report-text').value = '';
+    $('report-form').hidden = false;
+    $('report-error').hidden = true;
+    $('report-done').hidden = true;
+    $('report-send').hidden = false;
+    $('report-send').disabled = true;
+    $('report-ok').hidden = true;
+    $('report-card').hidden = false;
+    $('report-card').scrollTop = 0;
+    track('report_open', { what: via === 'toolbar' ? 'toolbar' : reportWhere.from });
+  }
+
+  function closeReport() {
+    if (speaking === reportReader) stopSpeaking();
+    $('report-card').hidden = true;
+  }
+
+  $('report-open').addEventListener('click', () => {
+    if ($('report-card').hidden) openReport('toolbar');
+    else closeReport();
+  });
+  document.querySelectorAll('[data-report]').forEach((button) => button.addEventListener('click', () => openReport('card')));
+  $('report-close').addEventListener('click', closeReport);
+  $('report-ok').addEventListener('click', closeReport);
+  reportKinds.forEach((button) => button.addEventListener('click', () => {
+    reportKind = button;
+    reportKinds.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+    $('report-send').disabled = false;
+    sound.play('pop');
+  }));
+  $('report-read').addEventListener('click', () => {
+    if (speaking === reportReader) {
+      stopSpeaking();
+      return;
+    }
+    const text = $('report-done').hidden
+      ? `回報問題。選一個最像的，按送出，桐爸就會收到。可以選：${reportKinds.map((b) => plainText(b.textContent)).join('、')}。${plainText($('report-note').textContent)}`
+      : plainText($('report-done').textContent).replace(/\s+/g, '');
+    speak(text, reportReader);
+    track('read_aloud', { what: 'report' });
+  });
+
+  $('report-send').addEventListener('click', async () => {
+    if (!reportKind || !reportWhere) return;
+    const fields = {
+      [REPORT_FIELDS.kind]: plainText(reportKind.textContent),
+      [REPORT_FIELDS.where]: reportWhere.detail,
+      [REPORT_FIELDS.text]: $('report-text').value.trim(),
+      [REPORT_FIELDS.device]: `${location.host || '本機檔案'}｜${innerWidth}×${innerHeight}｜${navigator.userAgent}`,
+    };
+    const button = $('report-send');
+    button.disabled = true;
+    $('report-error').hidden = true;
+    try {
+      // Google 表單不回 CORS 標頭，只能用 no-cors 送：送得出去就算成功，看不到表單的回覆
+      await fetch(`${REPORT_FORM}/formResponse`, { method: 'POST', mode: 'no-cors', body: new URLSearchParams(fields) });
+    } catch {
+      // 沒有網路，或 claude.ai 上的版本不能直接連 Google：給一個帶好內容的表單網頁連結。
+      // 小朋友打的字不放進網址（會留在瀏覽紀錄），到表單上再打一次
+      const link = new URL(`${REPORT_FORM}/viewform`);
+      link.searchParams.set('usp', 'pp_url');
+      Object.entries(fields).forEach(([key, value]) => {
+        if (key !== REPORT_FIELDS.text) link.searchParams.set(key, value);
+      });
+      $('report-link').href = link.href;
+      $('report-error').hidden = false;
+      $('report-error').scrollIntoView({ block: 'nearest' });
+      button.disabled = false;
+      return;
+    }
+    track('report_send', { what: reportKind.dataset.kind });
+    if (speaking === reportReader) stopSpeaking();
+    sound.play('stamp');
+    $('report-form').hidden = true;
+    $('report-done').hidden = false;
+    button.hidden = true;
+    $('report-ok').hidden = false;
+  });
+
   // ---------- 破紀錄橫幅 ----------
   function showToast(title, text) {
     const toast = $('toast');
@@ -1159,7 +1283,9 @@ function start(hotData = {}) {
   }
   document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', closeCards));
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeCards();
+    if (event.key !== 'Escape') return;
+    if ($('report-card').hidden) closeCards();
+    else closeReport();
   });
 
   $('help-open').addEventListener('click', () => {

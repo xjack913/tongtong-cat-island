@@ -8,7 +8,8 @@ if (location.hostname === 'tong.xjack.tw') {
     window.dataLayer.push(arguments);
   };
   window.gtag('js', new Date());
-  window.gtag('config', MEASUREMENT_ID, { allow_google_signals: false, allow_ad_personalization_signals: false });
+  // cookie 只放在 tong.xjack.tw，不跟 xjack.tw 其他子網域共用
+  window.gtag('config', MEASUREMENT_ID, { allow_google_signals: false, allow_ad_personalization_signals: false, cookie_domain: 'tong.xjack.tw' });
   const script = document.createElement('script');
   script.async = true;
   script.src = `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`;

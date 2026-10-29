@@ -379,7 +379,7 @@
 
   /* 日記區、學習數學島的字都帶注音：國字改用注音粉圓（字的右邊直接畫好注音），數字照舊。
      注音只有字高的四分之一，字要放大小朋友才看得清楚：--zy 是內文、--zy-2 是提示和按鈕、--zy-3 是小字 */
-  #diary-card, #learn-card, #lesson-card, #story-card {
+  #diary-card, #learn-card, #lesson-card, #story-card, #report-card {
     --round: "Bpmf Huninn", "Huninn", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
     --num: "Fredoka", "Bpmf Huninn", "Huninn", "Arial Rounded MT Bold", Arial, sans-serif;
     --zy: 29px; --zy-2: calc(var(--zy) * 0.8); --zy-3: calc(var(--zy) * 0.66);
@@ -393,7 +393,7 @@
   .learn-side > .learn-unit { order: -1; }
   .learn-unit { margin-top: 8px; }
   @media (min-width: 900px) {
-    #diary-card, #story-card { width: min(600px, calc(100% - 32px)); }
+    #diary-card, #story-card, #report-card { width: min(600px, calc(100% - 32px)); }
     #learn-card, #lesson-card { width: min(800px, calc(100% - 32px)); }
     /* 黑板課也分兩欄：左邊黑板講重點，右邊白紙放圖和例題，翻頁不用捲就看得到「考考你」 */
     .board { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: auto auto 1fr; column-gap: 16px; align-items: start; }
@@ -413,9 +413,9 @@
     #learn-card .card__label { display: none; }
     #learn-card .sheet__fig svg { max-height: 140px; }
   }
-  #diary-card .card__label, #learn-card .card__label, #lesson-card .card__label, #story-card .card__label { font-size: var(--zy-3); }
-  #diary-card .card__title, #learn-card .card__title, #lesson-card .card__title, #story-card .card__title { font-size: var(--zy); }
-  #diary-card .card__text, #diary-card .empty, #lesson-card .card__text { font-size: var(--zy-3); }
+  #diary-card .card__label, #learn-card .card__label, #lesson-card .card__label, #story-card .card__label, #report-card .card__label { font-size: var(--zy-3); }
+  #diary-card .card__title, #learn-card .card__title, #lesson-card .card__title, #story-card .card__title, #report-card .card__title { font-size: var(--zy); }
+  #diary-card .card__text, #diary-card .empty, #lesson-card .card__text, #report-card .card__text { font-size: var(--zy-3); }
   /* 卡片很長要捲的時候，按鈕列固定在卡片底部 */
   .card__dock {
     position: sticky; z-index: 1; bottom: calc(-1 * var(--pad-b)); margin-bottom: calc(-1 * var(--pad-b)); padding-bottom: var(--pad-b);
@@ -555,6 +555,30 @@
   .board__answer { margin-top: 10px; padding: 8px 12px; border-radius: 12px; background: var(--low-pale); color: var(--low-deep); font-size: var(--zy-2); line-height: 1.6; }
   .lesson-controls .paw-btn--read { flex: 1; }
   .learn-stats { margin-top: 10px; font-size: var(--zy-3); color: var(--text-2); }
+  /* 問題回報：疊在正在看的卡片上面，關掉就回到原本那張 */
+  #report-card { z-index: 8; }
+  .report-chip { background: var(--mid-pale); color: var(--mid-deep); }
+  .report-row { display: flex; justify-content: flex-end; margin-top: 4px; }
+  .learn-bar { flex-wrap: wrap; }
+  .learn-bar .report-link { margin-left: auto; }
+  .board .report-link { margin-left: 0; }
+  .report-where { margin-top: 10px; padding: 8px 12px; border-radius: 14px; background: var(--ink-pale); color: var(--ink-deep); font-size: var(--zy-3); line-height: 1.6; }
+  .report-where__tag { display: inline-block; margin-right: 8px; padding: 0 10px; border-radius: 999px; background: var(--paper); font-size: calc(var(--zy) * 0.6); }
+  .report-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .report-kind { min-height: 64px; text-align: center; font-size: var(--zy-2); color: var(--ink-deep); }
+  .report-kind[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: #fff; }
+  .report-text {
+    display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 10px 12px; border: 2px solid var(--line); border-radius: 14px;
+    font: inherit; font-size: var(--zy-2); line-height: 1.6; color: var(--text); resize: vertical;
+  }
+  .report-text:focus { border-color: var(--ink); outline: none; }
+  .report-note { margin-top: 12px; font-size: var(--zy-3); color: var(--rose-deep); }
+  #report-error { scroll-margin-bottom: 104px; }
+  .report-error { margin-top: 10px; padding: 8px 12px; border-radius: 14px; background: var(--rose-pale); color: var(--rose-deep); font-size: var(--zy-3); line-height: 1.6; }
+  .report-error a { color: inherit; }
+  .report-done { padding: 26px 6px; text-align: center; }
+  .report-send { flex: 1; min-height: 64px; font-size: var(--zy-2); }
+  .report-send:disabled { opacity: 0.4; cursor: default; }
 
   @media (max-width: 1000px) {
     .toast { top: 140px; }
@@ -565,10 +589,11 @@
       border-width: 3px 0 0; border-radius: 26px 26px 0 0; box-shadow: 0 -6px 24px rgba(42, 52, 144, 0.2);
       --pad-b: calc(20px + env(safe-area-inset-bottom, 0px)); padding-left: var(--gutter-l); padding-right: var(--gutter-r); padding-bottom: var(--pad-b);
     }
+    #report-card { z-index: 31; }
   }
   @media (max-width: 699px) {
     body { font-size: 16px; }
-    #diary-card, #learn-card, #lesson-card, #story-card { --zy: 23px; }
+    #diary-card, #learn-card, #lesson-card, #story-card, #report-card { --zy: 23px; }
     /* 手機太窄：翻頁和「唸給我聽」只留圖示，字還在、讀螢幕的軟體唸得到；「蓋掌印」留字 */
     #diary-prev span, #diary-next span, #diary-read span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .plate { padding: 4px 12px 4px 6px; gap: 6px; }
@@ -644,6 +669,10 @@
       <button class="sticker" id="sound-toggle" type="button" aria-pressed="true" aria-label="聲音">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path id="sound-wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
         <span class="tool__label" id="sound-label">聲音開</span>
+      </button>
+      <button class="sticker" id="report-open" type="button" aria-label="回報問題">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4.5L17 13H5"/></svg>
+        <span class="tool__label">回報問題</span>
       </button>
     </div>
   </header>
@@ -834,6 +863,7 @@
         <span class="page__who"><i class="dot" id="diary-dot"></i><span><b id="diary-cat"></b>的日記</span></span>
         <span class="page__new" id="diary-new" hidden>新的！</span>
         <span class="page__date" id="diary-date"></span>
+        <button class="link-btn report-link" type="button" data-report>這裡怪怪的</button>
       </header>
       <div class="page__lines" id="diary-lines"></div>
       <div class="page__paws" id="diary-paws" aria-hidden="true"></div>
@@ -895,6 +925,7 @@
       <div class="learn-side">
         <div class="learn-bar">
           <ol class="learn-dots" id="learn-dots" aria-label="今天的作業"></ol>
+          <button class="link-btn report-link" type="button" data-report>這裡怪怪的</button>
         </div>
         <p class="learn-unit" id="learn-unit"><span class="sheet__unit" id="sheet-unit"></span></p>
         <div class="tip" id="learn-tip" hidden>
@@ -944,11 +975,13 @@
     </div>
     <p class="card__text" id="lesson-intro">這次考試的範圍是一年級上學期的 9 個單元。想先學哪一個？</p>
     <div class="unit-grid" id="lesson-units" role="group" aria-label="選一個單元"></div>
+    <p class="report-row" id="lesson-report"><button class="link-btn report-link" type="button" data-report>這裡怪怪的</button></p>
     <section class="board" id="lesson-board" hidden aria-live="polite">
       <header class="board__head">
         <span class="sheet__unit" id="lesson-unit"></span>
         <ol class="learn-dots" id="lesson-dots" aria-label="這個單元的頁數"></ol>
         <button class="link-btn" id="lesson-back" type="button">換單元</button>
+        <button class="link-btn report-link" type="button" data-report>這裡怪怪的</button>
       </header>
       <h3 class="board__title" id="lesson-page-title"></h3>
       <div class="board__lines" id="lesson-lines"></div>
@@ -973,6 +1006,44 @@
           <svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg>
           <span id="lesson-next-label">下一頁</span>
         </button>
+      </div>
+    </div>
+  </article>
+
+  <article class="card" id="report-card" hidden aria-labelledby="report-title">
+    <div class="card__head">
+      <span class="trophy-chip report-chip" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h12l-2.5 4.5L17 13H5"/></svg></span>
+      <div>
+        <p class="card__label">桐桐貓貓島</p>
+        <h2 class="card__title" id="report-title">回報問題</h2>
+      </div>
+      <button class="card__close" id="report-close" type="button" aria-label="關閉">×</button>
+    </div>
+    <div id="report-form">
+      <p class="card__text">選一個最像的，按送出，桐爸就會收到。</p>
+      <p class="report-where"><span class="report-where__tag">會一起送出</span><span id="report-where"></span>；還有你用的裝置和畫面大小</p>
+      <div class="report-kinds" role="group" aria-label="問題的種類">
+        <button class="unit-chip report-kind" type="button" data-kind="zhuyin" aria-pressed="false">注音怪怪的</button>
+        <button class="unit-chip report-kind" type="button" data-kind="question" aria-pressed="false">題目或答案怪怪的</button>
+        <button class="unit-chip report-kind" type="button" data-kind="screen" aria-pressed="false">畫面或按鈕怪怪的</button>
+        <button class="unit-chip report-kind" type="button" data-kind="idea" aria-pressed="false">我有新點子</button>
+      </div>
+      <p class="report-note" id="report-note">想多說一點可以打字，不要寫名字、學校和住址喔！</p>
+      <textarea class="report-text" id="report-text" rows="3" maxlength="500" aria-label="想多說的話" aria-describedby="report-note" placeholder="不寫也可以"></textarea>
+      <p class="report-error" id="report-error" hidden>現在沒有送成功，等一下再按一次送出，或是<a id="report-link" href="#" target="_blank" rel="noopener">改用表單網頁送出</a>（打的字要在那邊再打一次）。</p>
+    </div>
+    <div class="report-done" id="report-done" hidden>
+      <p class="sheet__done-title">送出了！</p>
+      <p class="sheet__done-text">桐爸會去檢查，有錯就會改。</p>
+    </div>
+    <div class="card__dock">
+      <div class="diary-controls">
+        <button class="paw-btn paw-btn--read" id="report-read" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+          <span id="report-read-label">唸給我聽</span>
+        </button>
+        <button class="sticker sticker--solid report-send" id="report-send" type="button" disabled>送出</button>
+        <button class="sticker sticker--solid report-send" id="report-ok" type="button" hidden>好</button>
       </div>
     </div>
   </article>
