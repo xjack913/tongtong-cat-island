@@ -822,6 +822,7 @@ function start(hotData = {}) {
       renderCoach();
     } else {
       followCoach();
+      track('cat_follow', { what: 'coach' });
     }
   });
 
@@ -852,6 +853,7 @@ function start(hotData = {}) {
   function openLearn() {
     sound.unlock();
     closeCards();
+    track('class_open', { what: 'homework' });
     learnOpen = true;
     loadDay();
     renderLearn();
@@ -953,6 +955,7 @@ function start(hotData = {}) {
     button.classList.remove('is-nope');
     void button.offsetWidth;
     button.classList.add('is-nope');
+    track('homework_miss', { unit: s.p.unit });
     if (s.tries === 0) {
       s.tries = 1;
       const text = `再看一次喔！${s.p.hint}`;
@@ -1032,6 +1035,7 @@ function start(hotData = {}) {
   function openLesson() {
     sound.unlock();
     closeCards();
+    track('class_open', { what: 'lesson' });
     lessonUnit = null;
     renderLesson();
     $('lesson-card').hidden = false;
@@ -1042,6 +1046,8 @@ function start(hotData = {}) {
   function showLessonPage(unit, page) {
     lessonUnit = unit;
     lessonPage = page;
+    // 翻到最後一頁就算這個單元上完了
+    if (page === LESSONS[unit].length - 1) track('lesson_done', { unit });
     renderLesson();
     $('lesson-card').scrollTop = 0;
     sound.play('page');
@@ -1090,16 +1096,23 @@ function start(hotData = {}) {
     const page = LESSONS[lessonUnit][lessonPage];
     $('lesson-answer').hidden = false;
     $('lesson-reveal').hidden = true;
+    track('lesson_reveal', { unit: lessonUnit });
     sound.play('pop');
     speak(spoken(`答案是：${page.answer}`), lessonReader);
     $('lesson-answer').scrollIntoView({ block: 'nearest' });
   });
   $('lesson-prev').addEventListener('click', () => {
-    if (lessonPage > 0) showLessonPage(lessonUnit, lessonPage - 1);
+    if (lessonPage === 0) return;
+    track('lesson_page', { unit: lessonUnit, what: 'prev' });
+    showLessonPage(lessonUnit, lessonPage - 1);
   });
   $('lesson-next').addEventListener('click', () => {
-    if (lessonPage < LESSONS[lessonUnit].length - 1) showLessonPage(lessonUnit, lessonPage + 1);
-    else backToUnits();
+    if (lessonPage === LESSONS[lessonUnit].length - 1) {
+      backToUnits();
+      return;
+    }
+    track('lesson_page', { unit: lessonUnit, what: 'next' });
+    showLessonPage(lessonUnit, lessonPage + 1);
   });
   $('lesson-back').addEventListener('click', backToUnits);
   $('lesson-read').addEventListener('click', () => {
@@ -1342,16 +1355,18 @@ function start(hotData = {}) {
       if (info && info.writing) chip.append(el('small', '', '寫日記'));
       if (info && info.performing) chip.append(el('small', '', '表演中'));
       if (info && info.lost) chip.append(el('small', '', '迷路了'));
-      chip.addEventListener('click', () => openCat(index));
+      chip.addEventListener('click', () => openCat(index, 'island_card'));
       box.append(chip);
     });
   }
 
   // 貓卡
-  function openCat(index) {
+  // via：從哪裡點進來的（3d、island_card、box），給 GA 看大家怎麼找到貓
+  function openCat(index, via) {
     sound.unlock();
     closeCards();
     openCatIndex = index;
+    track('cat_open', { what: via });
     scene.meow(index);
     renderCat();
     $('cat-card').hidden = false;
@@ -1404,6 +1419,7 @@ function start(hotData = {}) {
       $('stage-dock').hidden = true;
       measureBottom();
       scene.follow(openCatIndex, insets());
+      track('cat_follow', { what: 'cat' });
     }
     updateNav();
     renderCat();
@@ -1482,13 +1498,14 @@ function start(hotData = {}) {
   scene.onPick((pick) => {
     sound.unlock();
     if (pick.type === 'island') goIsland(pick.id);
-    else if (pick.type === 'cat') openCat(pick.index);
+    else if (pick.type === 'cat') openCat(pick.index, '3d');
     else if (pick.type === 'coach') openCoach();
     else if (pick.type === 'teacher' || pick.type === 'podium') atLearn(openLearn);
     else if (pick.type === 'board') atLearn(openLesson);
     else if (pick.type === 'box') {
       const who = scene.peekBox(pick.spot);
-      if (who !== null) openCat(who);
+      track('box_peek', { result: who !== null ? 'found' : 'empty' });
+      if (who !== null) openCat(who, 'box');
       else sound.play('pop');
     }
   });
