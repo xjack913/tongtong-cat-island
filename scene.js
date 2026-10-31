@@ -1191,41 +1191,180 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     island.labelY = TOP + 1.7;
   }
 
+  // 錦鯉：每條魚自己挑池子裡的下一個點游過去，有時慢慢晃、有時衝一小段，
+  // 池邊有貓坐著看魚的時候，偶爾游到牠面前停一下；頭永遠朝游的方向（魚的模型頭朝本機 +z）
   const kois = [];
+  const koiRandom = mulberry32(seed + 1013);
+  function addKoi(island, color, cx, cz, pr) {
+    const fish = makeFish(color);
+    island.group.add(fish);
+    const a = koiRandom() * TAU;
+    const d = Math.sqrt(koiRandom()) * pr * 0.6;
+    // timer 0：第一格畫面才挑目標，那時貓已經在島上了
+    const koi = { fish, island, cx, cz, limit: pr - 0.2, x: cx + Math.cos(a) * d, z: cz + Math.sin(a) * d, heading: koiRandom() * TAU, speed: 0.15, want: 0.15, tx: cx, tz: cz, timer: 0, wiggle: koiRandom() * TAU, visit: null, visited: false, y: TOP + 0.005 };
+    kois.push(koi);
+  }
+  // 這座島上「看魚」的位置，現在有貓坐好在看的
+  function koiWatchers(koi) {
+    return koi.island.spots.filter((s) => s.event && s.event.type === 'fish' && s.occupant !== null
+      && cats[s.occupant].spot === s && cats[s.occupant].state === 'rest');
+  }
+  function towardSpot(koi, spot) {
+    const dx = spot.pos.x - koi.island.cx - koi.cx;
+    const dz = spot.pos.z - koi.island.cz - koi.cz;
+    const len = Math.hypot(dx, dz) || 1;
+    return [dx / len, dz / len];
+  }
+  // room：目標最遠可以到池子可游範圍的幾成
+  function setKoiGoal(koi, x, z, room) {
+    let tx = x - koi.cx;
+    let tz = z - koi.cz;
+    const reach = Math.hypot(tx, tz);
+    const max = koi.limit * room;
+    if (reach > max) {
+      tx *= max / reach;
+      tz *= max / reach;
+    }
+    koi.tx = koi.cx + tx;
+    koi.tz = koi.cz + tz;
+  }
+  function pickKoiGoal(koi) {
+    // 游到看魚的貓前面了：放慢、往牠那邊再靠一點，停在那裡給牠看
+    if (koi.visit) {
+      const spot = koi.visit;
+      koi.visit = null;
+      if (koiWatchers(koi).includes(spot)) {
+        const [ux, uz] = towardSpot(koi, spot);
+        koi.want = 0.03;
+        koi.timer = 2.5 + koiRandom() * 2;
+        koi.visited = true;
+        setKoiGoal(koi, koi.x + ux * 0.12, koi.z + uz * 0.12, 0.97);
+        return;
+      }
+    }
+    // 有貓在看就偶爾游過去，同一隻貓前面最多兩條；剛看完的魚先游開
+    const fresh = !koi.visited;
+    koi.visited = false;
+    const watched = koiWatchers(koi).filter((s) => kois.filter((k) => k.visit === s).length < 2);
+    if (fresh && watched.length && koiRandom() < 0.4) {
+      const spot = watched[Math.floor(koiRandom() * watched.length)];
+      const [ux, uz] = towardSpot(koi, spot);
+      const side = (koiRandom() - 0.5) * 0.5;
+      koi.visit = spot;
+      koi.want = 0.2 + koiRandom() * 0.1;
+      koi.timer = 8;
+      setKoiGoal(koi, koi.cx + (ux - uz * side) * koi.limit, koi.cz + (uz + ux * side) * koi.limit, 0.9);
+      return;
+    }
+    const mood = koiRandom();
+    const a = koiRandom() * TAU;
+    let d;
+    if (mood < 0.25) {
+      // 慢慢晃到附近
+      d = 0.15 + koiRandom() * 0.35;
+      koi.want = 0.04 + koiRandom() * 0.08;
+      koi.timer = 2 + koiRandom() * 3;
+    } else if (mood < 0.37) {
+      // 衝一小段
+      d = 0.8 + koiRandom() * 0.6;
+      koi.want = 0.55 + koiRandom() * 0.2;
+      koi.timer = 1.6;
+    } else {
+      d = 0.4 + koiRandom() * 0.9;
+      koi.want = 0.16 + koiRandom() * 0.16;
+      koi.timer = 5 + koiRandom() * 4;
+    }
+    setKoiGoal(koi, koi.x + Math.cos(a) * d, koi.z + Math.sin(a) * d, 0.85);
+  }
+  function stepKoi(koi, dt, t) {
+    koi.timer -= dt;
+    if (koi.timer <= 0 || Math.hypot(koi.tx - koi.x, koi.tz - koi.z) < 0.08) pickKoiGoal(koi);
+    const far = Math.hypot(koi.tx - koi.x, koi.tz - koi.z) || 1;
+    let gx = (koi.tx - koi.x) / far;
+    let gz = (koi.tz - koi.z) / far;
+    // 同一個池子裡太靠近的魚互相讓開
+    for (const other of kois) {
+      if (other === koi || other.cx !== koi.cx || other.cz !== koi.cz) continue;
+      const ox = koi.x - other.x;
+      const oz = koi.z - other.z;
+      const gap = Math.hypot(ox, oz);
+      if (gap > 0 && gap < 0.3) {
+        const push = ((0.3 - gap) / 0.3) * 1.5;
+        gx += (ox / gap) * push;
+        gz += (oz / gap) * push;
+      }
+    }
+    const goal = Math.atan2(gx, gz);
+    const turn = Math.atan2(Math.sin(goal - koi.heading), Math.cos(goal - koi.heading));
+    // 照現在的方向再游一下就會碰到池邊：轉快一點、放慢
+    const ahead = 0.12 + koi.speed * 0.5;
+    const nearEdge = Math.hypot(koi.x + Math.sin(koi.heading) * ahead - koi.cx, koi.z + Math.cos(koi.heading) * ahead - koi.cz) > koi.limit;
+    const rate = (nearEdge ? 3.5 : 1.2) + koi.speed * 3;
+    koi.heading += Math.max(-rate * dt, Math.min(rate * dt, turn));
+    // 轉大彎的時候先放慢
+    const want = koi.want * (0.35 + 0.65 * Math.max(0, Math.cos(turn))) * (nearEdge ? 0.4 : 1);
+    koi.speed += (want - koi.speed) * (1 - Math.exp(-2.5 * dt));
+    koi.x += Math.sin(koi.heading) * koi.speed * dt;
+    koi.z += Math.cos(koi.heading) * koi.speed * dt;
+    const rx = koi.x - koi.cx;
+    const rz = koi.z - koi.cz;
+    const out = Math.hypot(rx, rz);
+    if (out > koi.limit) {
+      const nx = rx / out;
+      const nz = rz / out;
+      koi.x = koi.cx + nx * koi.limit;
+      koi.z = koi.cz + nz * koi.limit;
+      // 真的碰到池邊就沿著池邊轉，不要頭朝外橫著滑
+      let hx = Math.sin(koi.heading);
+      let hz = Math.cos(koi.heading);
+      const outward = hx * nx + hz * nz;
+      if (outward > 0) {
+        hx -= nx * outward;
+        hz -= nz * outward;
+        koi.heading = Math.hypot(hx, hz) > 1e-3 ? Math.atan2(hx, hz) : koi.heading + Math.PI / 2;
+      }
+      pickKoiGoal(koi);
+    }
+    koi.fish.position.set(koi.x, koi.y, koi.z);
+    // 身體左右擺，游越快擺越快
+    koi.fish.rotation.y = koi.heading + Math.sin(t * (5 + koi.speed * 14) + koi.wiggle) * (0.05 + koi.speed * 0.22);
+  }
+
   function buildPark2(island) {
     const g = island.group;
-    const px = -0.2;
-    const pz = 0.25;
-    const pr = 0.85;
+    const px = 0.15;
+    const pz = -0.1;
+    const pr = 1.1;
     const pond = flatMesh(new THREE.Shape().absarc(0, 0, pr, 0, TAU), C.pond, TOP + 0.014, { flatShading: false, roughness: 0.25 });
     pond.position.set(px, TOP + 0.014, pz);
     g.add(pond);
-    for (let i = 0; i < 16; i++) {
-      const a = (i / 16) * TAU;
+    for (let i = 0; i < 21; i++) {
+      const a = (i / 21) * TAU;
       const rock = put(g, makeMesh(new THREE.DodecahedronGeometry(0.1 + island.random() * 0.04, 0), mat(C.stone)), px + Math.cos(a) * (pr + 0.05), TOP + 0.03, pz + Math.sin(a) * (pr + 0.05));
       rock.scale.y = 0.6;
     }
-    [[0.35, 0.2], [-0.4, -0.3], [0.1, -0.45]].forEach(([x, z]) => {
-      put(g, makeMesh(new THREE.CylinderGeometry(0.12, 0.12, 0.01, 12), mat(C.lily), false), px + x, TOP + 0.02, pz + z);
+    [[0.45, 0.25], [-0.5, -0.4], [0.15, -0.6], [-0.3, 0.55]].forEach(([x, z]) => {
+      put(g, makeMesh(new THREE.CylinderGeometry(0.13, 0.13, 0.01, 12), mat(C.lily), false), px + x, TOP + 0.02, pz + z);
     });
-    [0xff8a3d, 0xffffff, 0xff8a3d].forEach((color, i) => {
-      const fish = makeFish(color);
-      g.add(fish);
-      kois.push({ fish, cx: px, cz: pz, r: 0.3 + i * 0.17, speed: (i % 2 ? -1 : 1) * (0.5 + i * 0.12), phase: i * 2, y: TOP + 0.005 });
-    });
+    [0xff8a3d, 0xffffff, 0xff8a3d].forEach((color) => addKoi(island, color, px, pz, pr));
     island.obstacles.push({ x: px, z: pz, r: pr + 0.15 });
-    addBench(island, -0.3, -1.5, 0, { width: 0.9, seats: 2, kind: 'rest', doing: '在魚池公園的長椅上休息', event: { type: 'sleep', place: '魚池公園的長椅上' } });
-    addBench(island, 1.55, 0.55, -Math.PI / 2, { width: 0.9, seats: 2, kind: 'rest', doing: '在魚池公園的長椅上休息', event: { type: 'sleep', place: '魚池公園的長椅上' } });
-    [[Math.PI * 0.55, 1.2], [Math.PI * 1.0, 1.2], [Math.PI * 0.15, 1.25]].forEach(([a, r]) => {
-      const x = px + Math.cos(a) * r;
-      const z = pz + Math.sin(a) * r;
-      addSpot(island, { approach: [x + Math.cos(a) * 0.15, z + Math.sin(a) * 0.15], pos: [x, TOP + 0.005, z], face: Math.atan2(px - x, pz - z), poses: ['sit', 'loaf'], kind: 'rest', doing: '在魚池公園看魚', event: { type: 'fish', place: '魚池公園' } });
-    });
-    [[1.25, -0.95, 0xff8fab], [-1.55, -0.6, 0x8d9cf0]].forEach(([x, z, color]) => {
+    // 毛線球先放，等一下鋪小路才知道要繞開
+    [[1.95, -1.0, 0xff8fab], [-1.75, 0.5, 0x8d9cf0]].forEach(([x, z, color]) => {
       const yarn = makeYarn(color);
       yarn.position.set(x, TOP, z);
       g.add(yarn);
       island.obstacles.push({ x, z, r: 0.2 });
+    });
+    // 長椅面向魚池，正前方離池邊太近，從長椅兩頭上去
+    [-0.6, 0.1].forEach((k) => {
+      const x = px + Math.cos(Math.PI * k) * 1.55;
+      const z = pz + Math.sin(Math.PI * k) * 1.55;
+      addBench(island, x, z, Math.atan2(px - x, pz - z), { width: 0.9, seats: 2, kind: 'rest', side: true, doing: '在魚池公園的長椅上休息', event: { type: 'sleep', place: '魚池公園的長椅上' } });
+    });
+    [Math.PI * 0.55, Math.PI, -Math.PI * 0.2].forEach((a) => {
+      const x = px + Math.cos(a) * (pr + 0.37);
+      const z = pz + Math.sin(a) * (pr + 0.37);
+      addSpot(island, { approach: [x + Math.cos(a) * 0.15, z + Math.sin(a) * 0.15], pos: [x, TOP + 0.005, z], face: Math.atan2(px - x, pz - z), poses: ['sit', 'loaf'], kind: 'rest', doing: '在魚池公園看魚', event: { type: 'fish', place: '魚池公園' } });
     });
     island.labelY = TOP + 1.7;
   }
@@ -1486,11 +1625,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       rock.scale.y = 0.6;
     }
     put(g, makeMesh(new THREE.CylinderGeometry(0.11, 0.11, 0.01, 12), mat(C.lily), false), px + 0.3, TOP + 0.02, pz - 0.25);
-    [0xff8a3d, 0xffffff, 0xffc93c].forEach((color, i) => {
-      const fish = makeFish(color);
-      g.add(fish);
-      kois.push({ fish, cx: px, cz: pz, r: 0.22 + i * 0.15, speed: (i % 2 ? -1 : 1) * (0.55 + i * 0.1), phase: i * 2.4, y: TOP + 0.005 });
-    });
+    [0xff8a3d, 0xffffff, 0xffc93c].forEach((color) => addKoi(island, color, px, pz, pr));
     island.obstacles.push({ x: px, z: pz, r: pr + 0.15 });
     [[Math.PI, 1.05], [-0.15 * Math.PI, 1.05], [0.3 * Math.PI, 1.05]].forEach(([a, r]) => {
       const x = px + Math.cos(a) * r;
@@ -3398,11 +3533,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
         transient.splice(i, 1);
       }
     }
-    kois.forEach((koi) => {
-      const a = koi.phase + t * koi.speed;
-      koi.fish.position.set(koi.cx + Math.cos(a) * koi.r, koi.y, koi.cz + Math.sin(a) * koi.r);
-      koi.fish.rotation.y = -a + (koi.speed > 0 ? Math.PI : 0);
-    });
+    kois.forEach((koi) => stepKoi(koi, dt, t));
     if (!reducedMotion) {
       clouds.forEach((cloud) => {
         cloud.position.x += cloud.userData.speed * dt;
