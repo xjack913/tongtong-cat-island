@@ -359,6 +359,9 @@
   /* 表演區按鈕列 */
   .dock--stage { --level: var(--rose); --level-deep: var(--rose-deep); --level-pale: var(--rose-pale); grid-template-columns: minmax(0, 1fr) auto; }
   .tricks { display: flex; gap: 10px; }
+  .dock--race { --level: #C9543A; --level-deep: #8E3420; --level-pale: #FBE6DF; grid-template-columns: minmax(0, 1fr) auto; }
+  .race-go { min-height: 76px; padding: 0 30px; font-size: 24px; }
+  .race-go:disabled { opacity: 0.45; cursor: default; }
   .trick {
     display: flex; flex-direction: column; align-items: center; gap: 4px; width: 76px; padding: 0; border: 0; background: transparent;
     color: var(--ink-deep); font-size: 15px; line-height: 1.3;
@@ -687,7 +690,7 @@
 </head>
 <body>
 <div class="app" id="app">
-  <div class="scene" id="scene" role="img" aria-label="桐桐貓貓島 3D 地圖：中間是貓貓之家，左上是高階跳臺、上面中間是表演區、右上是中階跳臺和多多紙箱區、右邊是低階跳臺和日記區，最左上角是有黑板的學習數學島，下面有紙箱公園、魚池公園和合體公園，左下是排行榜島，島和島之間用木板橋連起來，島上全都是貓，還有一隻綁頭帶、兩腳走路的貓貓教練，和一隻戴眼鏡的貓貓老師。"></div>
+  <div class="scene" id="scene" role="img" aria-label="桐桐貓貓島 3D 地圖：中間是貓貓之家，左上是高階跳臺、上面中間是表演區、右上是中階跳臺和多多紙箱區、右邊是低階跳臺和日記區，最左上角是有黑板的學習數學島，下面有紙箱公園、魚池公園和合體公園，左下是排行榜島，最下面是有七條跑道的跑步田徑場島，島和島之間用木板橋連起來，島上全都是貓，還有一隻綁頭帶、兩腳走路的貓貓教練，和一隻戴眼鏡的貓貓老師。"></div>
 
   <header class="hud">
     <div class="plate">
@@ -794,6 +797,14 @@
         </button>
       </div>
     </section>
+    <section class="dock dock--race" id="race-dock" hidden aria-label="跑步比賽">
+      <div class="dock__info">
+        <p class="dock__level">跑步田徑場島</p>
+        <p class="dock__who" id="race-who" aria-live="polite"></p>
+        <p class="dock__next" id="race-next"></p>
+      </div>
+      <button class="sticker sticker--solid race-go" id="race-go" type="button" disabled>開始比賽</button>
+    </section>
     <nav class="island-nav" id="island-nav" aria-label="去哪座島"></nav>
   </div>
 
@@ -842,6 +853,7 @@
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v6a5 5 0 0 1-10 0zM11 14h2v3h3v4H8v-4h3z"/></svg></span><span><b>排行榜</b>每隻貓只算牠跳最高的那一次。頒獎臺上站的是這次前三名，第一名戴皇冠。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 4.5l11-2v13.2a3 3 0 1 1-2-2.8V6.1l-7 1.3v10.3a3 3 0 1 1-2-2.8z"/></svg></span><span><b>表演區</b>點轉圈圈、揮手、翻跟斗、唱歌，臺上的貓就會表演；按拍手，臺下的貓一起拍。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>日記區</b>貓貓會把今天做的事寫成日記。按貓掌幫日記蓋掌印，按「唸給我聽」就會唸出來。</span></li>
+      <li><span class="help-icon" aria-hidden="true">7</span><span><b>跑步田徑場島</b>七隻貓各站一條跑道，到齊後按「開始比賽」，跑一圈看誰第一名。跑道外面的草場，也常有貓跑來跑去。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。點老師或講台就改作業：每天有 20 隻貓來上課、各寫一張，你當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>島民卡</b>取一個自己的名字。按過幾次完美跳、改過幾張作業都會一直累積，下次來還在，還可以收集徽章。記下島民暗號，換裝置也找得回來。</span></li>
       <li><span class="help-icon" aria-hidden="true">？</span><span><b>貓貓教練</b>頭上綁頭帶、用兩隻腳走路。看到晃來晃去、頭上冒「？」的貓，就會叫牠去跳臺跳。</span></li>
@@ -852,7 +864,7 @@
         <svg viewBox="0 0 120 120" aria-hidden="true"><g fill="#fff" stroke="currentColor" stroke-width="5" stroke-linejoin="round"><circle cx="37" cy="24" r="11"/><circle cx="83" cy="24" r="11"/><path d="M30 52a30 30 0 0 1 60 0z"/></g><g fill="currentColor"><circle cx="49" cy="41" r="3.6"/><circle cx="71" cy="41" r="3.6"/></g><rect x="10" y="50" width="100" height="58" rx="29" fill="#fff" stroke="currentColor" stroke-width="5"/><text x="60" y="81" text-anchor="middle" dominant-baseline="middle" font-size="44" fill="currentColor" font-family="Huninn, PingFang TC, sans-serif">桐</text></svg>
         島主兼設計師：桐桐
       </p>
-      <p>這座島照桐桐畫的設計圖做：十一座島的形狀和位置、二十座木板橋，都跟她畫的一樣。第二次她又加了表演區、多多紙箱區、日記區、合體公園，還有貓貓教練；後來又說要一座學習數學島，放在高階跳臺上面。島上的樹是開白花的油桐樹。</p>
+      <p>這座島照桐桐畫的設計圖做：十一座島的形狀和位置、二十座木板橋，都跟她畫的一樣。第二次她又加了表演區、多多紙箱區、日記區、合體公園，還有貓貓教練；後來又說要一座學習數學島，放在高階跳臺上面；再後來又畫了一張跑步田徑場島，有七條跑道和一大片草場。島上的樹是開白花的油桐樹。</p>
       <figure>
         <img src="sketch.jpg" alt="桐桐用鉛筆畫的貓貓島設計圖：中間是有「桐」字招牌的房子，周圍有三座跳臺、有階梯舞臺的表演區、畫滿小紙箱的多多紙箱區、有書桌的日記區、有魚池的合體公園、兩座公園和 1、2、3 名的頒獎臺，用木板橋連起來，到處都是貓。" width="1200" height="786" loading="lazy">
         <figcaption>桐桐畫的設計圖（第二版）</figcaption>

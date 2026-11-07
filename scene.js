@@ -1,5 +1,5 @@
-// 桐桐貓貓島 3D 場景：十一座島的形狀、位置和二十座木板橋照桐桐的兩張草稿描，學習數學島是她後來說要加的。
-// 50 隻 Q 版貓在島上散步、排隊上跳臺比跳高、上表演區表演、躲紙箱、寫日記、寫數學作業、去公園休息、回貓貓之家睡覺；
+// 桐桐貓貓島 3D 場景：十一座島的形狀、位置和二十座木板橋照桐桐的兩張草稿描，學習數學島是她後來說要加的，跑步田徑場島是她另外畫的。
+// 50 隻 Q 版貓在島上散步、排隊上跳臺比跳高、上表演區表演、在跑道上賽跑、躲紙箱、寫日記、寫數學作業、去公園休息、回貓貓之家睡覺；
 // 這一輪跳最高的三隻會走上排行榜島的頒獎臺。兩腳走路、綁頭帶的貓貓教練會去找晃來晃去的貓，叫牠去跳臺跳；
 // 戴眼鏡的貓貓老師站在學習數學島的黑板前，桐桐改錯作業時會提醒她。
 // 島上的樹是開白花的油桐樹（桐桐的「桐」）。所有文字一律走 textContent。
@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ISLANDS, BRIDGES, LEVELS, SKETCH, PERFECT, TRICKS, TRICK_KEYS, fromSketch, meterAt, peakHeight, toCm, autoPower, maxCm, mulberry32 } from './logic.js';
+import { ISLANDS, BRIDGES, LEVELS, SKETCH, PERFECT, TRICKS, TRICK_KEYS, TRACK, fromSketch, meterAt, peakHeight, toCm, autoPower, maxCm, mulberry32, laneRadius, trackOuter, insideTrack, trackPoint } from './logic.js';
 
 const TAU = Math.PI * 2;
 const TOP = 0.8;
@@ -31,6 +31,7 @@ const C = {
   glass: 0xbfe6f5, pink: 0xffa8ba, sky: 0x9ec9ff, lemon: 0xffe08a, koi: 0xff8a3d, lily: 0x6fbf6a, stone: 0xd9d4ca,
   stage: 0xf3d29b, stageEdge: 0xd9a95e, curtain: 0xe8466e, curtainDark: 0xb8304f, floor: 0xe9c48f, floorDark: 0xc9a06a,
   paper: 0xfffdf6, rug: 0xbfc8ff, headband: 0xe8466e, kibble: 0xb7834b, waterBowl: 0x7fc6e8,
+  track: 0xd8694e, infield: 0x97d27c,
 };
 
 // 三座跳臺的場地：laneZ 是跑道在島上的南北位置，run 是樓梯水平長度，D 是從跳板尖到軟墊的距離，R 是軟墊半徑
@@ -558,12 +559,12 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   const clock = new THREE.Clock();
 
   const camera = new THREE.PerspectiveCamera(34, container.clientWidth / Math.max(1, container.clientHeight), 0.1, 400);
-  // 群島東西約 -19.3～22.6、南北約 -21.1～9.9 公尺
-  const overview = { position: new THREE.Vector3(), target: new THREE.Vector3(1.4, 0.8, -4.9) };
+  // 群島東西約 -19.3～22.6、南北約 -21.1～29.8 公尺（鏡頭斜著看，近的島看起來比較大，要多留一點）
+  const overview = { position: new THREE.Vector3(), target: new THREE.Vector3(1.4, 0.8, 5.4) };
   function fitOverview() {
     const halfV = THREE.MathUtils.degToRad(camera.fov / 2);
     const halfH = Math.atan(Math.tan(halfV) * camera.aspect);
-    const distance = Math.max(22.8 / Math.tan(halfH), 15.9 / Math.tan(halfV)) * 1.03;
+    const distance = Math.max(22.8 / Math.tan(halfH), 29.5 / Math.tan(halfV)) * 1.03;
     const elevation = THREE.MathUtils.degToRad(52);
     overview.position.set(overview.target.x, overview.target.y + Math.sin(elevation) * distance, overview.target.z + Math.cos(elevation) * distance);
     overview.distance = distance;
@@ -584,12 +585,12 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
 
   scene.add(new THREE.HemisphereLight(0xffffff, 0xbcae94, 1.25));
   const sun = new THREE.DirectionalLight(0xfff1dd, 2.5);
-  sun.target.position.set(1.6, 0, -4.9);
-  sun.position.set(1.6 + 12, 24, -4.9 + 14);
+  sun.target.position.set(1.6, 0, 5.7);
+  sun.position.set(1.6 + 12, 24, 5.7 + 14);
   scene.add(sun.target);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -29, right: 29, top: 29, bottom: -29, near: 1, far: 90 });
+  sun.shadow.mapSize.set(2560, 2560);
+  Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 110 });
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.02;
   scene.add(sun);
@@ -1781,6 +1782,116 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   }
 
   // 橋頭的位置先算好，島上擺東西時才知道要讓開
+  // ---------- 跑步田徑場島：七條跑道的橢圓跑道，外面一大片草場讓貓貓奔跑（桐桐畫的） ----------
+  const race = { island: null, phase: 'idle', runners: [], order: [], top: [], t: 0, next: 8, count: 0, finished: 0, user: false, gateNode: null, summon: 0, fieldLoop: [] };
+  const trackRing = (r, n = 160) => Array.from({ length: n }, (_, i) => {
+    const p = trackPoint(r, i / n);
+    return { x: p.x + TRACK.center.x, z: p.z + TRACK.center.z };
+  });
+
+  function buildTrack(island) {
+    const g = island.group;
+    const { center, inner, lanes, laneWidth, startX } = TRACK;
+    const outer = trackOuter();
+    const lifted = (factor) => ({ polygonOffset: true, polygonOffsetFactor: factor, polygonOffsetUnits: factor });
+    const surface = shapeOf(trackRing(outer));
+    surface.holes.push(shapeOf(trackRing(inner), THREE.Path));
+    g.add(flatMesh(surface, C.track, TOP + 0.012, lifted(-1)));
+    g.add(flatMesh(shapeOf(trackRing(inner)), C.infield, TOP + 0.01, lifted(-1)));
+    // 八條白線分出七條跑道
+    for (let i = 0; i <= lanes; i++) {
+      const r = inner + i * laneWidth;
+      const line = shapeOf(trackRing(r + 0.02));
+      line.holes.push(shapeOf(trackRing(r - 0.02), THREE.Path));
+      g.add(flatMesh(line, C.white, TOP + 0.02, lifted(-2)));
+    }
+    // 起跑線（也是終點線）：黑白格子
+    const span = outer - inner;
+    const lineTexture = paintTexture(64, 512, (ctx, w, h) => {
+      const size = w / 2;
+      for (let row = 0; row * size < h; row++) {
+        for (let col = 0; col < 2; col++) {
+          ctx.fillStyle = (row + col) % 2 ? '#22253A' : '#FFFFFF';
+          ctx.fillRect(col * size, row * size, size, size);
+        }
+      }
+    });
+    const startLine = new THREE.Mesh(new THREE.PlaneGeometry(0.26, span), new THREE.MeshBasicMaterial({ map: lineTexture, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+    startLine.rotation.x = -Math.PI / 2;
+    put(g, startLine, center.x + startX, TOP + 0.026, center.z + inner + span / 2);
+    // 每條跑道起跑線後面的號碼
+    for (let i = 0; i < lanes; i++) {
+      const texture = paintTexture(64, 64, (ctx, w, h) => {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = `600 50px ${NUM_FONT}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(i + 1), w / 2, h / 2 + 3);
+      });
+      const number = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.38), new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+      number.rotation.x = -Math.PI / 2;
+      put(g, number, center.x + startX - 1, TOP + 0.03, center.z + laneRadius(i));
+    }
+    // 起跑線兩頭的旗子
+    [[inner - 0.3, C.sun], [outer + 0.3, C.pink]].forEach(([z, color]) => {
+      put(g, makeFlag(color, 1.1), center.x + startX, TOP, center.z + z);
+      island.obstacles.push({ x: center.x + startX, z: center.z + z, r: 0.12 });
+    });
+    // 跑道後面的大招牌
+    const signZ = center.z - outer - 1.05;
+    const sign = new THREE.Group();
+    sign.position.set(center.x, TOP, signZ);
+    g.add(sign);
+    [-2.1, 2.1].forEach((x) => {
+      put(sign, makeMesh(new THREE.CylinderGeometry(0.07, 0.09, 1.7, 8), mat(C.woodDark)), x, 0.85, 0);
+      island.obstacles.push({ x: center.x + x, z: signZ, r: 0.2 });
+    });
+    const signTexture = paintTexture(768, 160, (ctx, w, h) => {
+      ctx.fillStyle = '#FFF4D1';
+      roundRectPath(ctx, 5, 5, w - 10, h - 10, 46);
+      ctx.fill();
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = '#D8694E';
+      ctx.stroke();
+      ctx.fillStyle = '#8E3420';
+      ctx.font = `84px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('★ 跑步田徑場 ★', w / 2, h / 2 + 4);
+    });
+    put(sign, new THREE.Mesh(new THREE.PlaneGeometry(4.5, 0.94), new THREE.MeshBasicMaterial({ map: signTexture, transparent: true, toneMapped: false })), 0, 1.5, 0.1);
+    pickable(sign, { type: 'island', id: island.id });
+    // 要去比賽的貓先到起跑線旁邊集合
+    race.island = island;
+    race.gateNode = addNode(island, center.x + startX - 0.5, center.z + outer + 0.75, 'spot');
+    spur(island, race.gateNode);
+    // 草場：跑道外面到島邊這一圈，貓貓在上面繞著跑
+    const shifted = island.local.map((p) => ({ x: p.x - center.x, z: p.z - center.z }));
+    const FIELD_STEPS = 48;
+    for (let i = 0; i < FIELD_STEPS; i++) {
+      const a = (i / FIELD_STEPS) * TAU;
+      const dx = Math.cos(a);
+      const dz = Math.sin(a);
+      let rIn = 0;
+      while (insideTrack(dx * rIn, dz * rIn, outer + 0.3)) rIn += 0.05;
+      race.fieldLoop.push({ dx, dz, rIn, rOut: rayToEdge(shifted, dx, dz) - 0.55 });
+    }
+    // 草場上多種一點花
+    for (let i = 0; i < 26; i++) {
+      const f = race.fieldLoop[Math.floor(island.random() * FIELD_STEPS)];
+      if (f.rOut <= f.rIn) continue;
+      const r = f.rIn + (f.rOut - f.rIn) * island.random();
+      flowerSpot(island, center.x + f.dx * r, center.z + f.dz * r);
+    }
+    const offTrack = (x, z) => !insideTrack(x - center.x, z - center.z, outer + 0.45) && Math.hypot(x - center.x, z - signZ) > 2.8;
+    island.treeFilter = offTrack;
+    island.flowerFilter = offTrack;
+    island.treeLimit = 9;
+    island.labelX = center.x;
+    island.labelY = TOP + 2.5;
+    island.labelZ = signZ;
+  }
+
   const bridgePlans = BRIDGES.map((def, index) => {
     const pts = def.points.map(fromSketch);
     const sides = [[islandById[def.a], pts[0]]];
@@ -1807,6 +1918,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     else if (island.kind === 'diary') buildDiary(island);
     else if (island.kind === 'combo') buildCombo(island);
     else if (island.kind === 'learn') buildLearn(island);
+    else if (island.kind === 'track') buildTrack(island);
     else if (island.id === 'park1') buildPark1(island);
     else if (island.id === 'park2') buildPark2(island);
   });
@@ -1931,7 +2043,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       const k = 0.2 + r() * 0.7;
       const x = Math.cos(a) * reach * k;
       const z = Math.sin(a) * reach * k;
-      if (edgeDist(ringPts, x, z) > 0.4 && edgeDist(local, x, z) > 0.3 && !blocked(island, x, z, 0.2)
+      if (edgeDist(ringPts, x, z) > 0.4 && edgeDist(local, x, z) > 0.3 && !blocked(island, x, z, 0.2) && (!island.flowerFilter || island.flowerFilter(x, z))
         && !island.spurs.some(([ax, az, bx, bz]) => segDist(x, z, ax, az, bx, bz) < 0.35)) flowerSpot(island, x, z);
     }
     if (island.strips.length) island.group.add(makeMesh(mergeGeometries(island.strips, false), mat(C.path), false, true));
@@ -2256,6 +2368,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     }
     freeUp(cat);
     clearLost(cat);
+    cat.race = null;
     if (show.waiting === cat.index) show.waiting = null;
     if (show.performer === cat.index) show.performer = null;
     cat.byTong = false;
@@ -2280,6 +2393,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       ['diary', cat.news >= 3 ? 0.12 : 0.02],
       ['lost', lostCount < 2 ? 0.06 : 0],
       ['study', learn.island && inClass(cat) ? 0.25 : 0],
+      ['field', 0.06 + (race.user ? 0.1 : 0)],
     ];
     let r = random() * weights.reduce((sum, [, w]) => sum + w, 0);
     for (const [kind, w] of weights) {
@@ -2296,6 +2410,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       if (kind === 'diary' && goSpot(cat, 'diary')) return;
       if (kind === 'lost' && goLost(cat)) return;
       if (kind === 'study' && goSpot(cat, 'study')) return;
+      if (kind === 'field' && goField(cat)) return;
       break;
     }
     wander(cat);
@@ -2631,6 +2746,254 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       freeUp(cat);
       if (goSpot(cat, 'audience', undefined, RUN)) need -= 1;
     }
+  }
+
+  // ---------- 跑步比賽：七隻貓各站一條跑道，到齊後倒數開跑，跑一圈回到起跑線 ----------
+  // 平常隔一陣子自己比一場；桐桐在這座島上時，等她按「開始比賽」才開跑
+  const LAP_SECONDS = 13;
+  const isRunner = (cat) => race.runners.includes(cat.index);
+  const freeToRace = (c) => (c.state === 'idle' || c.state === 'rest') && c.model.root.visible && championSlot(c) === null
+    && !(c.spot && ['diary', 'audience', 'study'].includes(c.spot.kind));
+
+  function sendToLane(cat, lane) {
+    freeUp(cat);
+    clearLost(cat);
+    cat.byTong = false;
+    cat.trick = null;
+    cat.spinY = 0;
+    cat.race = { lane, u: 0, v: 0, pace: 0, place: null, f: 1, ph: 0 };
+    race.runners.push(cat.index);
+    const start = trackPoint(laneRadius(lane), 0);
+    const spot = W(race.island, TRACK.center.x + start.x - 0.24, TOP + 0.02, TRACK.center.z + start.z);
+    go(cat, race.gateNode, () => {
+      if (!isRunner(cat)) {
+        idle(cat, 0.5, 2);
+        return;
+      }
+      cat.state = 'walk';
+      cat.purpose = 'raceLine';
+      setPath(cat, [spot], 1.3, () => {
+        if (!isRunner(cat)) {
+          idle(cat, 0.5, 2);
+          return;
+        }
+        cat.state = 'raceWait';
+        cat.pose = 'stand';
+        cat.moving = false;
+        cat.targetHeading = Math.PI / 2;
+        cat.doing = `站在第 ${lane + 1} 道準備比賽`;
+      });
+    }, { speed: RUN, purpose: 'race', doing: '跑去跑步田徑場比賽' });
+  }
+
+  // 空的跑道找貓補上。桐桐在看的時候找最近的，不然從近一點的貓裡隨機挑，每場才會不一樣
+  function fillLanes() {
+    const taken = new Set(race.runners.map((i) => cats[i].race.lane));
+    const open = [];
+    for (let lane = 0; lane < TRACK.lanes; lane++) if (!taken.has(lane)) open.push(lane);
+    if (!open.length) return;
+    const gate = nodes[race.gateNode].v;
+    const free = cats.filter((c) => freeToRace(c) && !isRunner(c)).sort((a, b) => a.pos.distanceTo(gate) - b.pos.distanceTo(gate));
+    const pool = race.user ? free : free.slice(0, 20).sort(() => random() - 0.5);
+    open.sort(() => random() - 0.5).forEach((lane, i) => {
+      if (pool[i]) sendToLane(pool[i], lane);
+    });
+  }
+
+  function raceBubble(text, seconds) {
+    const el = document.createElement('div');
+    el.className = 'trick-tag';
+    el.textContent = text;
+    const wrap = document.createElement('div');
+    wrap.append(el);
+    const bubble = new CSS2DObject(wrap);
+    bubble.position.copy(W(race.island, TRACK.center.x + TRACK.startX, TOP + 1.7, TRACK.center.z + (TRACK.inner + trackOuter()) / 2));
+    scene.add(bubble);
+    transient.push({ object: bubble, until: clock.elapsedTime + seconds });
+  }
+
+  function startCountdown() {
+    race.phase = 'countdown';
+    race.t = 0;
+    race.count = 3;
+    race.runners.forEach((i) => {
+      cats[i].pose = 'wiggle';
+    });
+    raceBubble('3', 0.95);
+    if (hooks.sound) hooks.sound('pop', 'track');
+  }
+
+  function startRun() {
+    race.phase = 'running';
+    race.t = 0;
+    race.finished = 0;
+    race.order = [];
+    race.runners.forEach((i) => {
+      const cat = cats[i];
+      cat.state = 'race';
+      cat.race.pace = (0.93 + 0.12 * cat.sporty + (cat.speed - 0.8) * 0.2 + rand(-0.035, 0.035)) / LAP_SECONDS;
+      cat.race.f = rand(0.7, 1.4);
+      cat.race.ph = rand(0, TAU);
+      cat.doing = `正在第 ${cat.race.lane + 1} 道比賽`;
+    });
+    raceBubble('開跑！', 1.1);
+    if (hooks.sound) hooks.sound('whistle', 'track');
+  }
+
+  function stepRunner(cat, dt) {
+    const r = cat.race;
+    const target = r.place === null ? r.pace * (1 + 0.08 * Math.sin(race.t * r.f + r.ph)) : 0;
+    r.v = damp(r.v, target, r.place === null ? 3 : 1.4, dt);
+    r.u += r.v * dt;
+    if (r.place === null && r.u >= 1) {
+      race.finished += 1;
+      r.place = race.finished;
+      race.order.push(cat.index);
+      say(cat, `第 ${r.place} 名`, 5.5, 'trick-tag');
+      if (hooks.sound) hooks.sound(r.place === 1 ? 'record' : 'pop', 'track');
+    }
+    const p = trackPoint(laneRadius(r.lane), r.u);
+    cat.pos.set(race.island.cx + TRACK.center.x + p.x, TOP + 0.02, race.island.cz + TRACK.center.z + p.z);
+    cat.targetHeading = Math.atan2(p.dx, p.dz);
+    cat.moving = true;
+    cat.pose = 'run';
+    if (r.place !== null && r.v < 0.004) {
+      cat.state = 'raceDone';
+      cat.moving = false;
+      cat.pose = r.place === 1 ? 'proud' : r.place <= 3 ? 'sit' : 'stand';
+      cat.doing = `在跑步田徑場跑了第 ${r.place} 名`;
+    }
+  }
+
+  function endRace() {
+    race.runners.forEach((i) => {
+      const cat = cats[i];
+      emit(cat, { type: 'race', place: cat.race.place });
+      cat.race = null;
+      idle(cat, 0.5, 3, 'stand');
+      cat.doing = '剛比完賽，在跑道上喘口氣';
+    });
+    race.runners = [];
+    race.phase = 'idle';
+    race.t = 0;
+    race.next = race.user ? 2.5 : rand(25, 50);
+  }
+
+  function raceStanding() {
+    return race.runners.slice().sort((a, b) => {
+      const ra = cats[a].race;
+      const rb = cats[b].race;
+      return (ra.place ?? 99) - (rb.place ?? 99) || rb.u - ra.u;
+    });
+  }
+
+  function stepRace(dt) {
+    if (!race.island) return;
+    race.t += dt;
+    race.top = race.phase === 'running' || race.phase === 'finish' ? raceStanding().slice(0, 3) : [];
+    if (race.phase === 'idle') {
+      race.next -= dt;
+      if (race.next <= 0) {
+        race.phase = 'gather';
+        race.t = 0;
+        race.order = [];
+        race.fill = 0;
+      }
+    } else if (race.phase === 'gather') {
+      race.fill -= dt;
+      if (race.fill <= 0) {
+        race.fill = 1.5;
+        fillLanes();
+      }
+      const here = race.runners.filter((i) => cats[i].state === 'raceWait');
+      // 等太久的貓就不等了（還在路上的走到就自己解散），至少三隻才比
+      const full = here.length === TRACK.lanes;
+      if (full || (race.t > 35 && here.length >= 3)) {
+        race.runners = here;
+        race.phase = 'ready';
+        race.t = 0;
+      }
+    } else if (race.phase === 'ready') {
+      if (!race.user && race.t > 2) startCountdown();
+    } else if (race.phase === 'countdown') {
+      const left = 3 - Math.floor(race.t);
+      if (left !== race.count) {
+        race.count = left;
+        if (left > 0) {
+          raceBubble(String(left), 0.95);
+          if (hooks.sound) hooks.sound('pop', 'track');
+        } else {
+          startRun();
+        }
+      }
+    } else if (race.phase === 'running') {
+      if (race.runners.every((i) => cats[i].state === 'raceDone')) {
+        race.phase = 'finish';
+        race.t = 0;
+        if (hooks.raceEnd) hooks.raceEnd(race.order.slice());
+      }
+    } else if (race.phase === 'finish' && race.t > 5) {
+      endRace();
+    }
+    // 桐桐來看的時候，草場上至少有兩隻貓在跑
+    if (!race.user) return;
+    race.summon -= dt;
+    if (race.summon > 0) return;
+    race.summon = 4;
+    if (cats.filter((c) => c.purpose === 'field' && c.state === 'walk').length >= 2) return;
+    const center = W(race.island, TRACK.center.x, TOP, TRACK.center.z);
+    const cat = cats.filter((c) => freeToRace(c) && !isRunner(c)).sort((a, b) => a.pos.distanceTo(center) - b.pos.distanceTo(center))[0];
+    if (cat) {
+      freeUp(cat);
+      goField(cat, true);
+    }
+  }
+
+  // 去草場奔跑：走到島邊的步道，在草地上繞著跑一段，再回到步道
+  function goField(cat, fast = false) {
+    if (!race.island) return false;
+    const ring = pickOne(race.island.ringNodes);
+    go(cat, ring, () => runOnField(cat, ring), { speed: fast ? RUN : cat.speed, purpose: 'field', doing: '要去跑步田徑場的草場奔跑' });
+    return true;
+  }
+
+  function runOnField(cat, ring) {
+    const island = race.island;
+    const node = nodes[ring];
+    const { center } = TRACK;
+    const loop = race.fieldLoop;
+    let i = Math.round((Math.atan2(node.z - center.z, node.x - center.x) / TAU) * loop.length);
+    const dir = random() < 0.5 ? 1 : -1;
+    const pts = [];
+    const steps = 6 + Math.floor(random() * 7);
+    // 兩點之間的直線不能切進跑道
+    const clearOfTrack = (ax, az, bx, bz) => [0.25, 0.5, 0.75].every((k) => !insideTrack(ax + (bx - ax) * k - center.x, az + (bz - az) * k - center.z, trackOuter() + 0.15));
+    let px = node.x;
+    let pz = node.z;
+    for (let s = 0; s < steps; s++) {
+      i = (i + dir * (2 + Math.floor(random() * 3)) + loop.length * 20) % loop.length;
+      const f = loop[i];
+      if (f.rOut <= f.rIn) continue;
+      const r = rand(f.rIn, f.rOut);
+      const x = center.x + f.dx * r;
+      const z = center.z + f.dz * r;
+      if (blocked(island, x, z, 0.2) || !clearOfTrack(px, pz, x, z)) continue;
+      pts.push(W(island, x, TOP + 0.005, z));
+      px = x;
+      pz = z;
+    }
+    // 跑完回到最近的步道，不繞回出發的地方（那可能在跑道另一邊）
+    const end = island.ringNodes.slice().sort((a, b) => Math.hypot(nodes[a].x - px, nodes[a].z - pz) - Math.hypot(nodes[b].x - px, nodes[b].z - pz))[0];
+    pts.push(nodes[end].v.clone());
+    cat.state = 'walk';
+    cat.purpose = 'field';
+    cat.doing = '在跑步田徑場的草場奔跑';
+    setPath(cat, pts, RUN * 1.15, () => {
+      cat.node = end;
+      emit(cat, { type: 'field' });
+      idle(cat, 1, 4, 'stand');
+      cat.doing = '跑完了，在草場上喘口氣';
+    });
   }
 
   // ---------- 學習數學島：桐桐在改作業時，課桌前至少坐 4 隻貓；老師輪流看黑板、看大家 ----------
@@ -3148,6 +3511,9 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       case 'podium':
         stepPodium(cat);
         break;
+      case 'race':
+        stepRunner(cat, dt);
+        break;
       default:
         break;
     }
@@ -3356,6 +3722,9 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     platforms.forEach((p) => setUser(p, p.id === id));
     show.user = id === 'stage';
     show.summonTimer = 0;
+    race.user = id === 'track';
+    race.summon = 0;
+    if (race.user && race.phase === 'idle') race.next = Math.min(race.next, 0.3);
     diaryTimer = 0;
     studyTimer = 0;
     // 桐桐來看表演時，臺上那隻多待一會兒，等她按動作
@@ -3387,6 +3756,11 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       const distance = Math.max(3.9 / Math.tan(halfH), 2.3 / Math.tan(halfVv)) * 1.05;
       offset = new THREE.Vector3(0.06, 0.72, 1).normalize().multiplyScalar(distance);
       target = W(island, 0.1, TOP + 0.75, -0.35);
+    } else if (island.kind === 'track') {
+      // 從起跑線這一側看整條跑道
+      const distance = Math.max(10.5 / Math.tan(halfH), 6.6 / Math.tan(halfVv)) * 1.05;
+      offset = new THREE.Vector3(0, 0.95, 1).normalize().multiplyScalar(distance);
+      target = W(island, TRACK.center.x, TOP + 0.3, TRACK.center.z);
     } else if (island.kind === 'stage') {
       // 從觀眾席後面看舞臺
       const distance = Math.max(3.1 / Math.tan(halfH), 1.9 / Math.tan(halfVv)) * 1.05;
@@ -3411,6 +3785,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     clearFollow();
     platforms.forEach((p) => setUser(p, false));
     show.user = false;
+    race.user = false;
     focusId = 'follow';
     cat.followed = true;
     cat.tagEl.classList.add('cat-tag--strong');
@@ -3476,6 +3851,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     stepShow(dt);
     stepDiary(dt);
     stepLearn(dt);
+    stepRace(dt);
     for (const cat of cats) {
       updateCat(cat, dt);
       applyPose(cat, dt, t);
@@ -3522,7 +3898,8 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     for (const cat of cats) {
       const onStage = focusPlatform && cat.platform === focusPlatform.id && ['ready', 'crouch', 'air', 'land'].includes(cat.state);
       const performing = focusId === 'stage' && show.performer === cat.index;
-      cat.tag.visible = cat.model.root.visible && (cat.followed || onStage || performing || camera.position.distanceTo(cat.pos) < TAG_DISTANCE);
+      const racing = focusId === 'track' && race.top.includes(cat.index);
+      cat.tag.visible = cat.model.root.visible && (cat.followed || onStage || performing || racing || camera.position.distanceTo(cat.pos) < TAG_DISTANCE);
       if (cat.zzz) cat.zzz.visible = cat.tag.visible;
     }
     coach.tag.visible = coach.followed || camera.position.distanceTo(coach.pos) < TAG_DISTANCE * 1.4;
@@ -3648,6 +4025,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   function islandOf(cat) {
     if (['queue', 'ready', 'crouch', 'air', 'land'].includes(cat.state) || cat.purpose === 'climb' || cat.purpose === 'exit') return cat.platform;
     if (cat.state === 'perform' || cat.purpose === 'climbStage' || cat.purpose === 'exitStage') return 'stage';
+    if (['raceWait', 'race', 'raceDone'].includes(cat.state) || cat.purpose === 'raceLine') return 'track';
     if (cat.state === 'walk') return null;
     if (cat.state === 'inside') return 'home';
     return nodes[cat.node] ? nodes[cat.node].island : null;
@@ -3696,6 +4074,25 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       cat.leaveAt = Math.max(cat.leaveAt, clock.elapsedTime + 12);
     }
     return count;
+  }
+
+  // 跑步比賽給介面用的：phase 是 idle、gather、ready、countdown、running、finish
+  function raceView() {
+    return {
+      phase: race.phase,
+      count: race.count,
+      total: race.runners.length,
+      lanes: TRACK.lanes,
+      arrived: race.runners.filter((i) => cats[i].state === 'raceWait').length,
+      standing: raceStanding(),
+    };
+  }
+
+  // 桐桐按「開始比賽」
+  function raceStart() {
+    if (race.phase !== 'ready') return false;
+    startCountdown();
+    return true;
   }
 
   // 點紙箱：有貓就探頭出來，沒有就冒一句「空的！」
@@ -3808,6 +4205,8 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     stageView,
     stageTrick,
     stageClap,
+    raceView,
+    raceStart,
     peekBox,
     writers,
     coachInfo,

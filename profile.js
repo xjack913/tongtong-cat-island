@@ -10,7 +10,7 @@ export const DEFAULT_NAME = '桐桐';
 export const NAME_MAX = 8;
 
 // 算「全島走透透」的島，id 跟 app.js 的 NAV 一樣（「看全島」和「貓貓教練」不是島）
-export const ISLAND_IDS = ['home', 'low', 'mid', 'high', 'stage', 'diary', 'learn', 'boxes', 'combo', 'park1', 'park2', 'rank'];
+export const ISLAND_IDS = ['home', 'low', 'mid', 'high', 'stage', 'track', 'diary', 'learn', 'boxes', 'combo', 'park1', 'park2', 'rank'];
 const UNIT_COUNT = 9;
 const COUNT_MAX = 1e9;
 const COUNT_KEYS = ['jumps', 'perfect', 'perfectHigh', 'records', 'graded', 'right', 'daysDone', 'daysAllRight', 'stamps', 'tricks', 'claps', 'boxes', 'days'];

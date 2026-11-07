@@ -9,9 +9,10 @@ export function fromSketch([px, py]) {
   return { x: (px - SKETCH.cx) / SKETCH.scale, z: (py - SKETCH.cy) / SKETCH.scale };
 }
 
-// 十二座島：outline 是草稿上的島形頂點；ring 是島上環狀步道離中心的比例。
+// 十三座島：outline 是草稿上的島形頂點；ring 是島上環狀步道離中心的比例。
 // 表演區到合體公園四座是桐桐第二張草稿加的，那張照片的角度不一樣，先用兩張照片上相同的角點對齊，再換成第一張的座標；
-// 學習數學島是桐桐後來說要加的，草稿上沒畫，放在高階跳臺上面那塊空地
+// 學習數學島是桐桐後來說要加的，草稿上沒畫，放在高階跳臺上面那塊空地；
+// 跑步田徑場島是桐桐另外畫的一張六角形（比例照她的圖），放在紙箱公園下面，長寬都是一般島的兩倍左右
 export const ISLANDS = [
   { id: 'home', kind: 'home', name: '貓貓之家', ring: 0.7, outline: [[560, 700], [593, 527], [895, 520], [960, 680], [860, 800], [640, 800]] },
   { id: 'high', kind: 'jump', level: 'high', name: '高階跳臺', ring: 0.7, outline: [[183, 398], [248, 248], [565, 222], [633, 410], [535, 556], [270, 530]] },
@@ -25,9 +26,10 @@ export const ISLANDS = [
   { id: 'diary', kind: 'diary', name: '日記區', ring: 0.8, outline: [[1231, 447], [1397, 408], [1387, 580], [1320, 596], [1232, 501]] },
   { id: 'combo', kind: 'combo', name: '合體公園', ring: 0.68, outline: [[1181, 707], [1307, 653], [1366, 760], [1241, 884], [1177, 782]] },
   { id: 'learn', kind: 'learn', name: '學習數學島', ring: 0.8, outline: [[262, 120], [330, 40], [590, 28], [648, 110], [600, 182], [300, 190]] },
+  { id: 'track', kind: 'track', name: '跑步田徑場島', ring: 0.92, outline: [[513, 1012], [993, 1046], [1140, 1286], [1010, 1527], [642, 1574], [381, 1415]] },
 ];
 
-// 二十二座木板橋：points 是草稿上的橋頭、轉折與橋尾（第一點靠 a 島、最後一點靠 b 島）。
+// 二十四座木板橋：points 是草稿上的橋頭、轉折與橋尾（第一點靠 a 島、最後一點靠 b 島）。
 // 表演區往下那座橋接在高階到中階的長橋上：join 是 [接到第幾座橋, 那座橋的第幾個點]
 export const BRIDGES = [
   { a: 'high', b: 'mid', points: [[585, 285], [680, 266], [780, 256], [812, 257], [880, 258], [962, 268]] },
@@ -52,7 +54,50 @@ export const BRIDGES = [
   { a: 'park2', b: 'combo', points: [[1144, 836], [1203, 817]] },
   { a: 'learn', b: 'high', points: [[420, 186], [425, 236]] },
   { a: 'learn', b: 'stage', points: [[646, 112], [754, 128]] },
+  { a: 'park1', b: 'track', points: [[745, 935], [745, 1030]] },
+  { a: 'park2', b: 'track', points: [[1040, 950], [985, 1075]] },
 ];
+
+// 跑步田徑場：橢圓跑道，七條跑道（第 1 道在最裡面）。單位是公尺，center 是跑道中心在島上的位置，
+// inner 是最裡面那條線的彎道半徑，straight 是直道長度的一半，startX 是起跑線（也是終點線）在前面直道的位置
+export const TRACK = { lanes: 7, laneWidth: 0.45, inner: 2.2, straight: 3.4, startX: -1.4, center: { x: -0.34, z: -0.5 } };
+
+export function laneRadius(lane) {
+  return TRACK.inner + (lane + 0.5) * TRACK.laneWidth;
+}
+
+export function trackOuter() {
+  return TRACK.inner + TRACK.lanes * TRACK.laneWidth;
+}
+
+// (x, z) 是從跑道中心量的，r 是這個形狀的彎道半徑
+export function insideTrack(x, z, r) {
+  return Math.hypot(Math.max(Math.abs(x) - TRACK.straight, 0), z) < r;
+}
+
+// 半徑 r 的那一圈上，從起跑線出發跑了 u 圈的位置和方向（從上面看是逆時針，前面直道往右跑）。
+// u 超過 1 就是跑過終點線之後繼續往前
+export function trackPoint(r, u) {
+  const { straight: hx, startX: sx } = TRACK;
+  const arc = Math.PI * r;
+  const length = 4 * hx + 2 * arc;
+  let d = (((u % 1) + 1) % 1) * length;
+  if (d < hx - sx) return { x: sx + d, z: r, dx: 1, dz: 0 };
+  d -= hx - sx;
+  if (d < arc) {
+    const a = d / r;
+    return { x: hx + Math.sin(a) * r, z: Math.cos(a) * r, dx: Math.cos(a), dz: -Math.sin(a) };
+  }
+  d -= arc;
+  if (d < 2 * hx) return { x: hx - d, z: -r, dx: -1, dz: 0 };
+  d -= 2 * hx;
+  if (d < arc) {
+    const a = d / r;
+    return { x: -hx - Math.sin(a) * r, z: -Math.cos(a) * r, dx: -Math.cos(a), dz: Math.sin(a) };
+  }
+  d -= arc;
+  return { x: -hx + d, z: r, dx: 1, dz: 0 };
+}
 
 // 三座跳臺：tower 是跳板離島面的高度、extra 是蓄滿力最多再往上跳幾公尺（公尺）。
 // 能量條：低階一直按住就會滿；中階、高階滿了會往下掉再上來，要抓最滿的時候放開
@@ -305,6 +350,8 @@ export function composeDiary(cat, events, pick = 0.5, who = '桐桐') {
     else if (e.type === 'podium') line = `我站上頒獎臺，是第 ${e.rank} 名${e.rank === 1 ? '，還戴了皇冠' : ''}！`;
     else if (e.type === 'watchJump') line = `我在${levelName(e.level)}看大家跳高。`;
     else if (e.type === 'study') line = '我在學習數學島寫作業。';
+    else if (e.type === 'race') line = e.place === 1 ? '我在跑步田徑場跑了第一名，我最快！' : `我在跑步田徑場跑了第 ${e.place} 名，下次要更快。`;
+    else if (e.type === 'field') line = '我在跑步田徑場的草場跑來跑去，好開心。';
     else if (e.type === 'homework') line = e.right ? `${who}老師改了我的數學作業，我寫對了！` : '我的數學作業寫錯了，下次要更仔細。';
     if (!line) continue;
     seen.add(e.type);

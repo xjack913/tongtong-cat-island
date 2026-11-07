@@ -21,6 +21,7 @@ const NAV = [
   { id: 'mid', label: '中階跳臺', level: 'mid' },
   { id: 'high', label: '高階跳臺', level: 'high' },
   { id: 'stage', label: '表演區' },
+  { id: 'track', label: '跑步田徑場島' },
   { id: 'diary', label: '日記區' },
   { id: 'learn', label: '學習數學島' },
   { id: 'boxes', label: '多多紙箱區' },
@@ -314,6 +315,9 @@ function start(hotData = {}) {
         memories.set(index, list);
       },
       diary: writeDiary,
+      raceEnd(order) {
+        if (focus === 'track' && order.length) showToast('比賽結束！', `第一名是${cats[order[0]].name}`);
+      },
     },
   });
 
@@ -838,6 +842,7 @@ function start(hotData = {}) {
     const dock = $('dock');
     dock.hidden = !level;
     $('stage-dock').hidden = id !== 'stage';
+    $('race-dock').hidden = id !== 'track';
     if (level) {
       dock.className = `dock dock--${id}`;
       $('dock-level').textContent = `${starsText(id)} ${level.name}`;
@@ -847,6 +852,9 @@ function start(hotData = {}) {
       lastDock = {};
     } else if (id === 'stage') {
       lastDock = {};
+    } else if (id === 'track') {
+      lastDock = {};
+      showToast('跑步田徑場島', '七隻貓到齊，按「開始比賽」就開跑');
     } else if (id === 'rank') {
       openRank();
     } else if (id === 'diary') {
@@ -941,6 +949,7 @@ function start(hotData = {}) {
   function tick() {
     requestAnimationFrame(tick);
     if (!$('stage-dock').hidden) tickStage();
+    if (!$('race-dock').hidden) tickRace();
     if ($('dock').hidden || !LEVELS[focus]) return;
     const view = scene.platformView(focus);
     if (!view) return;
@@ -962,6 +971,40 @@ function start(hotData = {}) {
     setText('dock-next', waiting.length ? `排隊中：${waiting.join('、')}` : '');
   }
   requestAnimationFrame(tick);
+
+  // ---------- 跑步比賽的按鈕和戰況 ----------
+  function tickRace() {
+    const view = scene.raceView();
+    const name = (k) => (view.standing[k] !== undefined ? cats[view.standing[k]].name : '');
+    let who = '';
+    let next = '';
+    if (view.phase === 'idle') {
+      who = '下一場比賽快開始了';
+      next = '貓貓正在休息';
+    } else if (view.phase === 'gather') {
+      who = `貓貓跑去起跑線（${view.arrived}／${view.lanes}）`;
+      next = '到齊就可以比賽';
+    } else if (view.phase === 'ready') {
+      who = `${view.total} 隻貓都就位了！`;
+      next = '按「開始比賽」，貓貓就開跑';
+    } else if (view.phase === 'countdown') {
+      who = `預備…${Math.max(1, view.count)}`;
+      next = '看哪一隻跑最快';
+    } else if (view.phase === 'running') {
+      who = `領先：${name(0)}`;
+      next = `第二 ${name(1)}、第三 ${name(2)}`;
+    } else {
+      who = `第一名是${name(0)}！`;
+      next = `第二名 ${name(1)}、第三名 ${name(2)}`;
+    }
+    setText('race-who', who);
+    setText('race-next', next);
+    $('race-go').disabled = view.phase !== 'ready';
+  }
+  $('race-go').addEventListener('click', () => {
+    sound.unlock();
+    scene.raceStart();
+  });
 
   // ---------- 表演區按鈕：點動作，臺上的貓就表演；拍手，臺下的貓一起拍 ----------
   const trickButtons = [...document.querySelectorAll('[data-trick]')];
@@ -1216,6 +1259,7 @@ function start(hotData = {}) {
     focus = 'coach';
     $('dock').hidden = true;
     $('stage-dock').hidden = true;
+    $('race-dock').hidden = true;
     measureBottom();
     scene.follow('coach', insets());
     followingCoach = true;
@@ -1852,6 +1896,7 @@ function start(hotData = {}) {
       followingCoach = false;
       $('dock').hidden = true;
       $('stage-dock').hidden = true;
+      $('race-dock').hidden = true;
       measureBottom();
       scene.follow(openCatIndex, insets());
       track('cat_follow', { what: 'cat' });
