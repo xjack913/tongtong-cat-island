@@ -1,0 +1,12 @@
+name = "tong-island"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+account_id = "f90d1d21e633d2e442a188f2d70b1541"
+workers_dev = false
+preview_urls = false
+routes = [{ pattern = "tong-api.xjack.tw", custom_domain = true }]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tong-island"
+database_id = "9417e8b9-8fa9-46b4-baf9-fc941be280ee"

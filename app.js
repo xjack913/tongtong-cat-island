@@ -8,7 +8,8 @@ import { LESSONS } from './lessons.js';
 import { drawFigure } from './figures.js';
 import { zhuyin, plainText } from './zhuyin.js';
 import {
-  BADGES, BADGE_GROUPS, ISLAND_IDS, NAME_MAX, sanitizeProfile, cleanName, playerName, stampChar, statValue, bump, addSeen, markDay, award, earnedDayText,
+  BADGES, BADGE_GROUPS, ISLAND_IDS, NAME_MAX, sanitizeProfile, sanitizeDeviceData, cleanName, playerName, stampChar, statValue, total, bestCm, seenCount, bump, addSeen, markDay, award, earnedDayText,
+  normalizeCode, formatCode, ownData, applyRemote,
 } from './profile.js';
 import { createScene } from './scene.js';
 
@@ -51,6 +52,10 @@ function el(tag, className, text) {
   if (text !== undefined) node.textContent = text;
   return node;
 }
+
+// 島民卡的雲端存檔：本機預覽接 wrangler dev，其他都接正式的
+const CLOUD_API = /^(127\.0\.0\.1|localhost)$/.test(location.hostname) ? 'http://127.0.0.1:8787' : 'https://tong-api.xjack.tw';
+const SYNC_DELAY = 20000;
 
 // GA4 玩法事件：只有 tong.xjack.tw 會載 GA（ga.js），其他地方沒有 gtag 就什麼都不做
 function track(name, params = {}) {
@@ -362,6 +367,7 @@ function start(hotData = {}) {
     save();
     if (fresh.length) announceBadges(fresh);
     if (!$('profile-card').hidden) renderProfile();
+    scheduleSync();
   }
 
   function tally(key) {
@@ -436,12 +442,12 @@ function start(hotData = {}) {
   }
 
   const PROFILE_STATS = [
-    ['完美跳', () => profile.counts.perfect, '次'],
-    ['幫貓貓跳', () => profile.counts.jumps, '次'],
-    ['跳最高', () => profile.bestCm, '公分'],
-    ['改作業', () => profile.counts.graded, '張'],
-    ['點過的貓', () => profile.seen.cats.length, '隻'],
-    ['來島上', () => profile.counts.days, '天'],
+    ['完美跳', () => total(profile, 'perfect'), '次'],
+    ['幫貓貓跳', () => total(profile, 'jumps'), '次'],
+    ['跳最高', () => bestCm(profile), '公分'],
+    ['改作業', () => total(profile, 'graded'), '張'],
+    ['點過的貓', () => seenCount(profile, 'cats'), '隻'],
+    ['來島上', () => total(profile, 'days'), '天'],
   ];
 
   function renderProfile() {
@@ -454,6 +460,7 @@ function start(hotData = {}) {
       $('profile-save').disabled = !cleanName(input.value);
       $('profile-skip').textContent = profile.name ? '先不改' : '繼續當桐桐';
     }
+    renderCloud();
     $('profile-stats').replaceChildren(...PROFILE_STATS.map(([label, value, unit]) => {
       const tile = el('div', 'stat-tile');
       const number = el('b', '', String(value()));
@@ -511,6 +518,7 @@ function start(hotData = {}) {
     const name = cleanName($('profile-input').value);
     if (!name) return;
     profile.name = name;
+    profile.nameAt = Date.now();
     profileEditing = false;
     $('profile-input').blur();
     save();
@@ -519,7 +527,218 @@ function start(hotData = {}) {
     if (!$('learn-card').hidden) renderLearn();
     sound.play('stamp');
     showToast(`${name}，歡迎來到貓貓島！`, '貓貓記住你的名字了');
+    if (profile.cloud.code) scheduleSync(0);
+    else linkCloud();
   });
+
+  // ---------- 島民暗號：存到雲端，換裝置或資料不見都找得回來 ----------
+  // 平常只存在這臺裝置；有暗號之後，動作停下來 20 秒、或離開頁面時送一次。連不上就先記在本機，等一下再試
+  let cloudState = 'idle'; // idle、saving、saved、offline、missing
+  let syncTimer = 0;
+  let syncBusy = false;
+  let linking = false;
+  let lastSent = '';
+  $('cloud-input').placeholder = zhuyin('例如 K7MP-3XQ2');
+
+  function newDeviceId() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    return [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function deviceId() {
+    if (!profile.cloud.deviceId) profile.cloud.deviceId = newDeviceId();
+    return profile.cloud.deviceId;
+  }
+
+  // 用 text/plain 送，瀏覽器不用先問一次 CORS，關分頁時也送得出去。連不上回 status 0
+  async function cloudPost(path, body, keepalive = false) {
+    try {
+      const res = await fetch(`${CLOUD_API}${path}`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body), keepalive });
+      return { status: res.status, body: await res.json().catch(() => ({})) };
+    } catch {
+      return { status: 0, body: {} };
+    }
+  }
+
+  function setCloudState(state) {
+    cloudState = state;
+    if (!$('profile-card').hidden) renderCloud();
+  }
+
+  // 收到別臺裝置合起來的資料：畫面上的數字、名字、徽章跟著更新
+  function receiveOthers(others) {
+    const renamed = applyRemote(profile, sanitizeDeviceData(others, cats.length));
+    if (renamed) applyName();
+    const fresh = award(profile, dayKey());
+    save();
+    if (fresh.length) announceBadges(fresh);
+    if (!$('profile-card').hidden) renderProfile();
+    if (!$('learn-card').hidden) renderLearn();
+  }
+
+  function scheduleSync(delay = SYNC_DELAY) {
+    if (!profile.cloud.code) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => syncNow(), delay);
+  }
+
+  async function syncNow({ keepalive = false, force = false } = {}) {
+    if (!profile.cloud.code || syncBusy) return;
+    const code = profile.cloud.code;
+    const data = ownData(profile);
+    const sent = JSON.stringify(data);
+    if (sent === lastSent && !force) return;
+    syncBusy = true;
+    clearTimeout(syncTimer);
+    const res = await cloudPost('/sync', { code, deviceId: deviceId(), data }, keepalive);
+    syncBusy = false;
+    if (code !== profile.cloud.code) return;
+    if (res.status === 200) {
+      lastSent = sent;
+      receiveOthers(res.body.others);
+      setCloudState('saved');
+      if (JSON.stringify(ownData(profile)) !== lastSent) scheduleSync();
+    } else if (res.status === 404) {
+      setCloudState('missing');
+    } else {
+      setCloudState('offline');
+      scheduleSync(60000);
+    }
+  }
+
+  // 開一張新卡：這臺裝置到現在累積的都帶上去
+  async function linkCloud() {
+    if (profile.cloud.code || linking) return;
+    linking = true;
+    setCloudState('saving');
+    const data = ownData(profile);
+    const res = await cloudPost('/players', { deviceId: deviceId(), data });
+    linking = false;
+    const code = res.status === 200 ? normalizeCode(res.body.code) : '';
+    if (!code) {
+      setCloudState('offline');
+      return;
+    }
+    profile.cloud.code = code;
+    lastSent = JSON.stringify(data);
+    save();
+    setCloudState('saved');
+    if (!$('profile-card').hidden) renderProfile();
+    if (JSON.stringify(ownData(profile)) !== lastSent) scheduleSync();
+  }
+
+  const CLOUD_STATUS = {
+    idle: '',
+    saving: '正在存到島上的資料庫…',
+    saved: '已經存好了。',
+    offline: '現在連不上，數字還記在這臺裝置上，等一下會再試。',
+    missing: '島上的資料庫找不到這組暗號，數字還記在這臺裝置上。',
+  };
+
+  function renderCloud() {
+    const code = profile.cloud.code;
+    $('cloud-has').hidden = !code;
+    $('cloud-none').hidden = !!code || profileEditing;
+    $('cloud-code').textContent = formatCode(code);
+    const status = code || cloudState === 'offline' ? CLOUD_STATUS[cloudState] : '';
+    $('cloud-status').hidden = !status;
+    $('cloud-status').textContent = status;
+    $('cloud-switch-note').hidden = !code;
+    $('cloud-switch-note').textContent = code
+      ? `這臺裝置現在是${who()}的卡。換過去之後，輸入原本的暗號 ${formatCode(code)} 還能換回來，先記下來喔。`
+      : '';
+  }
+
+  function closeRestore() {
+    $('cloud-restore').hidden = true;
+    $('cloud-restore-open').hidden = false;
+    $('cloud-error').hidden = true;
+    $('cloud-input').value = '';
+    $('cloud-find').disabled = false;
+  }
+
+  function restoreError(text) {
+    $('cloud-error').textContent = text;
+    $('cloud-error').hidden = false;
+    $('cloud-find').disabled = false;
+  }
+
+  // 輸入暗號找回卡：先不帶資料問一次，暗號對了才動這臺裝置的存檔
+  async function restoreCard(raw) {
+    const code = normalizeCode(raw);
+    if (!code) {
+      restoreError('暗號是 8 碼英文字母和數字，再看一次有沒有打錯。');
+      return;
+    }
+    if (code === profile.cloud.code) {
+      closeRestore();
+      showToast('這就是你現在的卡', '不用再找一次');
+      return;
+    }
+    $('cloud-find').disabled = true;
+    const switching = !!profile.cloud.code;
+    const id = switching ? newDeviceId() : deviceId();
+    const res = await cloudPost('/sync', { code, deviceId: id });
+    if (res.status === 404) {
+      restoreError('找不到這組暗號，再看一次有沒有打錯。');
+      return;
+    }
+    if (res.status !== 200) {
+      restoreError('現在連不上，等一下再試一次。');
+      return;
+    }
+    // 這臺原本是別張卡：先把舊卡存好再換；還沒有卡的話，這臺已經玩的數字會加進找回來的卡
+    if (switching) {
+      await syncNow({ force: true });
+      const today = dayKey();
+      Object.assign(profile, sanitizeProfile({ firstDay: today, lastDay: today }, cats.length));
+    }
+    profile.asked = true;
+    profile.cloud = { code, deviceId: id };
+    lastSent = '';
+    profileEditing = false;
+    closeRestore();
+    receiveOthers(res.body.others);
+    applyName();
+    setCloudState('saving');
+    renderProfile();
+    sound.play('stamp');
+    showToast('找回來了！', `${who()}，歡迎回來`);
+    syncNow({ force: true });
+  }
+
+  $('cloud-get').addEventListener('click', () => {
+    sound.unlock();
+    linkCloud();
+  });
+  $('cloud-restore-open').addEventListener('click', () => {
+    $('cloud-restore').hidden = false;
+    $('cloud-restore-open').hidden = true;
+    $('cloud-input').focus();
+  });
+  $('cloud-cancel').addEventListener('click', closeRestore);
+  $('cloud-restore').addEventListener('submit', (event) => {
+    event.preventDefault();
+    $('cloud-error').hidden = true;
+    restoreCard($('cloud-input').value);
+  });
+  $('cloud-copy').addEventListener('click', async () => {
+    const label = $('cloud-copy');
+    try {
+      await navigator.clipboard.writeText(formatCode(profile.cloud.code));
+      label.textContent = '複製好了';
+    } catch {
+      label.textContent = '請手抄下來';
+    }
+    setTimeout(() => {
+      label.textContent = '複製';
+    }, 2500);
+  });
+  // 離開頁面時把還沒送的補送出去
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) syncNow({ keepalive: true });
+  });
+  window.addEventListener('pagehide', () => syncNow({ keepalive: true }));
 
   function refreshBoards() {
     const top = leaderboard(records, 'all', 10);
@@ -1084,8 +1303,8 @@ function start(hotData = {}) {
       dot.setAttribute('aria-label', `第 ${i + 1} 張${s.result === 'good' ? '，一次就改對' : s.result === 'help' ? '，老師幫忙' : ''}`);
       return dot;
     }));
-    $('learn-stats').textContent = profile.counts.graded
-      ? `${who()}老師一共改了 ${profile.counts.graded} 張，一次就改對 ${profile.counts.right} 張。`
+    $('learn-stats').textContent = total(profile, 'graded')
+      ? `${who()}老師一共改了 ${total(profile, 'graded')} 張，一次就改對 ${total(profile, 'right')} 張。`
       : '點「寫對了」或「寫錯了」幫貓貓改作業。';
     const finished = sheetIndex >= stack.length;
     $('sheet-body').hidden = finished;
@@ -1756,8 +1975,11 @@ function start(hotData = {}) {
   // 第一次來先看故事，看完問名字；老玩家這次升級也問一次；有名字的人每天第一次來打個招呼
   if (!storySeen) openStory();
   else if (!profile.asked) openProfile(true);
-  else if (profile.name && newDay) showToast(`${profile.name}，歡迎回來！`, `這是你第 ${profile.counts.days} 天來島上`);
+  else if (profile.name && newDay) showToast(`${profile.name}，歡迎回來！`, `這是你第 ${total(profile, 'days')} 天來島上`);
   tallied();
+  // 有暗號就先對一次雲端；有名字還沒有暗號（連不上或舊版取的名字）就補開一張
+  if (profile.cloud.code) syncNow({ force: true });
+  else if (profile.name) linkCloud();
 }
 
 const hot = window.claude?.hot;

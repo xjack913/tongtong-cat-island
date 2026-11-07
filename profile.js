@@ -1,6 +1,9 @@
-// 島民卡：玩家自己取的名字、會一直累積的數字、拿到的徽章。瀏覽器與 Node 共用的純邏輯。
+// 島民卡：玩家自己取的名字、會一直累積的數字、拿到的徽章。瀏覽器、Node、Worker 共用的純邏輯。
 // 存在 localStorage 的 profile 欄位；數字只會往上加，排行榜的「重新比一次」不會清掉這裡。
 // 沒取名字的人維持原本的設定，就是島主桐桐。
+//
+// 有暗號的話，每臺裝置只把「自己這臺累積的」存到雲端（一臺一列）。別臺的合起來放在 remote，
+// 畫面上看到的是兩邊加起來。同一臺裝置重送只會取比較大的數字，所以送兩次不會多算。
 import { plainText } from './zhuyin.js';
 
 export const DEFAULT_NAME = '桐桐';
@@ -11,6 +14,10 @@ export const ISLAND_IDS = ['home', 'low', 'mid', 'high', 'stage', 'diary', 'lear
 const UNIT_COUNT = 9;
 const COUNT_MAX = 1e9;
 const COUNT_KEYS = ['jumps', 'perfect', 'perfectHigh', 'records', 'graded', 'right', 'daysDone', 'daysAllRight', 'stamps', 'tricks', 'claps', 'boxes', 'days'];
+
+// 島民暗號：8 碼，拿掉長得很像的 0、O、1、I、L，小朋友抄的時候才不會抄錯
+export const CODE_CHARS = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+export const CODE_LENGTH = 8;
 
 // stat 是 counts 裡的數字，或 seen 裡收集到幾個（islands、cats、units）
 export const BADGE_GROUPS = [
@@ -43,10 +50,7 @@ export const BADGES = [
   { id: 'days7', group: 'back', title: '常來的島民', text: '來島上 7 天', stat: 'days', goal: 7 },
   { id: 'days30', group: 'back', title: '老島民', text: '來島上 30 天', stat: 'days', goal: 30 },
 ];
-
-function emptyCounts() {
-  return Object.fromEntries(COUNT_KEYS.map((key) => [key, 0]));
-}
+const BADGE_IDS = new Set(BADGES.map((b) => b.id));
 
 function count(value) {
   return Number.isInteger(value) && value > 0 ? Math.min(value, COUNT_MAX) : 0;
@@ -57,6 +61,8 @@ function uniqueWhere(value, ok) {
 }
 
 const isDay = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+const isObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+const isTime = (value) => Number.isInteger(value) && value > 0 && value < 1e14;
 
 // 留下看得到的字：去掉換行、控制字元和注音選擇子，空白併成一個，最多 NAME_MAX 個字
 export function cleanName(text) {
@@ -64,15 +70,25 @@ export function cleanName(text) {
   return [...plain].slice(0, NAME_MAX).join('').trim();
 }
 
-// raw 是存檔裡的 profile。第一次打開新版時還沒有，就用舊存檔算得出來的數字開始（seed）
-export function sanitizeProfile(raw, catCount, seed = {}) {
-  const isObject = raw && typeof raw === 'object' && !Array.isArray(raw);
-  const from = isObject ? raw : { counts: seed };
-  const counts = emptyCounts();
+// 暗號：大小寫、空白、連字號都不計較；不是 8 碼或有不該出現的字就回空字串
+export function normalizeCode(text) {
+  const code = String(text ?? '').toUpperCase().replace(/[^0-9A-Z]/g, '');
+  if (code.length !== CODE_LENGTH) return '';
+  return [...code].every((c) => CODE_CHARS.includes(c)) ? code : '';
+}
+
+export function formatCode(code) {
+  return code ? `${code.slice(0, 4)}-${code.slice(4)}` : '';
+}
+
+// 一臺裝置累積的東西：存檔、上傳、合併都是這個形狀
+export function sanitizeDeviceData(raw, catCount) {
+  const from = isObject(raw) ? raw : {};
+  const counts = {};
   COUNT_KEYS.forEach((key) => {
     counts[key] = count(from.counts && from.counts[key]);
   });
-  const seen = from.seen || {};
+  const seen = isObject(from.seen) ? from.seen : {};
   const earned = {};
   BADGES.forEach((badge) => {
     const day = from.earned && from.earned[badge.id];
@@ -80,9 +96,7 @@ export function sanitizeProfile(raw, catCount, seed = {}) {
   });
   return {
     name: cleanName(from.name),
-    asked: from.asked === true,
-    firstDay: isDay(from.firstDay) ? from.firstDay : '',
-    lastDay: isDay(from.lastDay) ? from.lastDay : '',
+    nameAt: isTime(from.nameAt) ? from.nameAt : 0,
     bestCm: count(from.bestCm),
     counts,
     seen: {
@@ -94,6 +108,103 @@ export function sanitizeProfile(raw, catCount, seed = {}) {
   };
 }
 
+// raw 是存檔裡的 profile。第一次打開新版時還沒有，就用舊存檔算得出來的數字開始（seed）
+export function sanitizeProfile(raw, catCount, seed = {}) {
+  const from = isObject(raw) ? raw : { counts: seed };
+  const cloud = isObject(from.cloud) ? from.cloud : {};
+  return {
+    ...sanitizeDeviceData(from, catCount),
+    asked: from.asked === true,
+    firstDay: isDay(from.firstDay) ? from.firstDay : '',
+    lastDay: isDay(from.lastDay) ? from.lastDay : '',
+    cloud: {
+      code: normalizeCode(cloud.code),
+      deviceId: isDeviceId(cloud.deviceId) ? cloud.deviceId : '',
+    },
+    remote: sanitizeDeviceData(from.remote, catCount),
+  };
+}
+
+export function isDeviceId(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(value);
+}
+
+// 這臺裝置要上傳的部分
+export function ownData(profile) {
+  const { name, nameAt, bestCm, counts, seen, earned } = profile;
+  return { name, nameAt, bestCm, counts, seen, earned };
+}
+
+function earliest(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return a < b ? a : b;
+}
+
+function mergeEarned(a, b) {
+  const out = { ...a };
+  Object.entries(b).forEach(([id, day]) => {
+    if (BADGE_IDS.has(id)) out[id] = earliest(out[id], day);
+  });
+  return out;
+}
+
+function unionSeen(a, b) {
+  return {
+    islands: [...new Set([...a.islands, ...b.islands])],
+    cats: [...new Set([...a.cats, ...b.cats])],
+    units: [...new Set([...a.units, ...b.units])],
+  };
+}
+
+function latestName(a, b) {
+  if (b.name && (!a.name || b.nameAt >= a.nameAt)) return { name: b.name, nameAt: b.nameAt };
+  return { name: a.name, nameAt: a.nameAt };
+}
+
+// 同一臺裝置的舊資料和新資料：數字只取大的，重送、晚到都不會多算或變少
+export function mergeOwn(previous, next) {
+  const counts = {};
+  COUNT_KEYS.forEach((key) => {
+    counts[key] = Math.max(previous.counts[key], next.counts[key]);
+  });
+  return {
+    ...latestName(previous, next),
+    bestCm: Math.max(previous.bestCm, next.bestCm),
+    counts,
+    seen: unionSeen(previous.seen, next.seen),
+    earned: mergeEarned(previous.earned, next.earned),
+  };
+}
+
+// 不同裝置：數字加起來，收集的東西取聯集，名字用最後改的
+export function mergeDevices(list, catCount) {
+  return list.reduce((sum, device) => {
+    const counts = {};
+    COUNT_KEYS.forEach((key) => {
+      counts[key] = Math.min(sum.counts[key] + device.counts[key], COUNT_MAX);
+    });
+    return {
+      ...latestName(sum, device),
+      bestCm: Math.max(sum.bestCm, device.bestCm),
+      counts,
+      seen: unionSeen(sum.seen, device.seen),
+      earned: mergeEarned(sum.earned, device.earned),
+    };
+  }, sanitizeDeviceData(null, catCount));
+}
+
+// 收到別臺裝置合起來的資料。回傳 true 表示名字變了，畫面要跟著換
+export function applyRemote(profile, others) {
+  profile.remote = others;
+  profile.earned = mergeEarned(profile.earned, others.earned);
+  const named = latestName(profile, others);
+  const changed = named.name !== profile.name;
+  profile.name = named.name;
+  profile.nameAt = named.nameAt;
+  return changed;
+}
+
 export function playerName(profile) {
   return profile.name || DEFAULT_NAME;
 }
@@ -103,8 +214,21 @@ export function stampChar(profile) {
   return [...playerName(profile)][0];
 }
 
+// 畫面上看到的數字：這臺加上別臺
+export function total(profile, key) {
+  return Math.min(profile.counts[key] + profile.remote.counts[key], COUNT_MAX);
+}
+
+export function bestCm(profile) {
+  return Math.max(profile.bestCm, profile.remote.bestCm);
+}
+
+export function seenCount(profile, key) {
+  return new Set([...profile.seen[key], ...profile.remote.seen[key]]).size;
+}
+
 export function statValue(profile, stat) {
-  return profile.seen[stat] ? profile.seen[stat].length : profile.counts[stat] || 0;
+  return profile.seen[stat] ? seenCount(profile, stat) : total(profile, stat);
 }
 
 export function bump(profile, key, amount = 1) {
