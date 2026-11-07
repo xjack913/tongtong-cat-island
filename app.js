@@ -583,7 +583,8 @@ function start(hotData = {}) {
   }
 
   async function syncNow({ keepalive = false, force = false } = {}) {
-    if (!profile.cloud.code || syncBusy) return;
+    // 離開頁面時就算上一次還在路上也要送：頁面一關，上一次沒帶到的數字就沒機會了（重送不會多算）
+    if (!profile.cloud.code || (syncBusy && !keepalive)) return;
     const code = profile.cloud.code;
     const data = ownData(profile);
     const sent = JSON.stringify(data);
