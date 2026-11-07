@@ -488,12 +488,6 @@ function addHeadband(model) {
   band.rotation.x = -0.2;
 }
 
-// 貓島主：背上一件藍色小披風
-function addCape(model) {
-  const cape = part(new THREE.BoxGeometry(0.26, 0.02, 0.36), '#3E4BB8');
-  put(model.rig, makeMesh(cape, CAT_MATERIAL, false, false), 0, 0.31, -0.05);
-}
-
 // 貓貓老師：圓眼鏡，右手拿一根教鞭
 function addGlasses(model) {
   const ink = '#2B2730';
@@ -2014,6 +2008,8 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   }
   const edgePoint = (e) => ({ x: e.island.cx + e.ux * (e.edge - 0.35), z: e.island.cz + e.uz * (e.edge - 0.35) });
   const onDeck = (p) => new THREE.Vector3(p.x, TOP + 0.005, p.z);
+  // 橋面的每一段（世界座標），島主用搖桿走的時候判斷是不是還在橋上
+  const bridgeSegs = [];
   bridgePlans.filter((plan) => !plan.def.join).concat(bridgePlans.filter((plan) => plan.def.join)).forEach(({ index, def, pts, ends }) => {
     const deck = def.join
       ? [edgePoint(ends[0]), ...pts.slice(1)]
@@ -2021,6 +2017,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     for (let i = 0; i < deck.length - 1; i++) {
       const a = deck[i];
       const b = deck[i + 1];
+      bridgeSegs.push([a.x, a.z, b.x, b.z]);
       const length = Math.hypot(b.x - a.x, b.z - a.z);
       const angle = Math.atan2(b.x - a.x, b.z - a.z);
       const count = Math.max(2, Math.round(length / 0.3));
@@ -3129,7 +3126,6 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     let model;
     if (kind === 'cat') {
       model = buildCatModel({ index: owner.index, name: '島主', coat: { label: '島主', body: '#F2A35A', stripe: '#DD7F33', muzzle: '#FFE6C9' }, size: 1.18, chubby: 1, speed: 1.2 });
-      addCape(model);
       model.crown.visible = true;
       model.isCat = true;
       owner.bubbleY = 1.2;
@@ -3520,10 +3516,109 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     return true;
   }
 
+  // ---------- 島主：搖桿走路 ----------
+  // 搖桿往上是往鏡頭看過去的方向走；只能走在島上和橋上，碰到東西或走到海邊就停，斜著撞到會沿著邊滑過去
+  const stick = { x: 0, y: 0 };
+  const STICK_DEAD = 0.15;
+  const GROUND_Y = TOP + 0.005;
+  function ownerStick(x, y) {
+    stick.x = Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
+    stick.y = Number.isFinite(y) ? Math.max(-1, Math.min(1, y)) : 0;
+  }
+  function islandAt(x, z) {
+    return islands.find((island) => insidePoly(island.local, x - island.cx, z - island.cz)) || null;
+  }
+  const onBridge = (x, z, pad) => bridgeSegs.some(([ax, az, bx, bz]) => segDist(x, z, ax, az, bx, bz) < pad);
+  // strict：離海邊和東西留一點距離；站的地方本來就太靠近（例如剛從門口出來），就先放寬讓島主走得出來
+  function walkable(x, z, strict = true) {
+    const island = islandAt(x, z);
+    if (island) {
+      if (!strict) return true;
+      const lx = x - island.cx;
+      const lz = z - island.cz;
+      if (edgeDist(island.local, lx, lz) > 0.22 && !blocked(island, lx, lz, 0.12)) return true;
+    }
+    return onBridge(x, z, strict ? 0.3 : 0.4);
+  }
+  function lineWalkable(ax, az, bx, bz) {
+    const steps = Math.max(2, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.15));
+    for (let i = 1; i < steps; i++) {
+      const k = i / steps;
+      if (!walkable(ax + (bx - ax) * k, az + (bz - az) * k, false)) return false;
+    }
+    return true;
+  }
+  // 停下來的時候找一個走得到的路網節點，之後點地上或換島才找得到路
+  function settleOwnerNode() {
+    const here = islandAt(owner.pos.x, owner.pos.z);
+    if (here) owner.islandId = here.id;
+    const near = nodes.map((n, i) => [i, Math.hypot(n.v.x - owner.pos.x, n.v.z - owner.pos.z)]).sort((a, b) => a[1] - b[1]).slice(0, 12);
+    const reach = near.find(([i]) => lineWalkable(owner.pos.x, owner.pos.z, nodes[i].v.x, nodes[i].v.z));
+    owner.node = (reach || near[0])[0];
+  }
+  function stepStick(dt) {
+    const onGround = Math.abs(owner.pos.y - GROUND_Y) < 0.05;
+    if (owner.state !== 'stick') {
+      // 正在從椅子、舞臺或軟墊跳下來，等落地
+      if (owner.state === 'walk' && !onGround) return;
+      ownerStop();
+      owner.path = null;
+      owner.onArrive = null;
+      if (!onGround) {
+        ownerGo(owner.node, OWNER_WALK);
+        return;
+      }
+      owner.state = 'stick';
+    }
+    const fx = controls.target.x - camera.position.x;
+    const fz = controls.target.z - camera.position.z;
+    const fl = Math.hypot(fx, fz) || 1;
+    const ux = fx / fl;
+    const uz = fz / fl;
+    // 往前是鏡頭看過去的方向、往右是畫面的右邊；搖桿往上的 y 是負的
+    const mx = ux * -stick.y - uz * stick.x;
+    const mz = uz * -stick.y + ux * stick.x;
+    const ml = Math.hypot(mx, mz) || 1;
+    const mag = Math.min(1, Math.hypot(stick.x, stick.y));
+    const speed = mag > 0.85 ? OWNER_RUN : OWNER_WALK * Math.max(0.45, mag / 0.85);
+    const dx = (mx / ml) * speed * dt;
+    const dz = (mz / ml) * speed * dt;
+    owner.targetHeading = Math.atan2(mx, mz);
+    const px = owner.pos.x;
+    const pz = owner.pos.z;
+    const strict = walkable(px, pz);
+    let moved = false;
+    for (const [sx, sz] of [[dx, dz], [dx, 0], [0, dz]]) {
+      if (Math.hypot(sx, sz) < 1e-6 || !walkable(px + sx, pz + sz, strict)) continue;
+      owner.pos.x = px + sx;
+      owner.pos.z = pz + sz;
+      moved = true;
+      break;
+    }
+    owner.pos.y = GROUND_Y;
+    owner.hop = 0;
+    owner.moving = moved;
+    owner.pathSpeed = speed;
+    owner.pose = moved ? (speed > 2.2 ? 'run' : 'walk') : 'stand';
+    if (moved) {
+      const here = islandAt(owner.pos.x, owner.pos.z);
+      if (here) owner.islandId = here.id;
+    }
+  }
+  function stopStick() {
+    owner.state = 'idle';
+    owner.moving = false;
+    owner.pose = 'stand';
+    settleOwnerNode();
+  }
+
   // ---------- 島主：每一幀 ----------
   function updateOwner(dt, t) {
     const m = owner.model;
     if (!m) return;
+    const pushing = Math.hypot(stick.x, stick.y) > STICK_DEAD;
+    if (pushing && !ownerBusy()) stepStick(dt);
+    else if (owner.state === 'stick') stopStick();
     if (owner.state === 'walk') {
       followPath(owner, dt);
       if (owner.state === 'walk') owner.pose = owner.moving ? (owner.pathSpeed > 2.2 ? 'run' : 'walk') : 'stand';
@@ -4804,6 +4899,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     setOwnerLook,
     setOwnerName,
     ownerWalkTo,
+    ownerStick,
     ownerGoIsland,
     ownerSit,
     ownerCanSit: (id) => !!owner.model && seatsOn(id).length > 0,

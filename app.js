@@ -296,13 +296,60 @@ function start(hotData = {}) {
   // 島主正在做的事：站在跳臺軟墊上自己跳、站在表演區舞臺上
   let ownerJumping = false;
   let ownerOnStage = false;
+  // 在家看島：島主待在家裡，玩法回到原本的樣子（點島飛過去看、點貓看資料、跳臺按鈕讓貓跳）。只存在這臺
+  let atHome = stored.stayHome === true;
 
   // 第一次來的人先看島的故事，看過就不再跳出來
   let storySeen = !!stored.storySeen;
 
   function save() {
-    writeStore({ records, race: raceBoard, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay }, profile, news: newsLog });
+    writeStore({ records, race: raceBoard, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay }, profile, news: newsLog, stayHome: atHome });
   }
+
+  // ---------- 搖桿：跟著島主走的時候出現在左下角，推哪邊島主就往哪邊走（點地上走路照樣可以） ----------
+  const stickPad = $('stick');
+  const stickKnob = $('stick-knob');
+  const stickHold = { id: null };
+  function releaseStick() {
+    if (stickHold.id !== null && stickPad.hasPointerCapture(stickHold.id)) stickPad.releasePointerCapture(stickHold.id);
+    stickHold.id = null;
+    stickKnob.style.transform = '';
+    stickPad.classList.remove('is-on');
+    scene.ownerStick(0, 0);
+  }
+  function syncStick() {
+    const show = focus === 'owner' && !!profile.avatar && !atHome;
+    if (!show && stickHold.id !== null) releaseStick();
+    stickPad.hidden = !show;
+  }
+  function moveStick(event) {
+    const rect = stickPad.getBoundingClientRect();
+    const r = rect.width / 2;
+    let x = (event.clientX - (rect.left + r)) / r;
+    let y = (event.clientY - (rect.top + r)) / r;
+    const m = Math.hypot(x, y);
+    if (m > 1) {
+      x /= m;
+      y /= m;
+    }
+    stickKnob.style.transform = `translate(${(x * r * 0.55).toFixed(1)}px, ${(y * r * 0.55).toFixed(1)}px)`;
+    scene.ownerStick(x, y);
+  }
+  stickPad.addEventListener('pointerdown', (event) => {
+    if (stickHold.id !== null) return;
+    event.preventDefault();
+    sound.unlock();
+    stickHold.id = event.pointerId;
+    stickPad.setPointerCapture(event.pointerId);
+    stickPad.classList.add('is-on');
+    moveStick(event);
+  });
+  stickPad.addEventListener('pointermove', (event) => {
+    if (event.pointerId === stickHold.id) moveStick(event);
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((name) => stickPad.addEventListener(name, (event) => {
+    if (event.pointerId === stickHold.id) releaseStick();
+  }));
 
   // 成績太多時只留每隻貓在每座跳臺的最佳，加上最近 1000 跳
   function prune() {
@@ -461,6 +508,8 @@ function start(hotData = {}) {
     scene.setOwnerLook(profile.avatar);
     markLooks();
     $('learn-title').textContent = `${who()}老師改作業`;
+    // 改好的作業蓋島主名字的第一個字（還沒取名字就是「桐」）
+    $('sheet-seal').textContent = stampChar(profile);
     $('rank-note').textContent = rankNote();
     $('help-who').textContent = profile.name ? `島主${profile.name}` : '這座島的島主';
   }
@@ -883,6 +932,7 @@ function start(hotData = {}) {
     nav.querySelectorAll('.nav-chip').forEach((button) => {
       button.setAttribute('aria-pressed', String(button.dataset.island === focus));
     });
+    syncStick();
   }
 
   const bottom = $('bottom');
@@ -917,7 +967,8 @@ function start(hotData = {}) {
     ownerJumping = false;
     ownerOnStage = false;
     syncOwnerButtons();
-    scene.ownerGoIsland(id);
+    // 在家看島的時候島主不跟出門；還在外面的話先回家
+    scene.ownerGoIsland(atHome ? 'park1' : id);
     const level = LEVELS[id];
     const dock = $('dock');
     dock.hidden = !level;
@@ -954,7 +1005,7 @@ function start(hotData = {}) {
 
   // ---------- 島主也來玩：跳臺、舞臺、跑道上的按鈕 ----------
   function syncOwnerButtons() {
-    const can = !!profile.avatar;
+    const can = !!profile.avatar && !atHome;
     $('dock-owner').hidden = !can;
     $('dock-owner').textContent = ownerJumping ? '換貓貓跳' : '換我跳';
     $('stage-owner').hidden = !can;
@@ -1110,7 +1161,7 @@ function start(hotData = {}) {
     const running = view.phase === 'running' && view.ownerIn;
     setText('race-go', running ? '加速！' : '開始比賽');
     $('race-go').disabled = !(view.phase === 'ready' || running);
-    $('race-owner').hidden = !profile.avatar || view.ownerIn || !['gather', 'ready'].includes(view.phase);
+    $('race-owner').hidden = !profile.avatar || atHome || view.ownerIn || !['gather', 'ready'].includes(view.phase);
   }
   $('race-go').addEventListener('click', () => {
     sound.unlock();
@@ -1892,6 +1943,8 @@ function start(hotData = {}) {
     document.querySelectorAll('.card').forEach((card) => {
       card.hidden = true;
     });
+    // 卡片打開時搖桿會被蓋住，先放開，島主才不會一直走
+    if (stickHold.id !== null) releaseStick();
     stopSpeaking();
     diaryOpen = false;
     coachOpen = false;
@@ -1958,7 +2011,7 @@ function start(hotData = {}) {
     $('island-lede').textContent = copy.lede;
     $('island-text').textContent = copy.text;
     renderIsland();
-    $('island-sit').hidden = !scene.ownerCanSit(id);
+    $('island-sit').hidden = atHome || !scene.ownerCanSit(id);
     $('island-card').hidden = false;
   }
   $('island-sit').addEventListener('click', () => {
@@ -1987,7 +2040,7 @@ function start(hotData = {}) {
       if (info && info.writing) chip.append(el('small', '', '寫日記'));
       if (info && info.performing) chip.append(el('small', '', '表演中'));
       if (info && info.lost) chip.append(el('small', '', '迷路了'));
-      chip.addEventListener('click', () => openChat(index, 'island_card'));
+      chip.addEventListener('click', () => meetCat(index, 'island_card'));
       box.append(chip);
     });
   }
@@ -2049,13 +2102,35 @@ function start(hotData = {}) {
     firstVisit = false;
     followOwner();
   });
+  // 在家看島：島主待在家，玩法回到原本的樣子；要出門再按「出門逛島」或「跟著島主走」
+  $('home-stay').addEventListener('click', () => {
+    sound.unlock();
+    firstVisit = false;
+    atHome = true;
+    save();
+    closeCards();
+    syncOwnerButtons();
+    scene.ownerGoIsland('park1');
+    updateNav();
+    showToast('島主在家休息', '點島就飛過去看，點貓貓看牠的資料');
+  });
 
-  // 鏡頭跟著島主走：點地上就走過去、點貓貓就聊天
+  // 在家看島：點貓看貓卡（原本的玩法）；出門逛島：跟貓聊天
+  function meetCat(index, via) {
+    if (atHome) openCat(index, via);
+    else openChat(index, via);
+  }
+
+  // 鏡頭跟著島主走：點地上或推搖桿就走、點貓貓就聊天
   function followOwner() {
     if (!profile.avatar) {
       goIsland('park1');
       showToast('先選島主的樣子', '選好就可以出門逛島');
       return;
+    }
+    if (atHome) {
+      atHome = false;
+      save();
     }
     closeCards();
     focus = 'owner';
@@ -2070,7 +2145,7 @@ function start(hotData = {}) {
     scene.follow('owner', insets());
     track('island_view', { island: 'owner' });
     updateNav();
-    showToast('出門逛島', '點地上就走過去，點貓貓可以聊天');
+    showToast('出門逛島', '點地上或推搖桿走路，點貓貓可以聊天');
   }
 
   // ---------- 跟貓聊天 ----------
@@ -2157,6 +2232,21 @@ function start(hotData = {}) {
       if (rank) bestNode.append(`，全島第 ${rank.rank} 名`);
     } else {
       bestNode.textContent = '還沒跳過';
+    }
+    // 跑步：跑最快的那一次、在跑步排行第幾名、拿過幾次第一名
+    const runNode = $('cat-run');
+    runNode.replaceChildren();
+    const run = raceLeaderboard(raceBoard, cats.length).find((r) => r.cat === index);
+    if (run) {
+      runNode.append(el('b', '', secondsText(run.best)), ` 秒，全島第 ${run.rank} 名`);
+      if (run.wins) {
+        // 手機上放不下一行時，整段「拿過幾次第一名」一起換行，不要把「第一名」拆開
+        const wins = el('span', '', `拿過 ${run.wins} 次第一名`);
+        wins.style.whiteSpace = 'nowrap';
+        runNode.append('，', wins);
+      }
+    } else {
+      runNode.textContent = '還沒比過賽';
     }
     const levels = $('cat-levels');
     levels.replaceChildren();
@@ -2313,14 +2403,14 @@ function start(hotData = {}) {
   scene.onPick((pick) => {
     sound.unlock();
     if (pick.type === 'island') {
-      // 已經在這座島上（或正跟著島主逛）：點地上就是島主走過去
-      if (pick.point && profile.avatar && (focus === pick.id || focus === 'owner')) scene.ownerWalkTo(pick.point, pick.id);
+      // 已經在這座島上（或正跟著島主逛）：點地上就是島主走過去；在家看島就跟原本一樣飛過去看
+      if (pick.point && profile.avatar && !atHome && (focus === pick.id || focus === 'owner')) scene.ownerWalkTo(pick.point, pick.id);
       else goIsland(pick.id);
     } else if (pick.type === 'owner') openProfile();
     else if (pick.type === 'ownerHome') {
       if (focus === 'park1') openHome();
       else goIsland('park1');
-    } else if (pick.type === 'cat') openChat(pick.index, '3d');
+    } else if (pick.type === 'cat') meetCat(pick.index, '3d');
     else if (pick.type === 'coach') openCoach();
     else if (pick.type === 'teacher' || pick.type === 'podium') atLearn(openLearn);
     else if (pick.type === 'board') atLearn(openLesson);
@@ -2331,7 +2421,7 @@ function start(hotData = {}) {
         // 同一隻貓一分鐘內再點只算一次，連點同一個紙箱不會一直累積
         if (Date.now() - (foundInBox.get(hiding) || 0) > 60000) tally('boxes');
         foundInBox.set(hiding, Date.now());
-        openChat(hiding, 'box');
+        meetCat(hiding, 'box');
       } else {
         sound.play('pop');
       }

@@ -133,6 +133,19 @@
   .medal--2 { background: var(--silver); }
   .medal--3 { background: var(--bronze); color: #fff; }
 
+  /* 左下：島主的搖桿（跟著島主走的時候才有；卡片打開就收起來，才不會擋到） */
+  .stick {
+    position: absolute; z-index: 4; left: calc(var(--gutter-l) + 4px); bottom: calc(var(--bottom-h, 80px) + 8px); width: 128px; height: 128px; box-sizing: border-box;
+    border: 3px solid var(--ink); border-radius: 50%; background: rgba(255, 255, 255, 0.62); box-shadow: 0 4px 0 var(--ink-deep);
+    touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+  .stick[hidden], .app:has(.card:not([hidden])) .stick { display: none; }
+  .stick__knob {
+    position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%;
+    background: var(--ink); box-shadow: 0 3px 0 var(--ink-deep), inset 0 -4px 0 rgba(0, 0, 0, 0.12); pointer-events: none;
+  }
+  .stick.is-on { background: rgba(255, 255, 255, 0.8); }
+
   /* 破紀錄的大橫幅 */
   .toast {
     position: absolute; z-index: 6; top: 12px; left: 50%; transform: translateX(-50%); pointer-events: none;
@@ -628,7 +641,7 @@
   .news-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
   .news-item__tag { padding: 0 10px; border-radius: 999px; background: var(--sun-pale); color: var(--ink-deep); font-size: calc(var(--zy) * 0.55); }
   .news-item__text { font-size: var(--zy-3); line-height: 1.55; color: var(--text); }
-  .home-actions { position: sticky; bottom: calc(var(--pad-b) * -1); display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; margin: 12px 0 calc(var(--pad-b) * -1); padding: 8px 0 var(--pad-b); background: var(--paper); }
+  .home-actions { position: sticky; bottom: calc(var(--pad-b) * -1); display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 8px; margin: 12px 0 calc(var(--pad-b) * -1); padding: 8px 0 var(--pad-b); background: var(--paper); }
   .home-actions .sticker { min-height: 60px; font-size: var(--zy-3); }
   .home-actions .sticker:disabled { opacity: 0.45; cursor: default; }
   /* 跟貓聊天 */
@@ -704,6 +717,10 @@
     .trick__icon { width: 52px; height: 52px; }
     .trick__icon svg { width: 26px; height: 26px; }
     .paw-btn { min-width: 60px; }
+    /* 島主之家三顆按鈕放不下一排：「出門逛島」自己一整排 */
+    .home-actions { grid-template-columns: 1fr 1fr; }
+    .home-actions .sticker { min-height: 54px; }
+    #home-go { grid-column: 1 / -1; }
   }
   @media (prefers-reduced-motion: reduce) {
     .card, .toast, .peak-tag, .meow { animation: none; }
@@ -770,6 +787,8 @@
     <ol class="mini-board__list" id="mini-list"></ol>
     <span class="mini-board__empty" id="mini-empty">貓貓正在暖身，馬上就有成績</span>
   </button>
+
+  <div class="stick" id="stick" hidden aria-hidden="true"><span class="stick__knob" id="stick-knob"></span></div>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden>
     <p class="toast__title" id="toast-title"></p>
@@ -883,8 +902,8 @@
       <p>這座島是照桐桐自己畫的設計圖做的，在桐爸的幫忙下，變成一座真的可以玩的島，開放給大家一起來玩。</p>
     </section>
     <ul class="help-list">
-      <li><span class="help-icon" aria-hidden="true">家</span><span><b>島主之家</b>這是你的家。回到島上會先來這裡，聽最近島上的新鮮事，還可以選島主的樣子：大人、小孩、男生、女生，或是貓。</span></li>
-      <li><span class="help-icon" aria-hidden="true">走</span><span><b>出門逛島</b>按「出門逛島」或「跟著島主走」，點地上島主就走過去。點貓貓可以跟牠聊天、摸摸牠。</span></li>
+      <li><span class="help-icon" aria-hidden="true">家</span><span><b>島主之家</b>這是你的家。回到島上會先來這裡，聽最近島上的新鮮事，還可以選島主的樣子：大人、小孩、男生、女生，或是貓。想照原本的方式玩，就按「在家看島」，島主會待在家裡。</span></li>
+      <li><span class="help-icon" aria-hidden="true">走</span><span><b>出門逛島</b>按「出門逛島」或「跟著島主走」，點地上島主就走過去，也可以推左下角的搖桿走路。點貓貓可以跟牠聊天、摸摸牠。</span></li>
       <li><span class="help-icon" aria-hidden="true">玩</span><span><b>島主也來玩</b>跳臺按「換我跳」、表演區按「我也要上臺」、跑步田徑場島按「我也要跑」，公園可以坐下來休息。</span></li>
       <li><span class="help-icon" aria-hidden="true">1</span><span><b>選一座跳臺</b>點下面的低階、中階或高階跳臺，鏡頭會飛過去。</span></li>
       <li><span class="help-icon" aria-hidden="true">2</span><span><b>按住大按鈕，放開就跳</b>貓貓走到跳板前面，按鈕變藍色就可以按。</span></li>
@@ -942,6 +961,7 @@
       <dt>個性</dt><dd id="cat-personality"></dd>
       <dt>現在</dt><dd id="cat-doing"></dd>
       <dt>最高紀錄</dt><dd id="cat-best"></dd>
+      <dt>跑最快</dt><dd id="cat-run"></dd>
     </dl>
     <div class="level-bests" id="cat-levels"></div>
     <div class="card__actions">
@@ -1280,6 +1300,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/></svg>
         <span id="home-read-label">唸給我聽</span>
       </button>
+      <button class="sticker" id="home-stay" type="button">在家看島</button>
       <button class="sticker sticker--solid" id="home-go" type="button">出門逛島</button>
     </div>
   </article>
