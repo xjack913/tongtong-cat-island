@@ -12,13 +12,14 @@ export function fromSketch([px, py]) {
 // 十三座島：outline 是草稿上的島形頂點；ring 是島上環狀步道離中心的比例。
 // 表演區到合體公園四座是桐桐第二張草稿加的，那張照片的角度不一樣，先用兩張照片上相同的角點對齊，再換成第一張的座標；
 // 學習數學島是桐桐後來說要加的，草稿上沒畫，放在高階跳臺上面那塊空地；
-// 跑步田徑場島是桐桐另外畫的一張六角形（比例照她的圖），放在紙箱公園下面，長寬都是一般島的兩倍左右
+// 跑步田徑場島是桐桐另外畫的一張六角形（比例照她的圖），放在島主之家下面，長寬都是一般島的兩倍左右
 export const ISLANDS = [
   { id: 'home', kind: 'home', name: '貓貓之家', ring: 0.7, outline: [[560, 700], [593, 527], [895, 520], [960, 680], [860, 800], [640, 800]] },
   { id: 'high', kind: 'jump', level: 'high', name: '高階跳臺', ring: 0.7, outline: [[183, 398], [248, 248], [565, 222], [633, 410], [535, 556], [270, 530]] },
   { id: 'mid', kind: 'jump', level: 'mid', name: '中階跳臺', ring: 0.7, outline: [[893, 345], [1000, 228], [1185, 247], [1222, 330], [1145, 465], [970, 470]] },
   { id: 'low', kind: 'jump', level: 'low', name: '低階跳臺', ring: 0.74, outline: [[980, 528], [1195, 512], [1240, 642], [1000, 655]] },
-  { id: 'park1', kind: 'park', name: '紙箱公園', ring: 0.6, outline: [[668, 838], [838, 830], [840, 935], [650, 935]] },
+  // 島主之家原本是紙箱公園：id 留著 park1，玩家存檔裡的「去過哪些島」才不會斷掉
+  { id: 'park1', kind: 'owner', name: '島主之家', ring: 0.76, outline: [[640, 830], [850, 825], [872, 958], [628, 962]] },
   { id: 'park2', kind: 'park', name: '魚池公園', ring: 0.7, outline: [[895, 875], [1000, 745], [1138, 790], [1140, 935], [948, 955]] },
   { id: 'rank', kind: 'rank', name: '排行榜', ring: 0.7, outline: [[192, 642], [468, 588], [503, 795], [208, 840]] },
   { id: 'stage', kind: 'stage', name: '表演區', ring: 0.82, outline: [[753, 71], [1028, 93], [993, 189], [752, 226]] },
@@ -269,6 +270,66 @@ export function leaderboard(records, level = 'all', limit = 10) {
 
 export function topRecord(records, level = 'all') {
   return leaderboard(records, level, 1)[0] || null;
+}
+
+// 跑步比賽的成績：races 是這次一共比了幾場；cats 是每隻貓跑最快的那一次（best，十分之一秒）、
+// 那是第幾場（at）、第一名幾次（wins）、跑過幾場（runs）。島主跑的不算，這裡只比貓貓
+export function sanitizeRaceBoard(value, catCount = CAT_LIST.length) {
+  const board = { races: 0, cats: {} };
+  if (!value || typeof value !== 'object') return board;
+  const count = (n, min) => (Number.isInteger(n) && n >= min && n < 1e7 ? n : null);
+  board.races = count(value.races, 0) ?? 0;
+  const list = value.cats && typeof value.cats === 'object' ? value.cats : {};
+  for (const [key, s] of Object.entries(list)) {
+    const cat = Number(key);
+    if (!Number.isInteger(cat) || cat < 0 || cat >= catCount || !s || typeof s !== 'object') continue;
+    const best = s.best;
+    if (!Number.isInteger(best) || best <= 0 || best >= 6000) continue;
+    const runs = count(s.runs, 1) ?? 1;
+    board.cats[cat] = { best, at: count(s.at, 1) ?? 1, wins: Math.min(count(s.wins, 0) ?? 0, runs), runs };
+    board.races = Math.max(board.races, runs);
+  }
+  return board;
+}
+
+// 比完一場：results 是 [{ cat, place, tenths }]，place 是這場第幾名、tenths 是跑一圈用了幾個十分之一秒
+export function addRaceResult(board, results) {
+  const next = { races: board.races + 1, cats: { ...board.cats } };
+  for (const r of results) {
+    if (!Number.isInteger(r.cat) || r.cat < 0 || !Number.isInteger(r.tenths) || r.tenths <= 0 || r.tenths >= 6000) continue;
+    const old = next.cats[r.cat];
+    const s = old ? { ...old } : { best: r.tenths, at: next.races, wins: 0, runs: 0 };
+    s.runs += 1;
+    if (r.place === 1) s.wins += 1;
+    if (r.tenths < s.best) {
+      s.best = r.tenths;
+      s.at = next.races;
+    }
+    next.cats[r.cat] = s;
+  }
+  return next;
+}
+
+// 誰跑最快：秒數越少越前面，一樣快的算先跑出來的
+export function raceLeaderboard(board, limit = 10) {
+  return Object.entries(board.cats)
+    .map(([cat, s]) => ({ cat: Number(cat), ...s }))
+    .sort((a, b) => a.best - b.best || a.at - b.at || a.cat - b.cat)
+    .slice(0, limit)
+    .map((r, i) => ({ rank: i + 1, ...r }));
+}
+
+// 最常跑第一名的貓；一樣多次的算跑比較快的
+export function raceTopWinner(board) {
+  const list = Object.entries(board.cats)
+    .map(([cat, s]) => ({ cat: Number(cat), ...s }))
+    .filter((s) => s.wins > 0)
+    .sort((a, b) => b.wins - a.wins || a.best - b.best || a.cat - b.cat);
+  return list[0] || null;
+}
+
+export function secondsText(tenths) {
+  return (tenths / 10).toFixed(1);
 }
 
 // 這一跳破了哪些紀錄（跟這一跳之前的成績比）

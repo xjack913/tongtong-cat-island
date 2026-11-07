@@ -1,6 +1,6 @@
-// 桐桐貓貓島的島民卡雲端存檔（Cloudflare Worker＋D1）
+// 桐桐貓貓島的島主卡雲端存檔（Cloudflare Worker＋D1）
 //
-//   POST /players {deviceId, data}        → 開一張新卡，回傳島民暗號
+//   POST /players {deviceId, data}        → 開一張新卡，回傳島主暗號
 //   POST /sync    {code, deviceId, data?} → 存這臺裝置的資料（可省略），回傳別臺裝置合起來的資料
 //
 // 只存玩家取的名字和遊戲裡的數字，不收 email、不記 IP。

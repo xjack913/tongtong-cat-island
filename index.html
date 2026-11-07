@@ -282,6 +282,10 @@
   .level-tag--low { background: var(--low-pale); color: var(--low-deep); }
   .level-tag--mid { background: var(--mid-pale); color: var(--mid-deep); }
   .level-tag--high { background: var(--high-pale); color: var(--high-deep); }
+  .level-tag--win { background: #FFF1C2; color: #5C4300; }
+  .tabs--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tabs--two .tab { font-size: 17px; }
+  .tabs[hidden] { display: none; }
   .tong-badge {
     display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: 4px; vertical-align: 2px;
     border: 2px solid var(--ink); border-radius: 8px; color: var(--ink); font-size: 13px; line-height: 1;
@@ -382,7 +386,7 @@
 
   /* 日記區、學習數學島的字都帶注音：國字改用注音粉圓（字的右邊直接畫好注音），數字照舊。
      注音只有字高的四分之一，字要放大小朋友才看得清楚：--zy 是內文、--zy-2 是提示和按鈕、--zy-3 是小字 */
-  #diary-card, #learn-card, #lesson-card, #story-card, #report-card, #profile-card {
+  #diary-card, #learn-card, #lesson-card, #story-card, #report-card, #profile-card, #home-card, #chat-card {
     --round: "Bpmf Huninn", "Huninn", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
     --num: "Fredoka", "Bpmf Huninn", "Huninn", "Arial Rounded MT Bold", Arial, sans-serif;
     --zy: 29px; --zy-2: calc(var(--zy) * 0.8); --zy-3: calc(var(--zy) * 0.66);
@@ -396,7 +400,7 @@
   .learn-side > .learn-unit { order: -1; }
   .learn-unit { margin-top: 8px; }
   @media (min-width: 900px) {
-    #diary-card, #story-card, #report-card, #profile-card { width: min(600px, calc(100% - 32px)); }
+    #diary-card, #story-card, #report-card, #profile-card, #home-card, #chat-card { width: min(600px, calc(100% - 32px)); }
     #learn-card, #lesson-card { width: min(800px, calc(100% - 32px)); }
     /* 黑板課也分兩欄：左邊黑板講重點，右邊白紙放圖和例題，翻頁不用捲就看得到「考考你」 */
     .board { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: auto auto 1fr; column-gap: 16px; align-items: start; }
@@ -416,8 +420,8 @@
     #learn-card .card__label { display: none; }
     #learn-card .sheet__fig svg { max-height: 140px; }
   }
-  #diary-card .card__label, #learn-card .card__label, #lesson-card .card__label, #story-card .card__label, #report-card .card__label, #profile-card .card__label { font-size: var(--zy-3); }
-  #diary-card .card__title, #learn-card .card__title, #lesson-card .card__title, #story-card .card__title, #report-card .card__title, #profile-card .card__title { font-size: var(--zy); }
+  #diary-card .card__label, #learn-card .card__label, #lesson-card .card__label, #story-card .card__label, #report-card .card__label, #profile-card .card__label, #home-card .card__label, #chat-card .card__label { font-size: var(--zy-3); }
+  #diary-card .card__title, #learn-card .card__title, #lesson-card .card__title, #story-card .card__title, #report-card .card__title, #profile-card .card__title, #home-card .card__title, #chat-card .card__title { font-size: var(--zy); }
   #diary-card .card__text, #diary-card .empty, #lesson-card .card__text, #report-card .card__text { font-size: var(--zy-3); }
   /* 卡片很長要捲的時候，按鈕列固定在卡片底部 */
   .card__dock {
@@ -585,7 +589,7 @@
   .report-send { flex: 1; min-height: 64px; font-size: var(--zy-2); }
   .report-send:disabled { opacity: 0.4; cursor: default; }
 
-  /* 島民卡：名字、累積的數字、徽章（拿到的是金色，還沒拿到的看得到進度） */
+  /* 島主卡：名字、累積的數字、徽章（拿到的是金色，還沒拿到的看得到進度） */
   @media (min-width: 700px) { #profile-label { display: inline-block; max-width: 7em; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; } }
   .profile-form { margin-top: 10px; }
   .profile-form__label { display: block; font-size: var(--zy-2); color: var(--ink-deep); }
@@ -610,6 +614,34 @@
   .badge__day { font-size: var(--zy-3); color: var(--text-2); }
   .badge__bar { height: 8px; margin-top: 6px; overflow: hidden; border-radius: 999px; background: var(--ink-pale); }
   .badge__bar i { display: block; height: 100%; border-radius: inherit; background: var(--ink); }
+  /* 島主的樣子：一排五個按鈕 */
+  .looks-title { margin-top: 12px; font-size: var(--zy-2); color: var(--ink-deep); }
+  .looks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+  .look-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 96px; padding: 6px 2px; border: 2.5px solid var(--line); border-radius: 14px; background: var(--paper); color: var(--text-2); font: inherit; font-size: var(--zy-3); line-height: 1.25; }
+  .look-btn svg { width: 44px; height: 44px; flex: none; }
+  .look-btn[aria-pressed="true"] { border-color: var(--ink); background: var(--ink-pale); color: var(--ink-deep); }
+  /* 島主之家：最近的新鮮事 */
+  .home-lede { margin-top: 6px; font-size: var(--zy-3); color: var(--text-2); }
+  .home-box { margin-top: 10px; padding: 10px 14px 12px; border: 2px solid #EFE4C8; border-radius: 18px; background: #FFFDF6; }
+  .home-box__title { font-size: var(--zy-2); color: var(--ink-deep); }
+  .home-news { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .news-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .news-item__tag { padding: 0 10px; border-radius: 999px; background: var(--sun-pale); color: var(--ink-deep); font-size: calc(var(--zy) * 0.55); }
+  .news-item__text { font-size: var(--zy-3); line-height: 1.55; color: var(--text); }
+  .home-actions { position: sticky; bottom: calc(var(--pad-b) * -1); display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; margin: 12px 0 calc(var(--pad-b) * -1); padding: 8px 0 var(--pad-b); background: var(--paper); }
+  .home-actions .sticker { min-height: 60px; font-size: var(--zy-3); }
+  .home-actions .sticker:disabled { opacity: 0.45; cursor: default; }
+  /* 跟貓聊天 */
+  .chat-line { margin-top: 10px; padding: 12px 16px; border-radius: 18px; background: var(--sun-pale); font-size: var(--zy-2); line-height: 1.6; color: var(--text); }
+  .chat-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .chat-options .sticker { min-height: 58px; justify-content: center; font-size: var(--zy-3); white-space: normal; }
+  .chat-more { margin-top: 8px; }
+  /* 島主也來玩的按鈕 */
+  .dock-owner { align-self: flex-start; min-height: 40px; margin-top: 4px; padding: 0 14px; font-size: 15px; }
+  .race-side { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+  .race-owner { min-height: 44px; font-size: 16px; }
+  .cat-tag--owner { background: var(--ink); color: #fff; font-size: 14px; }
+  .island-pill--owner { background: var(--sun-pale); }
   .cloud-box { margin-top: 12px; padding: 12px 14px; border: 2px solid var(--line); border-radius: 16px; background: var(--paper); }
   .cloud-box__title { font-size: var(--zy-2); color: var(--ink-deep); }
   .cloud-code { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 6px; }
@@ -639,7 +671,7 @@
   }
   @media (max-width: 699px) {
     body { font-size: 16px; }
-    #diary-card, #learn-card, #lesson-card, #story-card, #report-card, #profile-card { --zy: 23px; }
+    #diary-card, #learn-card, #lesson-card, #story-card, #report-card, #profile-card, #home-card, #chat-card { --zy: 23px; }
     /* 手機太窄：翻頁和「唸給我聽」只留圖示，字還在、讀螢幕的軟體唸得到；「蓋掌印」留字 */
     #diary-prev span, #diary-next span, #diary-read span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .plate { padding: 4px 12px 4px 6px; gap: 6px; }
@@ -690,7 +722,7 @@
 </head>
 <body>
 <div class="app" id="app">
-  <div class="scene" id="scene" role="img" aria-label="桐桐貓貓島 3D 地圖：中間是貓貓之家，左上是高階跳臺、上面中間是表演區、右上是中階跳臺和多多紙箱區、右邊是低階跳臺和日記區，最左上角是有黑板的學習數學島，下面有紙箱公園、魚池公園和合體公園，左下是排行榜島，最下面是有七條跑道的跑步田徑場島，島和島之間用木板橋連起來，島上全都是貓，還有一隻綁頭帶、兩腳走路的貓貓教練，和一隻戴眼鏡的貓貓老師。"></div>
+  <div class="scene" id="scene" role="img" aria-label="桐桐貓貓島 3D 地圖：中間是貓貓之家，左上是高階跳臺、上面中間是表演區、右上是中階跳臺和多多紙箱區、右邊是低階跳臺和日記區，最左上角是有黑板的學習數學島，下面有魚池公園和合體公園，左下是排行榜島，下面中間是島主之家，最下面是有七條跑道的跑步田徑場島，島和島之間用木板橋連起來，島上全都是貓，還有一隻綁頭帶、兩腳走路的貓貓教練，和一隻戴眼鏡的貓貓老師。"></div>
 
   <header class="hud">
     <div class="plate">
@@ -709,9 +741,9 @@
       </div>
     </div>
     <div class="toolbar" role="toolbar" aria-label="島上工具">
-      <button class="sticker" id="profile-open" type="button" aria-label="島民卡">
+      <button class="sticker" id="profile-open" type="button" aria-label="島主卡">
         <svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg>
-        <span class="tool__label" id="profile-label">島民卡</span>
+        <span class="tool__label" id="profile-label">島主卡</span>
         <span class="nav-chip__badge" id="profile-badge" hidden></span>
       </button>
       <button class="sticker" id="help-open" type="button" aria-label="怎麼玩">
@@ -750,6 +782,7 @@
         <p class="dock__level" id="dock-level"></p>
         <p class="dock__who" id="dock-who"></p>
         <p class="dock__next" id="dock-next"></p>
+        <button class="sticker dock-owner" id="dock-owner" type="button" hidden>換我跳</button>
       </div>
       <button class="jump" id="jump-btn" type="button" disabled aria-label="按住蓄力，放開就跳">
         <svg class="jump__ring" viewBox="0 0 120 120" aria-hidden="true">
@@ -772,6 +805,7 @@
       <div class="dock__info">
         <p class="dock__level">★ 表演區</p>
         <p class="dock__who" id="stage-who" aria-live="polite"></p>
+        <button class="sticker dock-owner" id="stage-owner" type="button" hidden>我也要上臺</button>
         <p class="dock__next" id="stage-next"></p>
       </div>
       <div class="tricks" role="group" aria-label="叫臺上的貓表演">
@@ -803,7 +837,10 @@
         <p class="dock__who" id="race-who" aria-live="polite"></p>
         <p class="dock__next" id="race-next"></p>
       </div>
-      <button class="sticker sticker--solid race-go" id="race-go" type="button" disabled>開始比賽</button>
+      <div class="race-side">
+        <button class="sticker sticker--solid race-go" id="race-go" type="button" disabled>開始比賽</button>
+        <button class="sticker race-owner" id="race-owner" type="button" hidden>我也要跑</button>
+      </div>
     </section>
     <nav class="island-nav" id="island-nav" aria-label="去哪座島"></nav>
   </div>
@@ -820,7 +857,7 @@
     <div class="story" id="story-text">
       <p>這裡住著 50 隻貓，牠們以前是家貓，被丟掉以後變成了流浪貓。</p>
       <p>很愛貓的桐桐把牠們接到島上照顧，大家一起玩、一起遊戲、一起學習。</p>
-      <p>現在你就是島主桐桐，到每座島上看看大家在做什麼吧！</p>
+      <p>現在你也是這座島的島主，貓貓都是你的島民。到每座島上看看大家在做什麼吧！</p>
     </div>
     <div class="story-actions">
       <button class="sticker" id="story-read" type="button" aria-pressed="false">
@@ -841,28 +878,31 @@
     </div>
     <section class="story-box" aria-labelledby="story-box-title">
       <p class="story-box__title" id="story-box-title">島的故事</p>
-      <p>這是一座桐桐貓貓群島。來到這裡，你就是<span id="help-who">島主桐桐</span>，可以在不同的島上做不同的事，自由探險。</p>
+      <p>這是一座桐桐貓貓群島。來到這裡，你就是<span id="help-who">這座島的島主</span>，貓貓都是你的島民。可以在不同的島上做不同的事，自由探險。</p>
       <p>桐桐很愛貓。有些人養了貓，養一養就不要牠了，家貓就變成了流浪貓。桐桐把這些流浪貓接到島上照顧，大家一起玩耍、一起遊戲、一起學習。</p>
       <p>這座島是照桐桐自己畫的設計圖做的，在桐爸的幫忙下，變成一座真的可以玩的島，開放給大家一起來玩。</p>
     </section>
     <ul class="help-list">
+      <li><span class="help-icon" aria-hidden="true">家</span><span><b>島主之家</b>這是你的家。回到島上會先來這裡，聽最近島上的新鮮事，還可以選島主的樣子：大人、小孩、男生、女生，或是貓。</span></li>
+      <li><span class="help-icon" aria-hidden="true">走</span><span><b>出門逛島</b>按「出門逛島」或「跟著島主走」，點地上島主就走過去。點貓貓可以跟牠聊天、摸摸牠。</span></li>
+      <li><span class="help-icon" aria-hidden="true">玩</span><span><b>島主也來玩</b>跳臺按「換我跳」、表演區按「我也要上臺」、跑步田徑場島按「我也要跑」，公園可以坐下來休息。</span></li>
       <li><span class="help-icon" aria-hidden="true">1</span><span><b>選一座跳臺</b>點下面的低階、中階或高階跳臺，鏡頭會飛過去。</span></li>
       <li><span class="help-icon" aria-hidden="true">2</span><span><b>按住大按鈕，放開就跳</b>貓貓走到跳板前面，按鈕變藍色就可以按。</span></li>
       <li><span class="help-icon" aria-hidden="true">3</span><span><b>能量條要抓時機</b>低階一直按住就會滿；中階和高階的能量條會上上下下，最滿的時候放開跳最高。</span></li>
       <li><span class="help-icon" aria-hidden="true">4</span><span><b>完美跳會翻跟斗</b>能量條碰到黃色那一段放開，貓貓會在空中翻一圈。</span></li>
-      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v6a5 5 0 0 1-10 0zM11 14h2v3h3v4H8v-4h3z"/></svg></span><span><b>排行榜</b>每隻貓只算牠跳最高的那一次。頒獎臺上站的是這次前三名，第一名戴皇冠。</span></li>
+      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v6a5 5 0 0 1-10 0zM11 14h2v3h3v4H8v-4h3z"/></svg></span><span><b>排行榜</b>可以看跳高，也可以看跑步。每隻貓只算牠跳最高、跑最快的那一次。頒獎臺上站的是這次跳最高的前三名，第一名戴皇冠。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 4.5l11-2v13.2a3 3 0 1 1-2-2.8V6.1l-7 1.3v10.3a3 3 0 1 1-2-2.8z"/></svg></span><span><b>表演區</b>點轉圈圈、揮手、翻跟斗、唱歌，臺上的貓就會表演；按拍手，臺下的貓一起拍。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>日記區</b>貓貓會把今天做的事寫成日記。按貓掌幫日記蓋掌印，按「唸給我聽」就會唸出來。</span></li>
       <li><span class="help-icon" aria-hidden="true">7</span><span><b>跑步田徑場島</b>七隻貓各站一條跑道，到齊後按「開始比賽」，跑一圈看誰第一名。跑道外面的草場，也常有貓跑來跑去。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。點老師或講台就改作業：每天有 20 隻貓來上課、各寫一張，你當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
-      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>島民卡</b>取一個自己的名字。按過幾次完美跳、改過幾張作業都會一直累積，下次來還在，還可以收集徽章。記下島民暗號，換裝置也找得回來。</span></li>
+      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>島主卡</b>取一個自己的名字。按過幾次完美跳、改過幾張作業都會一直累積，下次來還在，還可以收集徽章。記下島主暗號，換裝置也找得回來。</span></li>
       <li><span class="help-icon" aria-hidden="true">？</span><span><b>貓貓教練</b>頭上綁頭帶、用兩隻腳走路。看到晃來晃去、頭上冒「？」的貓，就會叫牠去跳臺跳。</span></li>
       <li><span class="help-icon" aria-hidden="true">z</span><span><b>累了就休息</b>貓貓會去公園休息、躲進多多紙箱區的紙箱，也會回貓貓之家睡覺。點一下貓貓或紙箱，牠會跟你打招呼。</span></li>
     </ul>
     <section class="designer" aria-labelledby="designer-title">
       <p class="designer__name" id="designer-title">
         <svg viewBox="0 0 120 120" aria-hidden="true"><g fill="#fff" stroke="currentColor" stroke-width="5" stroke-linejoin="round"><circle cx="37" cy="24" r="11"/><circle cx="83" cy="24" r="11"/><path d="M30 52a30 30 0 0 1 60 0z"/></g><g fill="currentColor"><circle cx="49" cy="41" r="3.6"/><circle cx="71" cy="41" r="3.6"/></g><rect x="10" y="50" width="100" height="58" rx="29" fill="#fff" stroke="currentColor" stroke-width="5"/><text x="60" y="81" text-anchor="middle" dominant-baseline="middle" font-size="44" fill="currentColor" font-family="Huninn, PingFang TC, sans-serif">桐</text></svg>
-        島主兼設計師：桐桐
+        島的設計師：桐桐
       </p>
       <p>這座島照桐桐畫的設計圖做：十一座島的形狀和位置、二十座木板橋，都跟她畫的一樣。第二次她又加了表演區、多多紙箱區、日記區、合體公園，還有貓貓教練；後來又說要一座學習數學島，放在高階跳臺上面；再後來又畫了一張跑步田徑場島，有七條跑道和一大片草場。島上的樹是開白花的油桐樹。</p>
       <figure>
@@ -884,6 +924,7 @@
     <p class="card__text" id="island-text"></p>
     <p class="card__sub" id="island-count"></p>
     <div class="chips" id="island-cats"></div>
+    <div class="card__actions"><button class="sticker" id="island-sit" type="button" hidden>坐下來休息</button></div>
   </article>
 
   <article class="card" id="cat-card" hidden aria-labelledby="cat-name">
@@ -1140,7 +1181,11 @@
       <button class="card__close" type="button" data-close aria-label="關閉">×</button>
     </div>
     <p class="card__text" id="rank-note">每隻貓只算牠跳最高的那一次。名字旁邊蓋了「桐」字章的，是桐桐幫忙按的。</p>
-    <div class="tabs" role="tablist" aria-label="看哪一座跳臺">
+    <div class="tabs tabs--two" id="rank-kinds" role="tablist" aria-label="看哪一種比賽">
+      <button class="tab" type="button" role="tab" data-kind="jump" aria-selected="true">跳高</button>
+      <button class="tab" type="button" role="tab" data-kind="race" aria-selected="false">跑步</button>
+    </div>
+    <div class="tabs" id="rank-levels" role="tablist" aria-label="看哪一座跳臺">
       <button class="tab" type="button" role="tab" data-level="all" aria-selected="true">全部</button>
       <button class="tab" type="button" role="tab" data-level="low" aria-selected="false">低階</button>
       <button class="tab" type="button" role="tab" data-level="mid" aria-selected="false">中階</button>
@@ -1166,7 +1211,7 @@
       <span class="trophy-chip story-chip" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span>
       <div>
         <p class="card__label">桐桐貓貓島</p>
-        <h2 class="card__title" id="profile-title">你的島民卡</h2>
+        <h2 class="card__title" id="profile-title">你的島主卡</h2>
       </div>
       <button class="card__close" type="button" data-close aria-label="關閉">×</button>
     </div>
@@ -1181,9 +1226,12 @@
       </div>
     </form>
     <button class="link-btn" id="profile-rename" type="button">改名字</button>
+    <p class="looks-title">島主的樣子</p>
+    <div class="looks" id="profile-looks"></div>
+    <div class="card__actions"><button class="sticker sticker--solid" id="profile-go-home" type="button" hidden>回島主之家</button></div>
     <div class="profile-stats" id="profile-stats"></div>
     <section class="cloud-box" id="profile-cloud" aria-labelledby="cloud-title">
-      <p class="cloud-box__title" id="cloud-title">島民暗號</p>
+      <p class="cloud-box__title" id="cloud-title">島主暗號</p>
       <div id="cloud-has" hidden>
         <p class="cloud-code"><b id="cloud-code"></b><button class="sticker" id="cloud-copy" type="button">複製</button></p>
         <p class="cloud-note">換裝置或資料不見了，輸入這組暗號就能把卡找回來，請大人幫忙記下來。名字和累積的數字存在島上的資料庫，只有用這組暗號才拿得到。</p>
@@ -1195,7 +1243,7 @@
       <p class="cloud-status" id="cloud-status" role="status" hidden></p>
       <button class="link-btn" id="cloud-restore-open" type="button">我有暗號，要找回我的卡</button>
       <form class="cloud-restore" id="cloud-restore" hidden>
-        <label class="profile-form__label" for="cloud-input">輸入島民暗號</label>
+        <label class="profile-form__label" for="cloud-input">輸入島主暗號</label>
         <input class="report-text profile-input" id="cloud-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-describedby="cloud-error">
         <p class="report-note" id="cloud-error" role="alert" hidden></p>
         <p class="cloud-note" id="cloud-switch-note" hidden></p>
@@ -1208,6 +1256,62 @@
     <p class="profile-count" id="profile-count"></p>
     <div id="profile-badges"></div>
   </article>
+  <article class="card" id="home-card" hidden aria-labelledby="home-title">
+    <div class="card__head">
+      <span class="trophy-chip story-chip" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3 2.5 11.5H5V21h5v-6h4v6h5v-9.5h2.5z"/></svg></span>
+      <div>
+        <p class="card__label">島主之家</p>
+        <h2 class="card__title" id="home-title"></h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <p class="home-lede">你是這座島的島主，貓貓都是你的島民。</p>
+    <div id="home-pick" hidden>
+      <p class="looks-title">你想當什麼樣子的島主？</p>
+      <div class="looks" id="home-looks"></div>
+    </div>
+    <section class="home-box" aria-labelledby="home-news-title">
+      <p class="home-box__title" id="home-news-title">最近島上的新鮮事</p>
+      <ul class="home-news" id="home-news"></ul>
+    </section>
+    <button class="link-btn chat-more" id="home-change" type="button">換島主的樣子</button>
+    <div class="home-actions">
+      <button class="sticker" id="home-read" type="button" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/></svg>
+        <span id="home-read-label">唸給我聽</span>
+      </button>
+      <button class="sticker sticker--solid" id="home-go" type="button">出門逛島</button>
+    </div>
+  </article>
+
+  <article class="card" id="chat-card" hidden aria-labelledby="chat-name">
+    <div class="card__head">
+      <span class="cat-swatch" id="chat-swatch" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="rgba(34,37,58,0.55)"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg>
+      </span>
+      <div>
+        <p class="card__label" id="chat-coat"></p>
+        <h2 class="card__title" id="chat-name"></h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <p class="chat-line" id="chat-line" aria-live="polite"></p>
+    <div class="chat-options">
+      <button class="sticker sticker--solid" id="chat-pet" type="button">摸摸牠</button>
+      <button class="sticker" id="chat-doing" type="button">你在做什麼？</button>
+      <button class="sticker" id="chat-best" type="button">你跳多高？</button>
+      <button class="sticker" id="chat-diary" type="button">你寫了什麼日記？</button>
+    </div>
+    <button class="link-btn chat-more" id="chat-info" type="button">看牠的資料</button>
+  </article>
+
+  <template id="look-template">
+    <button class="look-btn" type="button" data-look="man" aria-pressed="false" aria-label="大人，男生"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="16" y="24" width="16" height="16" rx="4" fill="#3E4BB8"/><rect x="17" y="38" width="6" height="8" fill="#34405F"/><rect x="25" y="38" width="6" height="8" fill="#34405F"/><circle cx="24" cy="15" r="10" fill="#F7D2B4"/><path d="M14 14a10 10 0 0 1 20 0c-5-3-14-3-20 0z" fill="#4A3426"/></svg><span>大人<br>男生</span></button>
+    <button class="look-btn" type="button" data-look="woman" aria-pressed="false" aria-label="大人，女生"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M13 10a11 11 0 0 1 22 0v14H13z" fill="#5C3A28"/><path d="M18 24h12l6 18H12z" fill="#E8466E"/><rect x="18" y="41" width="4" height="5" fill="#F7D2B4"/><rect x="26" y="41" width="4" height="5" fill="#F7D2B4"/><circle cx="24" cy="15" r="9.5" fill="#F7D2B4"/><path d="M14.5 13a9.5 9.5 0 0 1 19 0c-5-3-13-3-19 0z" fill="#5C3A28"/></svg><span>大人<br>女生</span></button>
+    <button class="look-btn" type="button" data-look="boy" aria-pressed="false" aria-label="小孩，男生"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="17" y="29" width="14" height="10" rx="3" fill="#FFC93C"/><rect x="18" y="38" width="5" height="7" fill="#3E4BB8"/><rect x="25" y="38" width="5" height="7" fill="#3E4BB8"/><circle cx="24" cy="19" r="11" fill="#F7D2B4"/><path d="M13 18a11 11 0 0 1 22 0c-6-3-16-3-22 0z" fill="#2E2622"/></svg><span>小孩<br>男生</span></button>
+    <button class="look-btn" type="button" data-look="girl" aria-pressed="false" aria-label="小孩，女生"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="11" cy="19" r="5" fill="#3A2A22"/><circle cx="37" cy="19" r="5" fill="#3A2A22"/><path d="M19 29h10l5 12H14z" fill="#8D9CF0"/><rect x="19" y="40" width="4" height="5" fill="#F7D2B4"/><rect x="25" y="40" width="4" height="5" fill="#F7D2B4"/><circle cx="24" cy="19" r="11" fill="#F7D2B4"/><path d="M13 18a11 11 0 0 1 22 0c-6-3-16-3-22 0z" fill="#3A2A22"/></svg><span>小孩<br>女生</span></button>
+    <button class="look-btn" type="button" data-look="cat" aria-pressed="false" aria-label="貓"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 12l3 13h22l3-13-9 6H19z" fill="#F2A35A"/><ellipse cx="24" cy="29" rx="15" ry="13" fill="#F2A35A"/><circle cx="18" cy="27" r="2.2" fill="#2B2730"/><circle cx="30" cy="27" r="2.2" fill="#2B2730"/><path d="M21 33c2 2 4 2 6 0" stroke="#2B2730" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M18 8l3 4 3-4 3 4 3-4v6H18z" fill="#F2B200"/></svg><span>貓</span></button>
+  </template>
   <template id="badge-paw"><svg class="badge__icon" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></template>
 </div>
 

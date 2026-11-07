@@ -1,6 +1,7 @@
-// 島民卡：玩家自己取的名字、會一直累積的數字、拿到的徽章。瀏覽器、Node、Worker 共用的純邏輯。
+// 島主卡：玩家自己取的名字、島主的樣子、會一直累積的數字、拿到的徽章。瀏覽器、Node、Worker 共用的純邏輯。
+// 每個來的人都是這座島的島主，貓貓才是島民。
 // 存在 localStorage 的 profile 欄位；數字只會往上加，排行榜的「重新比一次」不會清掉這裡。
-// 沒取名字的人維持原本的設定，就是島主桐桐。
+// 沒取名字的人就叫桐桐。
 //
 // 有暗號的話，每臺裝置只把「自己這臺累積的」存到雲端（一臺一列）。別臺的合起來放在 remote，
 // 畫面上看到的是兩邊加起來。同一臺裝置重送只會取比較大的數字，所以送兩次不會多算。
@@ -9,13 +10,23 @@ import { plainText } from './zhuyin.js';
 export const DEFAULT_NAME = '桐桐';
 export const NAME_MAX = 8;
 
+// 島主可以選的樣子
+export const AVATARS = [
+  { id: 'man', label: '大人（男）' },
+  { id: 'woman', label: '大人（女）' },
+  { id: 'boy', label: '小孩（男）' },
+  { id: 'girl', label: '小孩（女）' },
+  { id: 'cat', label: '貓' },
+];
+const AVATAR_IDS = AVATARS.map((a) => a.id);
+
 // 算「全島走透透」的島，id 跟 app.js 的 NAV 一樣（「看全島」和「貓貓教練」不是島）
 export const ISLAND_IDS = ['home', 'low', 'mid', 'high', 'stage', 'track', 'diary', 'learn', 'boxes', 'combo', 'park1', 'park2', 'rank'];
 const UNIT_COUNT = 9;
 const COUNT_MAX = 1e9;
 const COUNT_KEYS = ['jumps', 'perfect', 'perfectHigh', 'records', 'graded', 'right', 'daysDone', 'daysAllRight', 'stamps', 'tricks', 'claps', 'boxes', 'days'];
 
-// 島民暗號：8 碼，拿掉長得很像的 0、O、1、I、L，小朋友抄的時候才不會抄錯
+// 島主暗號：8 碼，拿掉長得很像的 0、O、1、I、L，小朋友抄的時候才不會抄錯
 export const CODE_CHARS = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 export const CODE_LENGTH = 8;
 
@@ -47,8 +58,8 @@ export const BADGES = [
   { id: 'claps30', group: 'explore', title: '最佳觀眾', text: '在表演區拍手 30 次', stat: 'claps', goal: 30 },
   { id: 'tricks30', group: 'explore', title: '小小導演', text: '叫臺上的貓表演 30 次', stat: 'tricks', goal: 30 },
   { id: 'days3', group: 'back', title: '又回來玩了', text: '來島上 3 天', stat: 'days', goal: 3 },
-  { id: 'days7', group: 'back', title: '常來的島民', text: '來島上 7 天', stat: 'days', goal: 7 },
-  { id: 'days30', group: 'back', title: '老島民', text: '來島上 30 天', stat: 'days', goal: 30 },
+  { id: 'days7', group: 'back', title: '常來的島主', text: '來島上 7 天', stat: 'days', goal: 7 },
+  { id: 'days30', group: 'back', title: '老島主', text: '來島上 30 天', stat: 'days', goal: 30 },
 ];
 const BADGE_IDS = new Set(BADGES.map((b) => b.id));
 
@@ -97,6 +108,8 @@ export function sanitizeDeviceData(raw, catCount) {
   return {
     name: cleanName(from.name),
     nameAt: isTime(from.nameAt) ? from.nameAt : 0,
+    avatar: AVATAR_IDS.includes(from.avatar) ? from.avatar : '',
+    avatarAt: isTime(from.avatarAt) ? from.avatarAt : 0,
     bestCm: count(from.bestCm),
     counts,
     seen: {
@@ -131,8 +144,8 @@ export function isDeviceId(value) {
 
 // 這臺裝置要上傳的部分
 export function ownData(profile) {
-  const { name, nameAt, bestCm, counts, seen, earned } = profile;
-  return { name, nameAt, bestCm, counts, seen, earned };
+  const { name, nameAt, avatar, avatarAt, bestCm, counts, seen, earned } = profile;
+  return { name, nameAt, avatar, avatarAt, bestCm, counts, seen, earned };
 }
 
 function earliest(a, b) {
@@ -162,6 +175,11 @@ function latestName(a, b) {
   return { name: a.name, nameAt: a.nameAt };
 }
 
+function latestAvatar(a, b) {
+  if (b.avatar && (!a.avatar || b.avatarAt >= a.avatarAt)) return { avatar: b.avatar, avatarAt: b.avatarAt };
+  return { avatar: a.avatar, avatarAt: a.avatarAt };
+}
+
 // 同一臺裝置的舊資料和新資料：數字只取大的，重送、晚到都不會多算或變少
 export function mergeOwn(previous, next) {
   const counts = {};
@@ -170,6 +188,7 @@ export function mergeOwn(previous, next) {
   });
   return {
     ...latestName(previous, next),
+    ...latestAvatar(previous, next),
     bestCm: Math.max(previous.bestCm, next.bestCm),
     counts,
     seen: unionSeen(previous.seen, next.seen),
@@ -186,6 +205,7 @@ export function mergeDevices(list, catCount) {
     });
     return {
       ...latestName(sum, device),
+      ...latestAvatar(sum, device),
       bestCm: Math.max(sum.bestCm, device.bestCm),
       counts,
       seen: unionSeen(sum.seen, device.seen),
@@ -194,14 +214,17 @@ export function mergeDevices(list, catCount) {
   }, sanitizeDeviceData(null, catCount));
 }
 
-// 收到別臺裝置合起來的資料。回傳 true 表示名字變了，畫面要跟著換
+// 收到別臺裝置合起來的資料。回傳 true 表示名字或樣子變了，畫面要跟著換
 export function applyRemote(profile, others) {
   profile.remote = others;
   profile.earned = mergeEarned(profile.earned, others.earned);
   const named = latestName(profile, others);
-  const changed = named.name !== profile.name;
+  const looked = latestAvatar(profile, others);
+  const changed = named.name !== profile.name || looked.avatar !== profile.avatar;
   profile.name = named.name;
   profile.nameAt = named.nameAt;
+  profile.avatar = looked.avatar;
+  profile.avatarAt = looked.avatarAt;
   return changed;
 }
 

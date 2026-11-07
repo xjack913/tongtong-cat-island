@@ -2,6 +2,7 @@
 import {
   LEVELS, LEVEL_KEYS, PERFECT, TRICKS, DIARY_MAX, DIARY_SEED, makeCats, personality, sanitizeRecords, sanitizeDiaries, composeDiary, dateText,
   leaderboard, bestPerCat, topRecord, judgeJump, starsText, mulberry32,
+  sanitizeRaceBoard, addRaceResult, raceLeaderboard, raceTopWinner, secondsText,
 } from './logic.js';
 import { MATH_UNITS, dayKey, dailyClass, dailyHomework, sanitizeLearnDay, sanitizeLearnStats } from './math.js';
 import { LESSONS } from './lessons.js';
@@ -11,11 +12,14 @@ import {
   BADGES, BADGE_GROUPS, ISLAND_IDS, NAME_MAX, sanitizeProfile, sanitizeDeviceData, cleanName, playerName, stampChar, statValue, total, bestCm, seenCount, bump, addSeen, markDay, award, earnedDayText,
   normalizeCode, formatCode, ownData, applyRemote,
 } from './profile.js';
+import { composeNews, sanitizeNews, recordNews, recordJumpNews, recordRaceNews, chatGreeting, chatPet, chatDoing, chatBest, chatDiary, chatBusy } from './talk.js';
 import { createScene } from './scene.js';
 
 const STORE_KEY = 'tong-cat-island-v1';
 const RING = 2 * Math.PI * 54;
 const NAV = [
+  { id: 'park1', label: '島主之家' },
+  { id: 'owner', label: '跟著島主走' },
   { id: 'home', label: '貓貓之家' },
   { id: 'low', label: '低階跳臺', level: 'low' },
   { id: 'mid', label: '中階跳臺', level: 'mid' },
@@ -26,17 +30,15 @@ const NAV = [
   { id: 'learn', label: '學習數學島' },
   { id: 'boxes', label: '多多紙箱區' },
   { id: 'combo', label: '合體公園' },
-  { id: 'park1', label: '紙箱公園' },
   { id: 'park2', label: '魚池公園' },
   { id: 'rank', label: '排行榜' },
   { id: 'coach', label: '貓貓教練' },
   { id: 'overview', label: '看全島' },
 ];
 const ISLAND_COPY = {
-  home: { label: '島的中間', title: '貓貓之家', lede: '島上 50 隻貓貓的家。屋頂上的招牌，是島主桐桐的印章。', text: '跳累的貓會回來睡貓床、吃飯喝水，有時候還會躲進屋子裡。' },
+  home: { label: '島的中間', title: '貓貓之家', lede: '島上 50 隻貓貓的家。屋頂上的招牌，是設計師桐桐的印章。', text: '跳累的貓會回來睡貓床、吃飯喝水，有時候還會躲進屋子裡。' },
   boxes: { label: '躲貓貓的島', title: '多多紙箱區', lede: '滿地都是紙箱，貓貓最愛鑽進去躲起來。', text: '有的貓只露出耳朵，有的整隻躲起來，紙箱還會晃來晃去。點一下紙箱，看看誰躲在裡面！' },
   combo: { label: '休息的島', title: '合體公園', lede: '紙箱、魚池、水和飼料，全部合在一起的公園。', text: '貓貓可以躲紙箱、坐在池邊看魚，渴了喝水、餓了吃飼料。' },
-  park1: { label: '休息的島', title: '紙箱公園', lede: '跳累了就來這裡休息。', text: '長椅可以趴著睡，角落的紙箱最受歡迎，貓貓一看到就想鑽進去。' },
   park2: { label: '休息的島', title: '魚池公園', lede: '跳累了就來這裡休息。', text: '池子裡有三條錦鯉游來游去，貓貓最愛坐在旁邊看。' },
 };
 const LEVEL_HINT = {
@@ -54,7 +56,7 @@ function el(tag, className, text) {
   return node;
 }
 
-// 島民卡的雲端存檔：本機預覽接 wrangler dev，其他都接正式的
+// 島主卡的雲端存檔：本機預覽接 wrangler dev，其他都接正式的
 const CLOUD_API = /^(127\.0\.0\.1|localhost)$/.test(location.hostname) ? 'http://127.0.0.1:8787' : 'https://tong-api.xjack.tw';
 const SYNC_DELAY = 20000;
 
@@ -240,10 +242,13 @@ function start(hotData = {}) {
   const stored = readStore();
   let records = sanitizeRecords(hotData.records || stored.records, cats.length);
   let jumpCount = records.reduce((max, r) => Math.max(max, r.at), 0);
+  // 跑步比賽的成績：每隻貓跑最快的那一次、第一名幾次（「重新比一次」會跟跳高一起清掉）
+  let raceBoard = sanitizeRaceBoard(hotData.raceBoard || stored.race, cats.length);
   const sound = createSound(stored.sound !== false);
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let focus = 'overview';
   let rankLevel = 'all';
+  let rankKind = 'jump';
   let openCatIndex = null;
   let openIslandId = null;
   let holding = false;
@@ -270,7 +275,7 @@ function start(hotData = {}) {
   let newAfter = diarySeq;
   let unread = 0;
 
-  // 島民卡：名字、累積的數字、徽章。舊存檔第一次升級時，用還留著的成績、改作業張數、掌印當起點
+  // 島主卡：名字、累積的數字、徽章。舊存檔第一次升級時，用還留著的成績、改作業張數、掌印當起點
   const hadProfile = !!(hotData.profile || stored.profile);
   const profile = sanitizeProfile(hotData.profile || stored.profile, cats.length, {
     jumps: records.filter((r) => r.tong).length,
@@ -279,16 +284,24 @@ function start(hotData = {}) {
   });
   // 升級前就達標的徽章直接給，不用一次跳一大串提示
   if (!hadProfile) award(profile, dayKey());
-  const newDay = markDay(profile, dayKey());
+  // 上次來是哪一天，回到島主之家時才知道有哪些新公告；markDay 會把它換成今天，要先記下來
+  const previousDay = hadProfile ? profile.lastDay : '';
+  markDay(profile, dayKey());
   const who = () => playerName(profile);
+  const ownerLabel = () => `${who()}島主`;
+  // 島上真的發生的大事，邊玩邊記，回到島主之家時報給島主聽
+  let newsLog = sanitizeNews(stored.news);
 
-  window.claude?.hot?.snapshot?.(() => ({ records, diaries, profile }));
+  window.claude?.hot?.snapshot?.(() => ({ records, raceBoard, diaries, profile }));
+  // 島主正在做的事：站在跳臺軟墊上自己跳、站在表演區舞臺上
+  let ownerJumping = false;
+  let ownerOnStage = false;
 
   // 第一次來的人先看島的故事，看過就不再跳出來
   let storySeen = !!stored.storySeen;
 
   function save() {
-    writeStore({ records, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay }, profile });
+    writeStore({ records, race: raceBoard, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay }, profile, news: newsLog });
   }
 
   // 成績太多時只留每隻貓在每座跳臺的最佳，加上最近 1000 跳
@@ -315,8 +328,29 @@ function start(hotData = {}) {
         memories.set(index, list);
       },
       diary: writeDiary,
-      raceEnd(order) {
-        if (focus === 'track' && order.length) showToast('比賽結束！', `第一名是${cats[order[0]].name}`);
+      raceEnd(order, times = []) {
+        if (!order.length) return;
+        const { ownerIndex } = scene.raceView();
+        const nameOf = (i) => (i === ownerIndex ? ownerLabel() : cats[i].name);
+        newsLog = recordNews(newsLog, dayKey(), recordRaceNews(nameOf(order[0])));
+        // 排行榜島的跑步排行只比貓貓，島主跑的不算
+        const results = order
+          .map((cat, k) => ({ cat, place: k + 1, tenths: Math.round((times[k] || 0) * 10) }))
+          .filter((r) => r.cat !== ownerIndex && r.cat >= 0 && r.cat < cats.length && r.tenths > 0);
+        if (results.length) raceBoard = addRaceResult(raceBoard, results);
+        save();
+        refreshBoards();
+        if (focus !== 'track') return;
+        const place = order.indexOf(ownerIndex);
+        showToast('比賽結束！', place >= 0 ? `你跑了第 ${place + 1} 名` : `第一名是${nameOf(order[0])}`);
+      },
+      ownerJump({ level, cm, perfect }) {
+        showResult(`${ownerLabel()}跳了 ${cm} 公分${perfect ? '，完美跳！' : '！'}`, '');
+        if (perfect) {
+          bump(profile, 'perfect');
+          if (level === 'high') bump(profile, 'perfectHigh');
+          tallied();
+        }
       },
     },
   });
@@ -345,6 +379,8 @@ function start(hotData = {}) {
     }
     const islandRecord = judge.island && !judge.first && records.length > 3;
     if (islandRecord) {
+      newsLog = recordNews(newsLog, dayKey(), recordJumpNews(name, level.name, info.cm));
+      save();
       showToast('全島新紀錄！', `${name}在${level.name}跳了 ${info.cm} 公分`);
       if (!info.tong && info.platform === focus) sound.play('record');
     }
@@ -359,7 +395,7 @@ function start(hotData = {}) {
     return judge;
   }
 
-  // ---------- 島民卡：累積數字變了就看有沒有新徽章，存起來 ----------
+  // ---------- 島主卡：累積數字變了就看有沒有新徽章，存起來 ----------
   const badgeQueue = [];
   let badgeTimer = 0;
   let newBadges = 0;
@@ -419,14 +455,19 @@ function start(hotData = {}) {
 
   // 名字會出現在哪裡都由這裡換：工具列、招牌下面、改作業的標題、排行榜的說明
   function applyName() {
-    $('profile-label').textContent = profile.name || '島民卡';
-    $('plate-sub').textContent = profile.name ? `島民：${profile.name}` : '50 隻貓貓的跳高比賽';
+    $('profile-label').textContent = profile.name || '島主卡';
+    $('plate-sub').textContent = profile.name ? `島主：${profile.name}` : '50 隻貓貓的跳高比賽';
+    scene.setOwnerName(who());
+    scene.setOwnerLook(profile.avatar);
+    markLooks();
     $('learn-title').textContent = `${who()}老師改作業`;
-    $('rank-note').textContent = `每隻貓只算牠跳最高的那一次。名字旁邊蓋了「${stampChar(profile)}」字章的，是${who()}幫忙按的。`;
-    $('help-who').textContent = profile.name ? `島民${profile.name}` : '島主桐桐';
+    $('rank-note').textContent = rankNote();
+    $('help-who').textContent = profile.name ? `島主${profile.name}` : '這座島的島主';
   }
 
   let profileEditing = false;
+  // 第一次取完名字會留在島主卡（要看到島主暗號），關掉卡片才回到島主之家
+  let homeAfterProfile = false;
   // 預留文字的字也要選對讀音（量詞「個」）
   $('profile-input').placeholder = zhuyin(`最多 ${NAME_MAX} 個字`);
 
@@ -455,7 +496,8 @@ function start(hotData = {}) {
   ];
 
   function renderProfile() {
-    $('profile-title').textContent = profileEditing && !profile.name ? '你的島民卡' : `${who()}的島民卡`;
+    $('profile-go-home').hidden = !homeAfterProfile || profileEditing;
+    $('profile-title').textContent = profileEditing && !profile.name ? '你的島主卡' : `${who()}的島主卡`;
     $('profile-form').hidden = !profileEditing;
     $('profile-rename').hidden = profileEditing;
     if (profileEditing) {
@@ -535,7 +577,34 @@ function start(hotData = {}) {
     else linkCloud();
   });
 
-  // ---------- 島民暗號：存到雲端，換裝置或資料不見都找得回來 ----------
+  // ---------- 島主的樣子 ----------
+  function markLooks() {
+    document.querySelectorAll('.look-btn').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.look === profile.avatar)));
+  }
+
+  function setLook(look) {
+    const first = !profile.avatar;
+    profile.avatar = look;
+    profile.avatarAt = Date.now();
+    scene.setOwnerLook(look);
+    markLooks();
+    syncOwnerButtons();
+    save();
+    scheduleSync(0);
+    sound.play('stamp');
+    if (!$('home-card').hidden) renderHome();
+    if (first) showToast('這就是你了！', '點地上就走過去，點貓貓可以聊天');
+  }
+
+  // 島主卡和島主之家都放一排按鈕，內容從同一份範本抄
+  ['profile-looks', 'home-looks'].forEach((id) => {
+    const box = $(id);
+    box.append($('look-template').content.cloneNode(true));
+    box.querySelectorAll('.look-btn').forEach((button) => button.addEventListener('click', () => setLook(button.dataset.look)));
+  });
+  $('profile-looks').querySelectorAll('.look-btn').forEach((button) => button.setAttribute('tabindex', '0'));
+
+  // ---------- 島主暗號：存到雲端，換裝置或資料不見都找得回來 ----------
   // 平常只存在這臺裝置；有暗號之後，動作停下來 20 秒、或離開頁面時送一次。連不上就先記在本機，等一下再試
   let cloudState = 'idle'; // idle、saving、saved、offline、missing
   let syncTimer = 0;
@@ -705,6 +774,7 @@ function start(hotData = {}) {
     closeRestore();
     receiveOthers(res.body.others);
     applyName();
+    syncOwnerButtons();
     setCloudState('saving');
     renderProfile();
     sound.play('stamp');
@@ -756,6 +826,7 @@ function start(hotData = {}) {
       champions: top.slice(0, 3).map((r) => r.cat),
       best,
       top: top.slice(0, 5).map((r) => ({ name: cats[r.cat].name, cm: r.cm, level: r.level })),
+      raceTop: raceLeaderboard(raceBoard, 5).map((r) => ({ name: cats[r.cat].name, sec: secondsText(r.best) })),
     });
     renderMini(top);
     if (!$('rank-card').hidden) renderRank();
@@ -792,7 +863,11 @@ function start(hotData = {}) {
       badge.hidden = true;
       button.append(badge);
     }
-    button.addEventListener('click', () => (item.id === 'coach' ? findCoach() : goIsland(item.id)));
+    button.addEventListener('click', () => {
+      if (item.id === 'coach') findCoach();
+      else if (item.id === 'owner') followOwner();
+      else goIsland(item.id);
+    });
     nav.append(button);
   });
 
@@ -832,12 +907,17 @@ function start(hotData = {}) {
   }
 
   // quiet：從島上的東西點過來的（例如點黑板），不用再跳學習數學島的提示
-  function goIsland(id, quiet = false) {
+  // auto：程式自己帶過來的（重新打開網站回到島主之家），不算玩家按的，不送 GA
+  function goIsland(id, quiet = false, auto = false) {
     closeCards();
     focus = id;
-    track('island_view', { island: id });
+    if (!auto) track('island_view', { island: id });
     if (ISLAND_IDS.includes(id)) see('islands', id);
     followingCoach = false;
+    ownerJumping = false;
+    ownerOnStage = false;
+    syncOwnerButtons();
+    scene.ownerGoIsland(id);
     const level = LEVELS[id];
     const dock = $('dock');
     dock.hidden = !level;
@@ -855,6 +935,8 @@ function start(hotData = {}) {
     } else if (id === 'track') {
       lastDock = {};
       showToast('跑步田徑場島', '七隻貓到齊，按「開始比賽」就開跑');
+    } else if (id === 'park1') {
+      openHome();
     } else if (id === 'rank') {
       openRank();
     } else if (id === 'diary') {
@@ -868,6 +950,15 @@ function start(hotData = {}) {
     measureBottom();
     scene.focus(id, insets());
     updateNav();
+  }
+
+  // ---------- 島主也來玩：跳臺、舞臺、跑道上的按鈕 ----------
+  function syncOwnerButtons() {
+    const can = !!profile.avatar;
+    $('dock-owner').hidden = !can;
+    $('dock-owner').textContent = ownerJumping ? '換貓貓跳' : '換我跳';
+    $('stage-owner').hidden = !can;
+    $('stage-owner').textContent = ownerOnStage ? '我要下臺' : '我也要上臺';
   }
 
   // ---------- 跳臺大按鈕 ----------
@@ -905,7 +996,7 @@ function start(hotData = {}) {
   function pressJump() {
     if (holding || !LEVELS[focus]) return;
     sound.unlock();
-    if (!scene.press()) return;
+    if (ownerJumping ? !scene.ownerJumpPress() : !scene.press()) return;
     holding = true;
     jumpBtn.classList.add('is-holding');
     sound.startCharge();
@@ -916,7 +1007,8 @@ function start(hotData = {}) {
     holding = false;
     jumpBtn.classList.remove('is-holding', 'is-perfect');
     sound.stopCharge();
-    scene.release();
+    if (ownerJumping) scene.ownerJumpRelease();
+    else scene.release();
   }
 
   jumpBtn.addEventListener('pointerdown', (event) => {
@@ -951,6 +1043,18 @@ function start(hotData = {}) {
     if (!$('stage-dock').hidden) tickStage();
     if (!$('race-dock').hidden) tickRace();
     if ($('dock').hidden || !LEVELS[focus]) return;
+    if (ownerJumping) {
+      const own = scene.ownerJumpView();
+      if (!own.charging && holding) releaseJump();
+      jumpBtn.disabled = !(own.charging || own.ready);
+      setText('jump-label', own.charging ? '放開！' : own.ready ? '按住' : '等一下');
+      jumpFill.style.strokeDashoffset = String(RING * (1 - own.meter));
+      jumpBtn.classList.toggle('is-perfect', own.charging && own.meter >= PERFECT);
+      if (own.charging) sound.updateCharge(own.meter);
+      setText('dock-who', own.ready || own.charging ? `換${ownerLabel()}跳！` : `${ownerLabel()}走過去了…`);
+      setText('dock-next', '站在軟墊上，能量條和貓貓一樣');
+      return;
+    }
     const view = scene.platformView(focus);
     if (!view) return;
     const charging = view.charging !== null;
@@ -975,7 +1079,11 @@ function start(hotData = {}) {
   // ---------- 跑步比賽的按鈕和戰況 ----------
   function tickRace() {
     const view = scene.raceView();
-    const name = (k) => (view.standing[k] !== undefined ? cats[view.standing[k]].name : '');
+    const name = (k) => {
+      const i = view.standing[k];
+      if (i === undefined) return '';
+      return i === view.ownerIndex ? ownerLabel() : cats[i].name;
+    };
     let who = '';
     let next = '';
     if (view.phase === 'idle') {
@@ -985,8 +1093,8 @@ function start(hotData = {}) {
       who = `貓貓跑去起跑線（${view.arrived}／${view.lanes}）`;
       next = '到齊就可以比賽';
     } else if (view.phase === 'ready') {
-      who = `${view.total} 隻貓都就位了！`;
-      next = '按「開始比賽」，貓貓就開跑';
+      who = view.ownerIn ? '大家都就位了！' : `${view.total} 隻貓都就位了！`;
+      next = '按「開始比賽」就開跑';
     } else if (view.phase === 'countdown') {
       who = `預備…${Math.max(1, view.count)}`;
       next = '看哪一隻跑最快';
@@ -999,11 +1107,19 @@ function start(hotData = {}) {
     }
     setText('race-who', who);
     setText('race-next', next);
-    $('race-go').disabled = view.phase !== 'ready';
+    const running = view.phase === 'running' && view.ownerIn;
+    setText('race-go', running ? '加速！' : '開始比賽');
+    $('race-go').disabled = !(view.phase === 'ready' || running);
+    $('race-owner').hidden = !profile.avatar || view.ownerIn || !['gather', 'ready'].includes(view.phase);
   }
   $('race-go').addEventListener('click', () => {
     sound.unlock();
-    scene.raceStart();
+    if (scene.raceView().phase === 'running') scene.raceBoost();
+    else scene.raceStart();
+  });
+  $('race-owner').addEventListener('click', () => {
+    sound.unlock();
+    if (scene.raceJoin()) showToast('島主也要跑！', '開跑後連按「加速！」，跑得更快');
   });
 
   // ---------- 表演區按鈕：點動作，臺上的貓就表演；拍手，臺下的貓一起拍 ----------
@@ -1017,21 +1133,23 @@ function start(hotData = {}) {
     setText('stage-who', who);
     const next = view.performer !== null && view.waiting !== null ? `，下一個是${cats[view.waiting].name}` : '';
     setText('stage-next', `臺下有 ${view.audience} 隻貓在看${next}`);
-    const key = `${view.ready}|${view.trick}`;
+    const key = `${view.ready}|${view.trick}|${ownerOnStage}`;
     if (lastDock.trickKey === key) return;
     lastDock.trickKey = key;
     trickButtons.forEach((button) => {
-      button.disabled = !view.ready;
+      button.disabled = !view.ready && !ownerOnStage;
       button.classList.toggle('is-on', button.dataset.trick === view.trick);
     });
   }
   trickButtons.forEach((button) => button.addEventListener('click', () => {
     sound.unlock();
+    const mine = ownerOnStage && scene.ownerTrick(button.dataset.trick);
     if (scene.stageTrick(button.dataset.trick)) {
       track('stage_trick', { trick: button.dataset.trick });
       tally('tricks');
       return;
     }
+    if (mine) return;
     // 上一個動作還沒做完：鈕抖一下
     button.classList.remove('is-nope');
     void button.offsetWidth;
@@ -1043,6 +1161,21 @@ function start(hotData = {}) {
     sound.play('clap');
     track('stage_clap');
     tally('claps');
+    scene.ownerCheer();
+  });
+  $('stage-owner').addEventListener('click', () => {
+    sound.unlock();
+    if (!scene.ownerStage(!ownerOnStage)) return;
+    ownerOnStage = !ownerOnStage;
+    syncOwnerButtons();
+  });
+  $('dock-owner').addEventListener('click', () => {
+    sound.unlock();
+    if (!scene.ownerCushion(!ownerJumping, focus)) return;
+    ownerJumping = !ownerJumping;
+    syncOwnerButtons();
+    lastDock = {};
+    renderDockBest();
   });
 
   // ---------- 注音：日記區、學習數學島卡片上的字都加注音 ----------
@@ -1060,7 +1193,7 @@ function start(hotData = {}) {
     if (c.type === 'characterData') markZhuyin(c.target);
     else c.addedNodes.forEach(markZhuyin);
   }));
-  ['diary-card', 'learn-card', 'lesson-card', 'story-card', 'report-card', 'profile-card'].forEach((id) => {
+  ['diary-card', 'learn-card', 'lesson-card', 'story-card', 'report-card', 'profile-card', 'home-card', 'chat-card'].forEach((id) => {
     markZhuyin($(id));
     zhuyinWatch.observe($(id), { childList: true, characterData: true, subtree: true });
   });
@@ -1765,13 +1898,30 @@ function start(hotData = {}) {
     learnOpen = false;
     openCatIndex = null;
     openIslandId = null;
+    const wasChat = chatIndex !== null;
+    chatIndex = null;
+    homeAfterProfile = false;
+    scene.chatEnd();
+    // 聊完鏡頭回到島主身上（卡片都收起來才算得準，所以等這一輪結束）
+    if (wasChat && focus === 'owner') requestAnimationFrame(() => { if (focus === 'owner' && chatIndex === null) scene.follow('owner', insets()); });
     $('reset-confirm').hidden = true;
     $('reset-ask').hidden = false;
   }
-  document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', closeCards));
+  function closeToHome() {
+    const goHome = homeAfterProfile;
+    closeCards();
+    if (goHome) goIsland('park1', true, true);
+  }
+  document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', closeToHome));
+  $('profile-go-home').addEventListener('click', closeToHome);
   // 看完島的故事，接著問要叫什麼名字
   $('story-start').addEventListener('click', () => {
-    if (!profile.asked) openProfile(true);
+    if (profile.asked) {
+      goIsland('park1', true, true);
+      return;
+    }
+    openProfile(true);
+    homeAfterProfile = true;
   });
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
@@ -1808,8 +1958,12 @@ function start(hotData = {}) {
     $('island-lede').textContent = copy.lede;
     $('island-text').textContent = copy.text;
     renderIsland();
+    $('island-sit').hidden = !scene.ownerCanSit(id);
     $('island-card').hidden = false;
   }
+  $('island-sit').addEventListener('click', () => {
+    if (openIslandId && scene.ownerSit(openIslandId)) showToast('坐下來休息', `${ownerLabel()}走過去坐下了`);
+  });
 
   function renderIsland() {
     if (!openIslandId) return;
@@ -1833,10 +1987,143 @@ function start(hotData = {}) {
       if (info && info.writing) chip.append(el('small', '', '寫日記'));
       if (info && info.performing) chip.append(el('small', '', '表演中'));
       if (info && info.lost) chip.append(el('small', '', '迷路了'));
-      chip.addEventListener('click', () => openCat(index, 'island_card'));
+      chip.addEventListener('click', () => openChat(index, 'island_card'));
       box.append(chip);
     });
   }
+
+  // ---------- 島主之家：回到島上先到這裡，報告最近的新鮮事 ----------
+  const homeReader = { button: $('home-read'), label: $('home-read-label'), idle: '唸給我聽' };
+  if (!synth) $('home-read').hidden = true;
+  let homeItems = [];
+  // 第一次打開網站看到的是歡迎，之後才是歡迎回來
+  let firstVisit = !stored.storySeen;
+
+  function buildHomeItems() {
+    const latest = diaries[diaries.length - 1];
+    homeItems = composeNews({
+      today: dayKey(),
+      previousDay,
+      events: newsLog,
+      diary: latest ? { name: cats[latest.cat].name, line: latest.lines[0] } : null,
+      names: cats.map((c) => c.name),
+      // 第一次來還要選樣子，新鮮事少一點，不用捲那麼遠
+      limit: firstVisit ? 3 : 5,
+    });
+  }
+
+  function renderHome() {
+    $('home-title').textContent = firstVisit ? '這裡是你的家！' : `${ownerLabel()}，歡迎回來！`;
+    $('home-news').replaceChildren(...homeItems.map((item) => {
+      const li = el('li', 'news-item');
+      li.append(el('span', 'news-item__tag', item.tag), el('span', 'news-item__text', item.text));
+      return li;
+    }));
+    const noLook = !profile.avatar;
+    $('home-pick').hidden = !noLook;
+    $('home-change').hidden = noLook;
+    $('home-go').textContent = noLook ? '先選島主的樣子' : '出門逛島';
+    $('home-go').disabled = noLook;
+  }
+
+  function openHome() {
+    closeCards();
+    stopSpeaking();
+    buildHomeItems();
+    renderHome();
+    $('home-card').hidden = false;
+    $('home-card').scrollTop = 0;
+  }
+
+  $('home-read').addEventListener('click', () => {
+    if (speaking === homeReader) {
+      stopSpeaking();
+      return;
+    }
+    speak(`${plainText($('home-title').textContent)}最近島上的新鮮事：${homeItems.map((item) => item.text).join('')}`, homeReader);
+    track('read_aloud', { what: 'home' });
+  });
+  $('home-change').addEventListener('click', () => openProfile());
+  $('home-go').addEventListener('click', () => {
+    sound.unlock();
+    firstVisit = false;
+    followOwner();
+  });
+
+  // 鏡頭跟著島主走：點地上就走過去、點貓貓就聊天
+  function followOwner() {
+    if (!profile.avatar) {
+      goIsland('park1');
+      showToast('先選島主的樣子', '選好就可以出門逛島');
+      return;
+    }
+    closeCards();
+    focus = 'owner';
+    followingCoach = false;
+    ownerJumping = false;
+    ownerOnStage = false;
+    syncOwnerButtons();
+    $('dock').hidden = true;
+    $('stage-dock').hidden = true;
+    $('race-dock').hidden = true;
+    measureBottom();
+    scene.follow('owner', insets());
+    track('island_view', { island: 'owner' });
+    updateNav();
+    showToast('出門逛島', '點地上就走過去，點貓貓可以聊天');
+  }
+
+  // ---------- 跟貓聊天 ----------
+  let chatIndex = null;
+
+  function chatSay(text) {
+    $('chat-line').textContent = text;
+    speak(text);
+  }
+
+  function openChat(index, via) {
+    sound.unlock();
+    closeCards();
+    chatIndex = index;
+    track('cat_open', { what: via });
+    see('cats', index);
+    const { busy } = scene.chatStart(index);
+    scene.meow(index);
+    const cat = cats[index];
+    $('chat-swatch').style.background = cat.coat.body;
+    $('chat-coat').textContent = cat.coat.label;
+    $('chat-name').textContent = cat.name;
+    const info = scene.catInfo(index);
+    $('chat-card').hidden = false;
+    $('chat-card').scrollTop = 0;
+    // 跟著島主走的時候，鏡頭讓出卡片的位置，才看得到島主和貓
+    if (focus === 'owner') scene.follow('owner', insets());
+    chatSay(busy ? chatBusy(info && info.doing) : chatGreeting(cat, who(), Math.random()));
+  }
+
+  $('chat-pet').addEventListener('click', () => {
+    if (chatIndex === null) return;
+    scene.chatPet();
+    chatSay(chatPet(Math.random()));
+  });
+  $('chat-doing').addEventListener('click', () => {
+    if (chatIndex === null) return;
+    const info = scene.catInfo(chatIndex);
+    chatSay(chatDoing(info && info.doing));
+  });
+  $('chat-best').addEventListener('click', () => {
+    if (chatIndex === null) return;
+    const best = bestPerCat(records).get(chatIndex);
+    chatSay(chatBest(best && best.cm, best && LEVELS[best.level].name));
+  });
+  $('chat-diary').addEventListener('click', () => {
+    if (chatIndex === null) return;
+    const mine = diaries.filter((d) => d.cat === chatIndex).pop();
+    chatSay(chatDiary(mine && mine.lines[0]));
+  });
+  $('chat-info').addEventListener('click', () => {
+    if (chatIndex !== null) openCat(chatIndex, 'chat');
+  });
 
   // 貓卡
   // via：從哪裡點進來的（3d、island_card、box），給 GA 看大家怎麼找到貓
@@ -1919,8 +2206,23 @@ function start(hotData = {}) {
     $('rank-card').hidden = false;
   }
 
+  function rankNote() {
+    return rankKind === 'race'
+      ? '每隻貓只算牠跑最快的那一次，跑一圈用的秒數越少越快。島主一起跑的不算，這裡只比貓貓。'
+      : `每隻貓只算牠跳最高的那一次。名字旁邊蓋了「${stampChar(profile)}」字章的，是${who()}幫忙按的。`;
+  }
+
   function renderRank() {
-    document.querySelectorAll('#rank-card .tab').forEach((tab) => tab.setAttribute('aria-selected', String(tab.dataset.level === rankLevel)));
+    const racing = rankKind === 'race';
+    document.querySelectorAll('#rank-kinds .tab').forEach((tab) => tab.setAttribute('aria-selected', String(tab.dataset.kind === rankKind)));
+    document.querySelectorAll('#rank-levels .tab').forEach((tab) => tab.setAttribute('aria-selected', String(tab.dataset.level === rankLevel)));
+    $('rank-levels').hidden = racing;
+    $('rank-title').textContent = racing ? '這次誰跑最快？' : '這次誰跳最高？';
+    $('rank-note').textContent = rankNote();
+    if (racing) {
+      renderRaceRank();
+      return;
+    }
     const rows = leaderboard(records, rankLevel, 10);
     const list = $('rank-list');
     list.replaceChildren();
@@ -1951,7 +2253,37 @@ function start(hotData = {}) {
       : '這次還沒有人跳。';
   }
 
-  document.querySelectorAll('#rank-card .tab').forEach((tab) => tab.addEventListener('click', () => {
+  // 跑步排行：秒數越少越前面；跑過第一名的貓旁邊寫第一名幾次
+  function renderRaceRank() {
+    const rows = raceLeaderboard(raceBoard, 10);
+    const list = $('rank-list');
+    list.replaceChildren();
+    rows.forEach((r) => {
+      const li = el('li', 'rank-row');
+      li.append(el('span', `medal medal--${r.rank}`, String(r.rank)));
+      const dot = el('i', 'dot');
+      dot.style.background = cats[r.cat].coat.body;
+      li.append(dot);
+      li.append(el('span', 'rank-row__name', cats[r.cat].name));
+      li.append(r.wins ? el('span', 'level-tag level-tag--win', `第一名 ${r.wins} 次`) : el('span'));
+      const sec = el('span', 'rank-row__cm', secondsText(r.best));
+      sec.append(el('small', '', '秒'));
+      li.append(sec);
+      list.append(li);
+    });
+    $('rank-empty').hidden = rows.length > 0;
+    $('rank-empty').textContent = '還沒有比賽成績，貓貓正在田徑場暖身。';
+    const champ = raceTopWinner(raceBoard);
+    $('rank-summary').textContent = raceBoard.races
+      ? `這次一共比了 ${raceBoard.races} 場${champ ? `，最常跑第一名的是${cats[champ.cat].name}（${champ.wins} 次）` : ''}。`
+      : '這次還沒有比賽。';
+  }
+
+  document.querySelectorAll('#rank-kinds .tab').forEach((tab) => tab.addEventListener('click', () => {
+    rankKind = tab.dataset.kind;
+    renderRank();
+  }));
+  document.querySelectorAll('#rank-levels .tab').forEach((tab) => tab.addEventListener('click', () => {
     rankLevel = tab.dataset.level;
     renderRank();
   }));
@@ -1967,11 +2299,12 @@ function start(hotData = {}) {
   $('reset-yes').addEventListener('click', () => {
     records = [];
     jumpCount = 0;
+    raceBoard = sanitizeRaceBoard(null);
     save();
     refreshBoards();
     $('reset-confirm').hidden = true;
     $('reset-ask').hidden = false;
-    showToast('新的一輪開始！', '大家重新比，看這次誰跳最高');
+    showToast('新的一輪開始！', '大家重新比，看這次誰跳最高、誰跑最快');
   });
 
   const foundInBox = new Map();
@@ -1979,8 +2312,15 @@ function start(hotData = {}) {
   // 3D 場景裡點到的東西
   scene.onPick((pick) => {
     sound.unlock();
-    if (pick.type === 'island') goIsland(pick.id);
-    else if (pick.type === 'cat') openCat(pick.index, '3d');
+    if (pick.type === 'island') {
+      // 已經在這座島上（或正跟著島主逛）：點地上就是島主走過去
+      if (pick.point && profile.avatar && (focus === pick.id || focus === 'owner')) scene.ownerWalkTo(pick.point, pick.id);
+      else goIsland(pick.id);
+    } else if (pick.type === 'owner') openProfile();
+    else if (pick.type === 'ownerHome') {
+      if (focus === 'park1') openHome();
+      else goIsland('park1');
+    } else if (pick.type === 'cat') openChat(pick.index, '3d');
     else if (pick.type === 'coach') openCoach();
     else if (pick.type === 'teacher' || pick.type === 'podium') atLearn(openLearn);
     else if (pick.type === 'board') atLearn(openLesson);
@@ -1991,7 +2331,7 @@ function start(hotData = {}) {
         // 同一隻貓一分鐘內再點只算一次，連點同一個紙箱不會一直累積
         if (Date.now() - (foundInBox.get(hiding) || 0) > 60000) tally('boxes');
         foundInBox.set(hiding, Date.now());
-        openCat(hiding, 'box');
+        openChat(hiding, 'box');
       } else {
         sound.play('pop');
       }
@@ -2018,10 +2358,16 @@ function start(hotData = {}) {
   refreshBoards();
   updateNav();
   applyName();
-  // 第一次來先看故事，看完問名字；老玩家這次升級也問一次；有名字的人每天第一次來打個招呼
-  if (!storySeen) openStory();
-  else if (!profile.asked) openProfile(true);
-  else if (profile.name && newDay) showToast(`${profile.name}，歡迎回來！`, `這是你第 ${total(profile, 'days')} 天來島上`);
+  syncOwnerButtons();
+  // 第一次來先看故事，看完問名字和樣子；再來就直接回到島主之家，先聽最近的新鮮事
+  if (!storySeen) {
+    openStory();
+  } else if (!profile.asked) {
+    openProfile(true);
+    homeAfterProfile = true;
+  } else {
+    goIsland('park1', true, true);
+  }
   tallied();
   // 有暗號就先對一次雲端；有名字還沒有暗號（連不上或舊版取的名字）就補開一張
   if (profile.cloud.code) syncNow({ force: true });

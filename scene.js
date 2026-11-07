@@ -1,5 +1,6 @@
 // 桐桐貓貓島 3D 場景：十一座島的形狀、位置和二十座木板橋照桐桐的兩張草稿描，學習數學島是她後來說要加的，跑步田徑場島是她另外畫的。
 // 50 隻 Q 版貓在島上散步、排隊上跳臺比跳高、上表演區表演、在跑道上賽跑、躲紙箱、寫日記、寫數學作業、去公園休息、回貓貓之家睡覺；
+// 玩家是島主，從島主之家出發，可以在島上走來走去、跟貓聊天、一起玩設施。
 // 這一輪跳最高的三隻會走上排行榜島的頒獎臺。兩腳走路、綁頭帶的貓貓教練會去找晃來晃去的貓，叫牠去跳臺跳；
 // 戴眼鏡的貓貓老師站在學習數學島的黑板前，桐桐改錯作業時會提醒她。
 // 島上的樹是開白花的油桐樹（桐桐的「桐」）。所有文字一律走 textContent。
@@ -8,6 +9,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ISLANDS, BRIDGES, LEVELS, SKETCH, PERFECT, TRICKS, TRICK_KEYS, TRACK, fromSketch, meterAt, peakHeight, toCm, autoPower, maxCm, mulberry32, laneRadius, trackOuter, insideTrack, trackPoint } from './logic.js';
+import { buildHuman, animateHuman, disposeModel } from './avatar.js';
 
 const TAU = Math.PI * 2;
 const TOP = 0.8;
@@ -484,6 +486,12 @@ function addHeadband(model) {
   [-1, 1].forEach((s) => parts.push(part(new THREE.BoxGeometry(0.032, 0.12, 0.014), '#E8466E', [s * 0.035, -0.055, -0.13], [0.45, 0, s * 0.4])));
   const band = put(model.head, makeMesh(mergeGeometries(parts, false), CAT_MATERIAL, false, false), 0, 0.09, 0.03);
   band.rotation.x = -0.2;
+}
+
+// 貓島主：背上一件藍色小披風
+function addCape(model) {
+  const cape = part(new THREE.BoxGeometry(0.26, 0.02, 0.36), '#3E4BB8');
+  put(model.rig, makeMesh(cape, CAT_MATERIAL, false, false), 0, 0.31, -0.05);
 }
 
 // 貓貓老師：圓眼鏡，右手拿一根教鞭
@@ -1046,6 +1054,10 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   // ---------- 排行榜島：草稿上的 2、1、3 頒獎臺，後面是獎盃和成績看板 ----------
   const podiumSpots = [];
   let boardRows = [];
+  // 有跑步成績的時候，看板「這次跳最高」和「這次跑最快」輪流秀
+  let raceRows = [];
+  let boardMode = 'jump';
+  let boardFlip = 8;
   function buildRank(island) {
     const g = island.group;
     const px = 0.2;
@@ -1100,15 +1112,17 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       ctx.font = `66px ${FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('這次跳最高', w / 2, 78);
-      if (!boardRows.length) {
+      const racing = boardMode === 'race' && raceRows.length > 0;
+      const rows = racing ? raceRows : boardRows;
+      ctx.fillText(racing ? '這次跑最快' : '這次跳最高', w / 2, 78);
+      if (!rows.length) {
         ctx.fillStyle = '#ffffff';
         ctx.font = `48px ${FONT}`;
         ctx.fillText('貓貓正在暖身…', w / 2, 330);
         return;
       }
       const medals = ['#F2B200', '#C3CBD6', '#D99559', '#8D96E8', '#8D96E8'];
-      boardRows.slice(0, 5).forEach((row, i) => {
+      rows.slice(0, 5).forEach((row, i) => {
         const y = 168 + i * 88;
         ctx.fillStyle = medals[i];
         ctx.beginPath();
@@ -1124,10 +1138,10 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
         ctx.fillText(row.name, 156, y);
         ctx.textAlign = 'right';
         ctx.font = `30px ${FONT}`;
-        ctx.fillText('公分', w - 56, y + 8);
+        ctx.fillText(racing ? '秒' : '公分', w - 56, y + 8);
         ctx.font = `600 58px ${NUM_FONT}`;
         ctx.fillStyle = '#FFC93C';
-        ctx.fillText(String(row.cm), w - 132, y + 2);
+        ctx.fillText(racing ? row.sec : String(row.cm), racing ? w - 102 : w - 132, y + 2);
       });
     });
     put(board, makeMesh(new THREE.BoxGeometry(2.5, 1.5, 0.06), mat(0x2a3490)), 0, 1.4 + 0.75, -0.04);
@@ -1166,30 +1180,90 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     island.labelZ = -1.72;
   }
 
-  // ---------- 兩座公園 ----------
-  function buildPark1(island) {
-    addBench(island, -0.75, -0.2, 0, { width: 0.9, seats: 2, kind: 'rest', doing: '在紙箱公園的長椅上休息', event: { type: 'sleep', place: '紙箱公園的長椅上' } });
-    addBench(island, 0.8, -0.2, 0, { width: 0.9, seats: 2, kind: 'rest', doing: '在紙箱公園的長椅上休息', event: { type: 'sleep', place: '紙箱公園的長椅上' } });
-    const corners = scalePts(island.local, 0.8);
-    let boxes = 0;
-    corners.forEach((p) => {
-      if (boxes >= 3) return;
-      const near = island.spurs.some(([ax, az, bx, bz]) => segDist(p.x, p.z, ax, az, bx, bz) < 0.7)
-        || island.headPts.some(([hx, hz]) => Math.hypot(p.x - hx, p.z - hz) < 1.1);
-      if (near) return;
-      const box = makeBox();
-      box.position.set(p.x, TOP, p.z);
-      box.rotation.y = island.random() * 0.6 - 0.3;
-      island.group.add(box);
-      island.obstacles.push({ x: p.x, z: p.z, r: 0.34 });
-      const inward = Math.hypot(p.x, p.z) || 1;
-      const spot = addSpot(island, { approach: [p.x - (p.x / inward) * 0.55, p.z - (p.z / inward) * 0.55], pos: [p.x, TOP + 0.03, p.z], face: Math.atan2(-p.x, -p.z), poses: ['inbox'], kind: 'rest', doing: '躲在紙箱公園的紙箱裡', event: { type: 'box', place: '紙箱公園' } });
-      spot.box = box;
-      pickable(box, { type: 'box', spot: spot.index });
-      boxes += 1;
+  // ---------- 島主之家：玩家的家（原本是紙箱公園）。一棟小房子、信箱、門前小廣場和兩張長椅 ----------
+  const ownerHome = { doorNode: null };
+  function buildOwnerHome(island) {
+    const g = island.group;
+    const hz = -0.7;
+    const wallW = 2.5;
+    const wallD = 1.15;
+    const wallH = 1.05;
+    const front = wallD / 2;
+    const house = new THREE.Group();
+    house.position.set(0, TOP, hz);
+    g.add(house);
+    put(house, makeMesh(new THREE.BoxGeometry(wallW + 0.25, 0.08, wallD + 0.25), mat(C.stone)), 0, 0.04, 0);
+    put(house, makeMesh(new THREE.BoxGeometry(wallW, wallH, wallD), mat(0xfff2d8)), 0, 0.08 + wallH / 2, 0);
+    // 紅屋頂和煙囪
+    const roofShape = new THREE.Shape();
+    roofShape.moveTo(-front - 0.22, 0);
+    roofShape.lineTo(front + 0.22, 0);
+    roofShape.lineTo(0, 0.72);
+    roofShape.closePath();
+    const roofGeo = new THREE.ExtrudeGeometry(roofShape, { depth: wallW + 0.3, bevelEnabled: false });
+    roofGeo.translate(0, 0, -(wallW + 0.3) / 2);
+    roofGeo.rotateY(Math.PI / 2);
+    put(house, makeMesh(roofGeo, mat(0xe8705a)), 0, 0.08 + wallH, 0);
+    put(house, makeMesh(new THREE.BoxGeometry(0.24, 0.5, 0.24), mat(0xc9805e)), 0.8, 0.08 + wallH + 0.42, -0.12);
+    put(house, makeMesh(new THREE.BoxGeometry(0.3, 0.06, 0.3), mat(C.stone)), 0.8, 0.08 + wallH + 0.68, -0.12);
+    // 門和門把
+    put(house, makeMesh(new THREE.BoxGeometry(0.56, 0.8, 0.05), mat(C.door)), 0, 0.08 + 0.4, front);
+    put(house, makeMesh(new THREE.SphereGeometry(0.035, 8, 6), mat(C.sun)), 0.19, 0.5, front + 0.04);
+    put(house, makeMesh(new THREE.BoxGeometry(0.8, 0.03, 0.4), mat(C.rug)), 0, 0.03, front + 0.34);
+    // 兩扇窗
+    [-1, 1].forEach((s) => {
+      put(house, makeMesh(new THREE.BoxGeometry(0.46, 0.46, 0.03), mat(C.white)), s * 0.82, 0.62, front + 0.005);
+      put(house, makeMesh(new THREE.BoxGeometry(0.38, 0.38, 0.03), mat(C.glass, { flatShading: false, roughness: 0.3 })), s * 0.82, 0.62, front + 0.012);
+      put(house, makeMesh(new THREE.BoxGeometry(0.03, 0.38, 0.02), mat(C.white)), s * 0.82, 0.62, front + 0.03);
+      put(house, makeMesh(new THREE.BoxGeometry(0.5, 0.05, 0.1), mat(C.wood)), s * 0.82, 0.37, front + 0.05);
     });
-    island.extraTrees = [[0, 0.6]];
-    island.labelY = TOP + 1.7;
+    // 門上的招牌
+    const signTexture = paintTexture(512, 128, (ctx, w, h) => {
+      ctx.fillStyle = '#FFF4D1';
+      roundRectPath(ctx, 4, 4, w - 8, h - 8, 36);
+      ctx.fill();
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = '#3E4BB8';
+      ctx.stroke();
+      ctx.fillStyle = '#2A3490';
+      ctx.font = `72px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('島主之家', w / 2, h / 2 + 4);
+    });
+    put(house, new THREE.Mesh(new THREE.PlaneGeometry(0.98, 0.25), new THREE.MeshBasicMaterial({ map: signTexture, transparent: true, toneMapped: false })), 0, 1.0, front + 0.04);
+    const flag = makeFlag(C.sun, 0.7);
+    flag.position.set(-0.8, 0.08 + wallH + 0.5, 0);
+    house.add(flag);
+    pickable(house, { type: 'ownerHome' });
+    island.obstacles.push({ x: 0, z: hz, w: wallW + 0.3, d: wallD + 0.35 });
+
+    // 信箱：新鮮事都放在這裡，點了就看得到
+    const mailbox = new THREE.Group();
+    mailbox.position.set(1.05, TOP, 0.2);
+    g.add(mailbox);
+    put(mailbox, makeMesh(new THREE.CylinderGeometry(0.035, 0.04, 0.5, 8), mat(C.woodDark)), 0, 0.25, 0);
+    put(mailbox, makeMesh(new THREE.BoxGeometry(0.34, 0.22, 0.24), mat(0xe8466e)), 0, 0.6, 0);
+    put(mailbox, makeMesh(new THREE.BoxGeometry(0.22, 0.03, 0.02), mat(C.white)), 0, 0.62, 0.125);
+    put(mailbox, makeMesh(new THREE.BoxGeometry(0.03, 0.14, 0.09), mat(C.sun)), 0.18, 0.72, 0);
+    pickable(mailbox, { type: 'ownerHome' });
+    island.obstacles.push({ x: 1.05, z: 0.2, r: 0.2 });
+
+    // 門前小廣場
+    const plaza = flatMesh(new THREE.Shape().absarc(0, 0, 0.62, 0, TAU), C.path, TOP + 0.011);
+    plaza.position.set(0, TOP + 0.011, 0.5);
+    g.add(plaza);
+    ownerHome.doorNode = addNode(island, 0, 0.42, 'spot');
+    spur(island, ownerHome.doorNode);
+
+    [-1.75, 1.95].forEach((x) => {
+      addBench(island, x, 0.62, 0, { width: 0.9, seats: 2, kind: 'rest', doing: '在島主之家的長椅上發呆', event: { type: 'sleep', place: '島主之家的長椅' } });
+    });
+    [[-0.75, 0.15], [-1.25, -0.05], [0.72, 0.42], [-0.55, 1.05], [0.5, 1.1]].forEach(([x, z]) => flowerSpot(island, x, z));
+    island.extraTrees = [[-2.5, -0.9], [2.5, -0.95], [-2.75, 1.3], [2.85, 1.35]];
+    island.treeLimit = 4;
+    island.labelY = TOP + 2.55;
+    island.labelZ = hz;
   }
 
   // 錦鯉：每條魚自己挑池子裡的下一個點游過去，有時慢慢晃、有時衝一小段，
@@ -1360,7 +1434,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     [-0.6, 0.1].forEach((k) => {
       const x = px + Math.cos(Math.PI * k) * 1.55;
       const z = pz + Math.sin(Math.PI * k) * 1.55;
-      addBench(island, x, z, Math.atan2(px - x, pz - z), { width: 0.9, seats: 2, kind: 'rest', side: true, doing: '在魚池公園的長椅上休息', event: { type: 'sleep', place: '魚池公園的長椅上' } });
+      addBench(island, x, z, Math.atan2(px - x, pz - z), { width: 0.9, seats: 2, kind: 'rest', side: true, doing: '在魚池公園的長椅上發呆', event: { type: 'sleep', place: '魚池公園的長椅上' } });
     });
     [Math.PI * 0.55, Math.PI, -Math.PI * 0.2].forEach((a) => {
       const x = px + Math.cos(a) * (pr + 0.37);
@@ -1460,6 +1534,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     show.climb = [climb(1.32, 0.27, sz, true), climb(0.55, 0.54, sz - 0.1, true), climb(0, 0.54, sz - 0.1, false)];
     show.descend = [climb(-0.55, 0.54, sz - 0.1, false), climb(-1.32, 0.27, sz, true), climb(-2.25, 0, sz + 0.15, true)];
     show.stand = W(island, 0, TOP + 0.545, sz - 0.1);
+    show.ownerSpot = climb(1.05, 0.27, sz + 0.12, true);
     island.treeFilter = (x, z) => z < sz - 0.2;
     island.treeLimit = 3;
     island.labelY = TOP + 2.95;
@@ -1919,7 +1994,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     else if (island.kind === 'combo') buildCombo(island);
     else if (island.kind === 'learn') buildLearn(island);
     else if (island.kind === 'track') buildTrack(island);
-    else if (island.id === 'park1') buildPark1(island);
+    else if (island.kind === 'owner') buildOwnerHome(island);
     else if (island.id === 'park2') buildPark2(island);
   });
   const platformById = Object.fromEntries(platforms.map((p) => [p.id, p]));
@@ -2186,6 +2261,21 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     teacher.model.root.visible = false;
   }
 
+  // ---------- 島主：玩家自己。選了樣子才會出現在島上 ----------
+  const owner = {
+    index: -3, name: '島主', kind: '', model: null, pp: { ...POSES.upright }, bubbleY: 1.3, size: 1.1, speed: 1.2,
+    pos: new THREE.Vector3(), heading: 0, targetHeading: 0, hop: 0, moving: false,
+    state: 'idle', pose: 'stand', poseT: 0, timer: 0, node: 0, spot: null, purpose: '', doing: '',
+    path: null, pi: 0, pathSpeed: 1.8, onArrive: null, segLen: 0, vy: 0, spinX: 0, spinY: 0, squash: 0,
+    gait: 0, phase: 1.7, blink: 2, look: 0, nodT: 0, tailSide: 1, followed: false,
+    islandId: null, placed: false, sitSpot: null, cushion: null, charge: 0, jump: null, trick: null, race: null, chatting: null, onStage: false,
+  };
+  owner.tagEl = document.createElement('div');
+  owner.tagEl.className = 'cat-tag cat-tag--owner';
+  owner.tagName = document.createElement('span');
+  owner.tagEl.append(owner.tagName);
+  owner.tag = new CSS2DObject(owner.tagEl);
+
   let champions = [];
   function championSlot(cat) {
     const k = champions.indexOf(cat.index);
@@ -2429,7 +2519,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       cat.timer = rand(0.3, 1.2);
       cat.lostHome = cat.pos.clone();
       cat.pose = 'stand';
-      cat.doing = '晃來晃去，不知道要做什麼';
+      cat.doing = '晃來晃去，還沒想好要做什麼';
       markLost(cat, '？');
     }, { purpose: 'lost', doing: `在${island.name}晃來晃去` });
     return true;
@@ -2752,6 +2842,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   // 平常隔一陣子自己比一場；桐桐在這座島上時，等她按「開始比賽」才開跑
   const LAP_SECONDS = 13;
   const isRunner = (cat) => race.runners.includes(cat.index);
+  const runnerOf = (i) => (i === owner.index ? owner : cats[i]);
   const freeToRace = (c) => (c.state === 'idle' || c.state === 'rest') && c.model.root.visible && championSlot(c) === null
     && !(c.spot && ['diary', 'audience', 'study'].includes(c.spot.kind));
 
@@ -2789,6 +2880,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   // 空的跑道找貓補上。桐桐在看的時候找最近的，不然從近一點的貓裡隨機挑，每場才會不一樣
   function fillLanes() {
     const taken = new Set(race.runners.map((i) => cats[i].race.lane));
+    if (race.ownerIn) taken.add(owner.race.lane);
     const open = [];
     for (let lane = 0; lane < TRACK.lanes; lane++) if (!taken.has(lane)) open.push(lane);
     if (!open.length) return;
@@ -2819,6 +2911,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     race.runners.forEach((i) => {
       cats[i].pose = 'wiggle';
     });
+    if (race.ownerIn) owner.pose = 'ready';
     raceBubble('3', 0.95);
     if (hooks.sound) hooks.sound('pop', 'track');
   }
@@ -2836,18 +2929,23 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       cat.race.ph = rand(0, TAU);
       cat.doing = `正在第 ${cat.race.lane + 1} 道比賽`;
     });
+    if (race.ownerIn) owner.state = 'race';
     raceBubble('開跑！', 1.1);
     if (hooks.sound) hooks.sound('whistle', 'track');
   }
 
   function stepRunner(cat, dt) {
     const r = cat.race;
-    const target = r.place === null ? r.pace * (1 + 0.08 * Math.sin(race.t * r.f + r.ph)) : 0;
+    const boost = r.boost || 0;
+    r.boost = damp(boost, 0, 2.2, dt);
+    const target = r.place === null ? r.pace * (1 + 0.08 * Math.sin(race.t * r.f + r.ph)) * (1 + boost) : 0;
     r.v = damp(r.v, target, r.place === null ? 3 : 1.4, dt);
     r.u += r.v * dt;
     if (r.place === null && r.u >= 1) {
       race.finished += 1;
       r.place = race.finished;
+      // 剛好跑完一圈的那一刻（這一格多跑出去的那一點扣回來），排行榜島要用
+      r.time = Math.max(0.1, race.t - (r.u - 1) / Math.max(r.v, 1e-6));
       race.order.push(cat.index);
       say(cat, `第 ${r.place} 名`, 5.5, 'trick-tag');
       if (hooks.sound) hooks.sound(r.place === 1 ? 'record' : 'pop', 'track');
@@ -2860,9 +2958,18 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     if (r.place !== null && r.v < 0.004) {
       cat.state = 'raceDone';
       cat.moving = false;
-      cat.pose = r.place === 1 ? 'proud' : r.place <= 3 ? 'sit' : 'stand';
+      if (cat === owner) cat.pose = r.place === 1 ? 'cheer' : 'stand';
+      else cat.pose = r.place === 1 ? 'proud' : r.place <= 3 ? 'sit' : 'stand';
       cat.doing = `在跑步田徑場跑了第 ${r.place} 名`;
     }
+  }
+
+  function ownerLeaveRace() {
+    race.ownerIn = false;
+    owner.race = null;
+    owner.state = 'idle';
+    owner.pose = 'stand';
+    owner.node = race.gateNode;
   }
 
   function endRace() {
@@ -2873,6 +2980,10 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       idle(cat, 0.5, 3, 'stand');
       cat.doing = '剛比完賽，在跑道上喘口氣';
     });
+    if (race.ownerIn) {
+      ownerLeaveRace();
+      owner.islandId = 'track';
+    }
     race.runners = [];
     race.phase = 'idle';
     race.t = 0;
@@ -2880,9 +2991,10 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   }
 
   function raceStanding() {
-    return race.runners.slice().sort((a, b) => {
-      const ra = cats[a].race;
-      const rb = cats[b].race;
+    const entrants = race.ownerIn ? [...race.runners, owner.index] : race.runners.slice();
+    return entrants.sort((a, b) => {
+      const ra = runnerOf(a).race;
+      const rb = runnerOf(b).race;
       return (ra.place ?? 99) - (rb.place ?? 99) || rb.u - ra.u;
     });
   }
@@ -2906,9 +3018,11 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
         fillLanes();
       }
       const here = race.runners.filter((i) => cats[i].state === 'raceWait');
-      // 等太久的貓就不等了（還在路上的走到就自己解散），至少三隻才比
-      const full = here.length === TRACK.lanes;
-      if (full || (race.t > 35 && here.length >= 3)) {
+      const ownerHere = race.ownerIn && owner.state === 'raceWait';
+      const count = here.length + (ownerHere ? 1 : 0);
+      // 等太久的貓就不等了（還在路上的走到就自己解散），至少三位才比；島主一定要等
+      const full = count === TRACK.lanes;
+      if (full || (race.t > 35 && count >= 3 && (!race.ownerIn || ownerHere))) {
         race.runners = here;
         race.phase = 'ready';
         race.t = 0;
@@ -2927,10 +3041,10 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
         }
       }
     } else if (race.phase === 'running') {
-      if (race.runners.every((i) => cats[i].state === 'raceDone')) {
+      if (race.runners.every((i) => cats[i].state === 'raceDone') && (!race.ownerIn || owner.state === 'raceDone')) {
         race.phase = 'finish';
         race.t = 0;
-        if (hooks.raceEnd) hooks.raceEnd(race.order.slice());
+        if (hooks.raceEnd) hooks.raceEnd(race.order.slice(), race.order.map((i) => runnerOf(i).race.time));
       }
     } else if (race.phase === 'finish' && race.t > 5) {
       endRace();
@@ -2994,6 +3108,456 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       idle(cat, 1, 4, 'stand');
       cat.doing = '跑完了，在草場上喘口氣';
     });
+  }
+
+  // ---------- 島主：換樣子 ----------
+  const OWNER_CAT_POSE = { stand: 'upright', walk: 'uprightWalk', run: 'run', sit: 'sit', cheer: 'cheer', wave: 'wave', pet: 'point', crouch: 'crouch', jump: 'air', sing: 'sing', ready: 'wiggle' };
+
+  function setOwnerLook(kind) {
+    if (owner.kind === kind) return;
+    const old = owner.model;
+    if (old) {
+      old.root.remove(owner.tag);
+      scene.remove(old.root);
+      const list = old.pickables || old.meshes;
+      for (let i = pickables.length - 1; i >= 0; i--) if (list.includes(pickables[i])) pickables.splice(i, 1);
+      if (old.meshes) disposeModel(old);
+    }
+    owner.kind = kind;
+    owner.model = null;
+    if (!kind) return;
+    let model;
+    if (kind === 'cat') {
+      model = buildCatModel({ index: owner.index, name: '島主', coat: { label: '島主', body: '#F2A35A', stripe: '#DD7F33', muzzle: '#FFE6C9' }, size: 1.18, chubby: 1, speed: 1.2 });
+      addCape(model);
+      model.crown.visible = true;
+      model.isCat = true;
+      owner.bubbleY = 1.2;
+      owner.tag.position.set(0, 0.98, 0);
+    } else {
+      model = buildHuman(kind);
+      owner.bubbleY = model.height + 0.3;
+      owner.tag.position.set(0, model.height / model.root.scale.x + 0.16, 0);
+    }
+    (model.pickables || model.meshes).forEach((mesh) => {
+      mesh.userData.pick = { type: 'owner' };
+      pickables.push(mesh);
+    });
+    model.root.add(owner.tag);
+    scene.add(model.root);
+    owner.model = model;
+    if (!owner.placed) {
+      owner.placed = true;
+      owner.node = ownerHome.doorNode;
+      owner.pos.copy(nodes[owner.node].v);
+      owner.islandId = 'park1';
+      owner.heading = 0;
+      owner.targetHeading = 0;
+    }
+  }
+
+  function setOwnerName(name) {
+    owner.name = name;
+    owner.tagName.textContent = `島主 ${name}`;
+  }
+
+  // ---------- 島主：走路 ----------
+  const OWNER_WALK = 1.8;
+  const OWNER_RUN = 3.4;
+  const ownerBusy = () => !owner.model || owner.state === 'air' || owner.state === 'charge' || (!!race.ownerIn && race.phase !== 'finish');
+
+  // 放下手上的事：從椅子起來、下舞臺、離開軟墊
+  function ownerStop() {
+    if (race.ownerIn && race.phase === 'finish') ownerLeaveRace();
+    if (owner.sitSpot) owner.sitSpot.ownerHere = false;
+    owner.sitSpot = null;
+    owner.cushion = null;
+    owner.onStage = false;
+    owner.trick = null;
+    owner.spinX = 0;
+    owner.spinY = 0;
+    owner.hop = 0;
+    owner.poseT = 0;
+  }
+
+  function ownerArrived(then) {
+    owner.state = 'idle';
+    owner.moving = false;
+    owner.pose = 'stand';
+    if (then) then();
+  }
+
+  function ownerGo(node, speed, then) {
+    go(owner, node, () => ownerArrived(then), { speed, purpose: 'owner' });
+  }
+
+  function ownerPath(pts, speed, then) {
+    owner.state = 'walk';
+    setPath(owner, pts, speed, () => ownerArrived(then));
+  }
+
+  // 走到島上的某一點：同一座島而且中間沒擋到就直接走，不然沿著路走
+  function ownerWalkTo(point, islandId, then) {
+    const island = islandById[islandId];
+    if (!island || ownerBusy()) return false;
+    const lx = point.x - island.cx;
+    const lz = point.z - island.cz;
+    if (!insidePoly(island.local, lx, lz)) return false;
+    ownerStop();
+    const ring = nearestRing(island, lx, lz);
+    const open = edgeDist(island.local, lx, lz) > 0.25 && !blocked(island, lx, lz, 0.15);
+    const dest = open ? W(island, lx, TOP + 0.005, lz) : null;
+    const done = () => {
+      owner.islandId = island.id;
+      if (then) then();
+    };
+    const fromX = owner.pos.x - island.cx;
+    const fromZ = owner.pos.z - island.cz;
+    const onGround = Math.abs(owner.pos.y - (TOP + 0.005)) < 0.05;
+    if (dest && owner.islandId === island.id && onGround && segmentClear(island, fromX, fromZ, lx, lz, 0.12)) {
+      owner.node = ring;
+      ownerPath([dest], OWNER_WALK, done);
+      return true;
+    }
+    const speed = owner.pos.distanceTo(nodes[ring].v) > 7 ? OWNER_RUN : OWNER_WALK;
+    ownerGo(ring, speed, () => {
+      owner.islandId = island.id;
+      if (dest) ownerPath([dest], OWNER_WALK, done);
+      else done();
+    });
+    return true;
+  }
+
+  // 每座島島主落腳的地方
+  function ownerEntry(island) {
+    if (island.kind === 'owner') return ownerHome.doorNode;
+    if (island.kind === 'jump') return platformById[island.id].exitNode;
+    if (island.kind === 'stage') return show.waitNode;
+    if (island.kind === 'track') return race.gateNode;
+    return island.ringNodes.slice().sort((a, b) => nodes[b].z - nodes[a].z)[0];
+  }
+
+  // 按導覽列去別的島：近的跑過去，遠的「咻」一下就到
+  function ownerGoIsland(id) {
+    const island = islandById[id];
+    if (!island || ownerBusy() || owner.islandId === id) return false;
+    ownerStop();
+    const entry = ownerEntry(island);
+    owner.islandId = id;
+    // 到了就轉過來面向鏡頭，看得到島主的臉
+    const faceFront = () => { owner.targetHeading = 0; };
+    if (owner.pos.distanceTo(nodes[entry].v) < 9) {
+      ownerGo(entry, OWNER_RUN, faceFront);
+      return true;
+    }
+    owner.path = null;
+    owner.onArrive = null;
+    owner.pos.copy(nodes[entry].v);
+    owner.node = entry;
+    ownerArrived(faceFront);
+    say(owner, '咻！', 1, 'trick-tag');
+    return true;
+  }
+
+  // ---------- 島主：跟貓聊天。閒著的貓會停下來看著島主 ----------
+  function holdCat(cat) {
+    if (!['idle', 'rest', 'walk'].includes(cat.state)) return false;
+    cat.held = { state: cat.state, pose: cat.pose };
+    if (cat.pose === 'sleep') clearSleep(cat);
+    cat.state = 'chat';
+    cat.moving = false;
+    cat.pose = cat.spot ? 'sit' : 'stand';
+    return true;
+  }
+
+  function chatEnd() {
+    const index = owner.chatting;
+    owner.chatting = null;
+    if (index === null) return;
+    const cat = cats[index];
+    if (cat.state !== 'chat' || !cat.held) return;
+    cat.state = cat.held.state;
+    cat.pose = cat.held.pose;
+    if (cat.pose === 'sleep') showSleep(cat);
+    cat.held = null;
+  }
+
+  function faceEachOther(cat) {
+    owner.targetHeading = Math.atan2(cat.pos.x - owner.pos.x, cat.pos.z - owner.pos.z);
+    if (!cat.spot && cat.state === 'chat') cat.targetHeading = Math.atan2(owner.pos.x - cat.pos.x, owner.pos.z - cat.pos.z);
+  }
+  function chatStart(index) {
+    const cat = cats[index];
+    if (!cat) return { busy: true };
+    chatEnd();
+    const held = holdCat(cat);
+    owner.chatting = index;
+    if (held && owner.model && !ownerBusy()) {
+      const dx = owner.pos.x - cat.pos.x;
+      const dz = owner.pos.z - cat.pos.z;
+      const d = Math.hypot(dx, dz);
+      // 已經在旁邊就不用走
+      if (d > 1.05) {
+        const islandId = nodes[cat.node] ? nodes[cat.node].island : null;
+        const point = new THREE.Vector3(cat.pos.x + (dx / (d || 1)) * 0.72, TOP, cat.pos.z + (dz / (d || 1)) * 0.72);
+        if (islandId) ownerWalkTo(point, islandId, () => faceEachOther(cat));
+      } else {
+        // 走到一半遇到這隻貓就停下來，不然聊到一半島主會走掉
+        if (owner.path) {
+          owner.path = null;
+          owner.onArrive = null;
+          if (nodes[cat.node]) owner.islandId = nodes[cat.node].island;
+          ownerArrived();
+        }
+        faceEachOther(cat);
+      }
+      // 坐在長椅、窩在紙箱裡的貓不轉身，站著的才轉過來
+      if (!cat.spot) cat.targetHeading = Math.atan2(dx, dz);
+    }
+    return { busy: !held };
+  }
+
+  function chatPet() {
+    const index = owner.chatting;
+    if (index === null) return;
+    say(cats[index], '♥', 1.5, 'heart');
+    meow(index);
+    if (owner.model && owner.state === 'idle') {
+      owner.pose = 'pet';
+      owner.poseT = 1.1;
+    }
+  }
+
+  // ---------- 島主：坐下來 ----------
+  const SIT_KINDS = ['rest', 'watch', 'audience'];
+  const seatsOn = (id) => spots.filter((s) => s.island === id && SIT_KINDS.includes(s.kind) && s.occupant === null && !s.ownerHere);
+
+  function ownerSit(id) {
+    if (ownerBusy()) return false;
+    const list = seatsOn(id).sort((a, b) => a.pos.distanceTo(owner.pos) - b.pos.distanceTo(owner.pos));
+    if (!list.length) return false;
+    ownerStop();
+    const seat = list[0];
+    seat.ownerHere = true;
+    owner.sitSpot = seat;
+    ownerGo(seat.node, OWNER_WALK, () => {
+      owner.islandId = id;
+      owner.state = 'walk';
+      hopInto(owner, seat, () => {
+        owner.state = 'idle';
+        owner.pose = 'sit';
+        owner.spot = null;
+        owner.targetHeading = seat.face;
+      });
+    });
+    return true;
+  }
+
+  // ---------- 島主：上表演區舞臺，按動作時跟著一起做 ----------
+  function ownerStage(on) {
+    if (!show.island || ownerBusy()) return false;
+    ownerStop();
+    if (!on) {
+      ownerGo(show.waitNode, OWNER_WALK);
+      return true;
+    }
+    owner.islandId = 'stage';
+    ownerGo(show.waitNode, OWNER_RUN, () => {
+      ownerPath([clonePt(show.ownerSpot)], 1.1, () => {
+        owner.onStage = true;
+        owner.targetHeading = 0;
+      });
+    });
+    return true;
+  }
+
+  function ownerTrick(name) {
+    if (!owner.model || !owner.onStage || owner.state !== 'idle' || !TRICKS[name]) return false;
+    owner.trick = { name, t: 0, dur: TRICKS[name].dur };
+    if (name === 'sing') say(owner, '♪ ♫ ♪', 2.6, 'notes');
+    return true;
+  }
+
+  function stepOwnerTrick(dt) {
+    const tr = owner.trick;
+    tr.t += dt;
+    const k = Math.min(1, tr.t / tr.dur);
+    if (tr.name === 'spin') {
+      owner.pose = 'stand';
+      owner.spinY = easeInOut(k) * TAU;
+    } else if (tr.name === 'wave') {
+      owner.pose = 'wave';
+    } else if (tr.name === 'flip') {
+      owner.pose = k < 0.85 ? 'jump' : 'stand';
+      owner.hop = Math.sin(Math.PI * k) * 0.6;
+      owner.spinX = easeInOut(k) * TAU;
+    } else {
+      owner.pose = 'sing';
+    }
+    if (tr.t < tr.dur) return;
+    owner.trick = null;
+    owner.spinX = 0;
+    owner.spinY = 0;
+    owner.hop = 0;
+    owner.pose = 'stand';
+  }
+
+  function ownerCheer() {
+    if (!owner.model || owner.state !== 'idle' || owner.trick) return;
+    owner.pose = 'cheer';
+    owner.poseT = 1.4;
+  }
+
+  // ---------- 島主：站上跳臺的軟墊自己跳，能量條和貓一樣 ----------
+  function ownerCushion(on, id) {
+    const p = platformById[id];
+    if (!p || ownerBusy()) return false;
+    ownerStop();
+    if (!on) {
+      ownerGo(p.exitNode, OWNER_WALK);
+      return true;
+    }
+    owner.islandId = id;
+    ownerGo(p.exitNode, OWNER_RUN, () => {
+      const top = p.landTop.clone();
+      top.hop = true;
+      ownerPath([top], 1.1, () => {
+        owner.cushion = p;
+        owner.state = 'cushion';
+        owner.targetHeading = -Math.PI / 2;
+      });
+    });
+    return true;
+  }
+
+  function ownerJumpView() {
+    const p = owner.cushion;
+    return {
+      ready: !!p && owner.state === 'cushion',
+      charging: !!p && owner.state === 'charge',
+      meter: p && owner.state === 'charge' ? meterAt(p.level, owner.charge) : 0,
+    };
+  }
+
+  function ownerJumpPress() {
+    if (!owner.cushion || owner.state !== 'cushion') return false;
+    owner.state = 'charge';
+    owner.charge = 0;
+    owner.pose = 'crouch';
+    return true;
+  }
+
+  function ownerJumpRelease() {
+    const p = owner.cushion;
+    if (!p || owner.state !== 'charge') return null;
+    const power = meterAt(p.level, owner.charge);
+    const peak = peakHeight(p.level, power, 1, random());
+    const vy = Math.sqrt(2 * GRAVITY * Math.max(0.2, peak - p.cushionTop));
+    owner.jump = { t: 0, T: (2 * vy) / GRAVITY, vy, y: p.landTop.y, cm: toCm(peak), perfect: power >= PERFECT, peaked: false };
+    owner.state = 'air';
+    owner.pose = 'jump';
+    p.squash = 1;
+    if (hooks.sound) hooks.sound('boing', p.id);
+    return { power };
+  }
+
+  function stepOwnerAir(dt) {
+    const j = owner.jump;
+    const p = owner.cushion;
+    j.t += dt;
+    owner.pos.y = j.y + j.vy * j.t - (GRAVITY * j.t * j.t) / 2;
+    owner.spinX = j.perfect ? easeInOut(Math.min(1, j.t / j.T)) * TAU : 0;
+    if (!j.peaked && j.t >= j.T / 2) {
+      j.peaked = true;
+      say(owner, `${j.cm} 公分${j.perfect ? '，完美跳！' : ''}`, 1.8, 'trick-tag');
+    }
+    if (j.t < j.T) return;
+    owner.pos.y = j.y;
+    owner.spinX = 0;
+    owner.state = 'cushion';
+    owner.pose = 'stand';
+    p.squash = 1;
+    if (hooks.sound) hooks.sound('land', p.id);
+    if (hooks.ownerJump) hooks.ownerJump({ level: p.level, cm: j.cm, perfect: j.perfect });
+    owner.jump = null;
+  }
+
+  // ---------- 島主：下場跑步。最外面那條跑道讓給島主；開跑後連按加速 ----------
+  function raceJoin() {
+    if (!owner.model || race.ownerIn || owner.state === 'air' || owner.state === 'charge' || !['gather', 'ready'].includes(race.phase)) return false;
+    ownerStop();
+    const lane = TRACK.lanes - 1;
+    const taken = race.runners.find((i) => cats[i].race.lane === lane);
+    if (taken !== undefined) {
+      const cat = cats[taken];
+      race.runners = race.runners.filter((i) => i !== taken);
+      if (cat.state === 'raceWait') {
+        cat.race = null;
+        idle(cat, 0.5, 2, 'stand');
+      }
+    }
+    race.ownerIn = true;
+    owner.race = { lane, u: 0, v: 0, pace: 0.97 / LAP_SECONDS, place: null, f: 0.9, ph: 1, boost: 0 };
+    race.phase = 'gather';
+    race.t = 0;
+    race.fill = 0;
+    owner.islandId = 'track';
+    const start = trackPoint(laneRadius(lane), 0);
+    const spot = W(race.island, TRACK.center.x + start.x - 0.24, TOP + 0.02, TRACK.center.z + start.z);
+    ownerGo(race.gateNode, OWNER_RUN, () => {
+      ownerPath([spot], OWNER_WALK, () => {
+        owner.state = 'raceWait';
+        owner.pose = 'ready';
+        owner.targetHeading = Math.PI / 2;
+      });
+    });
+    return true;
+  }
+
+  function raceBoost() {
+    if (owner.state !== 'race' || !owner.race || owner.race.place !== null) return false;
+    owner.race.boost = Math.min(0.55, (owner.race.boost || 0) + 0.13);
+    return true;
+  }
+
+  // ---------- 島主：每一幀 ----------
+  function updateOwner(dt, t) {
+    const m = owner.model;
+    if (!m) return;
+    if (owner.state === 'walk') {
+      followPath(owner, dt);
+      if (owner.state === 'walk') owner.pose = owner.moving ? (owner.pathSpeed > 2.2 ? 'run' : 'walk') : 'stand';
+    } else if (owner.state === 'race') {
+      stepRunner(owner, dt);
+    } else if (owner.state === 'charge') {
+      owner.charge += dt;
+      owner.pose = 'crouch';
+    } else if (owner.state === 'air') {
+      stepOwnerAir(dt);
+    }
+    if (owner.trick) stepOwnerTrick(dt);
+    if (owner.poseT > 0) {
+      owner.poseT -= dt;
+      if (owner.poseT <= 0 && owner.state === 'idle' && !owner.trick) owner.pose = owner.sitSpot ? 'sit' : 'stand';
+    }
+    // 聊天的時候貓和島主看著對方
+    if (owner.chatting !== null) {
+      const cat = cats[owner.chatting];
+      if (cat.state === 'chat') cat.targetHeading = Math.atan2(owner.pos.x - cat.pos.x, owner.pos.z - cat.pos.z);
+      if (owner.state === 'idle' && !owner.sitSpot) owner.targetHeading = Math.atan2(cat.pos.x - owner.pos.x, cat.pos.z - owner.pos.z);
+    }
+    if (m.isCat) {
+      const pose = owner.pose;
+      owner.pose = OWNER_CAT_POSE[pose] || 'upright';
+      applyPose(owner, dt, t);
+      owner.pose = pose;
+    } else {
+      animateHuman(m, owner.pose, owner.moving, dt, t);
+      owner.heading = dampAngle(owner.heading, owner.targetHeading, 10, dt);
+      m.root.position.set(owner.pos.x, owner.pos.y + owner.hop, owner.pos.z);
+      m.root.rotation.y = owner.heading + owner.spinY;
+      m.spin.rotation.x = owner.spinX;
+    }
   }
 
   // ---------- 學習數學島：桐桐在改作業時，課桌前至少坐 4 隻貓；老師輪流看黑板、看大家 ----------
@@ -3125,7 +3689,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   };
 
   function goSpot(cat, kind, filter = () => true, speed = cat.speed) {
-    const free = spots.filter((s) => s.kind === kind && s.occupant === null && filter(s));
+    const free = spots.filter((s) => s.kind === kind && s.occupant === null && !s.ownerHere && filter(s));
     if (!free.length) return false;
     const spot = pickOne(free);
     spot.occupant = cat.index;
@@ -3756,6 +4320,11 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       const distance = Math.max(3.9 / Math.tan(halfH), 2.3 / Math.tan(halfVv)) * 1.05;
       offset = new THREE.Vector3(0.06, 0.72, 1).normalize().multiplyScalar(distance);
       target = W(island, 0.1, TOP + 0.75, -0.35);
+    } else if (island.kind === 'owner') {
+      // 從門前看整棟房子和廣場
+      const distance = Math.max(4.1 / Math.tan(halfH), 2.9 / Math.tan(halfVv)) * 1.05;
+      offset = new THREE.Vector3(0.1, 0.62, 1).normalize().multiplyScalar(distance);
+      target = W(island, 0, TOP + 0.45, 0);
     } else if (island.kind === 'track') {
       // 從起跑線這一側看整條跑道
       const distance = Math.max(10.5 / Math.tan(halfH), 6.6 / Math.tan(halfVv)) * 1.05;
@@ -3780,8 +4349,8 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
 
   // index 是貓的編號，或 'coach' 跟著教練
   function follow(index, insets = {}) {
-    const cat = index === 'coach' ? coach : cats[index];
-    if (!cat) return false;
+    const cat = index === 'coach' ? coach : index === 'owner' ? owner : cats[index];
+    if (!cat || !cat.model) return false;
     clearFollow();
     platforms.forEach((p) => setUser(p, false));
     show.user = false;
@@ -3792,7 +4361,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     followed = cat;
     marker.visible = true;
     mode = 'follow';
-    const offset = new THREE.Vector3(0, 3.6, 5.2);
+    const offset = cat === owner ? new THREE.Vector3(0, 5.6, 8) : new THREE.Vector3(0, 3.6, 5.2);
     const shift = framedShift(offset, insets);
     const target = cat.pos.clone().add(shift);
     startFlight(target.clone().add(offset), target, FLY_MS, { offset, shift });
@@ -3815,7 +4384,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     raycaster.setFromCamera(pointer, camera);
     const hit = raycaster.intersectObjects(pickables, false).find((h) => h.object.visible && (h.object.userData.pick.type !== 'cat' || cats[h.object.userData.pick.index].model.root.visible));
     // 直接點到貓、教練、老師、黑板或講台就算數；黑板、講台不用讓給旁邊的貓
-    if (hit && ['cat', 'coach', 'teacher', 'board', 'podium'].includes(hit.object.userData.pick.type)) {
+    if (hit && ['cat', 'coach', 'teacher', 'owner', 'ownerHome', 'board', 'podium'].includes(hit.object.userData.pick.type)) {
       pickHandlers.forEach((cb) => cb(hit.object.userData.pick));
       return;
     }
@@ -3824,7 +4393,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     const py = event.clientY - rect.top;
     let near = null;
     let nearest = 36;
-    for (const cat of cats.concat([coach, teacher])) {
+    for (const cat of cats.concat([coach, teacher], owner.model ? [owner] : [])) {
       if (!cat.model.root.visible || camera.position.distanceTo(cat.pos) > 26) continue;
       screenPoint.set(cat.pos.x, cat.pos.y + cat.hop + 0.25 * cat.size, cat.pos.z).project(camera);
       if (screenPoint.z > 1) continue;
@@ -3834,7 +4403,9 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
         near = cat;
       }
     }
-    const pick = near ? (near === coach ? { type: 'coach' } : near === teacher ? { type: 'teacher' } : { type: 'cat', index: near.index }) : hit && hit.object.userData.pick;
+    let pick = near ? (near === coach ? { type: 'coach' } : near === teacher ? { type: 'teacher' } : near === owner ? { type: 'owner' } : { type: 'cat', index: near.index }) : hit && hit.object.userData.pick;
+    // 點到島的地面：連點到的位置一起給，島主才知道要走去哪裡
+    if (pick && pick.type === 'island' && hit) pick = { ...pick, point: hit.point.clone() };
     if (pick) pickHandlers.forEach((cb) => cb(pick));
   }
   const screenPoint = new THREE.Vector3();
@@ -3852,6 +4423,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     stepDiary(dt);
     stepLearn(dt);
     stepRace(dt);
+    stepBoard(dt);
     for (const cat of cats) {
       updateCat(cat, dt);
       applyPose(cat, dt, t);
@@ -3860,6 +4432,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     applyPose(coach, dt, t);
     updateTeacher(dt);
     applyPose(teacher, dt, t);
+    updateOwner(dt, t);
     // 整隻躲起來的貓，紙箱偶爾會晃一晃
     boxSpots.forEach((spot) => {
       const cat = spot.occupant !== null ? cats[spot.occupant] : null;
@@ -3902,6 +4475,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       cat.tag.visible = cat.model.root.visible && (cat.followed || onStage || performing || racing || camera.position.distanceTo(cat.pos) < TAG_DISTANCE);
       if (cat.zzz) cat.zzz.visible = cat.tag.visible;
     }
+    owner.tag.visible = !!owner.model;
     coach.tag.visible = coach.followed || camera.position.distanceTo(coach.pos) < TAG_DISTANCE * 1.4;
     teacher.tag.visible = teacher.model.root.visible && camera.position.distanceTo(teacher.pos) < TAG_DISTANCE * 1.4;
     for (let i = transient.length - 1; i >= 0; i--) {
@@ -4024,6 +4598,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
 
   function islandOf(cat) {
     if (['queue', 'ready', 'crouch', 'air', 'land'].includes(cat.state) || cat.purpose === 'climb' || cat.purpose === 'exit') return cat.platform;
+    if (cat.state === 'chat') return nodes[cat.node] ? nodes[cat.node].island : null;
     if (cat.state === 'perform' || cat.purpose === 'climbStage' || cat.purpose === 'exitStage') return 'stage';
     if (['raceWait', 'race', 'raceDone'].includes(cat.state) || cat.purpose === 'raceLine') return 'track';
     if (cat.state === 'walk') return null;
@@ -4083,8 +4658,10 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       count: race.count,
       total: race.runners.length,
       lanes: TRACK.lanes,
-      arrived: race.runners.filter((i) => cats[i].state === 'raceWait').length,
+      arrived: race.runners.filter((i) => cats[i].state === 'raceWait').length + (race.ownerIn && owner.state === 'raceWait' ? 1 : 0),
       standing: raceStanding(),
+      ownerIn: race.ownerIn === true,
+      ownerIndex: owner.index,
     };
   }
 
@@ -4148,7 +4725,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
 
   // app 給的成績摘要：冠軍（前三名的貓）、每座跳臺最高紀錄、看板前五名
   let boardReady = false;
-  function updateBoard({ champions: list = [], best = {}, top = [] }) {
+  function updateBoard({ champions: list = [], best = {}, top = [], raceTop = [] }) {
     champions = list.slice(0, 3);
     const instant = !boardReady;
     boardReady = true;
@@ -4178,8 +4755,23 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       }
     });
     boardRows = top;
+    raceRows = raceTop;
+    repaintRankBoard();
+  }
+
+  function repaintRankBoard() {
     const rank = islands.find((island) => island.kind === 'rank');
     if (rank && rank.boardTexture) rank.boardTexture.userData.repaint();
+  }
+
+  // 排行榜島的看板：有跑步成績才換著秀，每 8 秒換一次
+  function stepBoard(dt) {
+    if (!raceRows.length) return;
+    boardFlip -= dt;
+    if (boardFlip > 0) return;
+    boardFlip = 8;
+    boardMode = boardMode === 'jump' ? 'race' : 'jump';
+    repaintRankBoard();
   }
 
   function dispose() {
@@ -4207,6 +4799,24 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     stageClap,
     raceView,
     raceStart,
+    raceJoin,
+    raceBoost,
+    setOwnerLook,
+    setOwnerName,
+    ownerWalkTo,
+    ownerGoIsland,
+    ownerSit,
+    ownerCanSit: (id) => !!owner.model && seatsOn(id).length > 0,
+    ownerStage,
+    ownerTrick,
+    ownerCheer,
+    ownerCushion,
+    ownerJumpView,
+    ownerJumpPress,
+    ownerJumpRelease,
+    chatStart,
+    chatEnd,
+    chatPet,
     peekBox,
     writers,
     coachInfo,
