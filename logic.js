@@ -277,8 +277,8 @@ const ENDINGS = {
   other: ['今天好好玩。', '明天見！', '喵～'],
 };
 
-// pick 是 0～1 的亂數（測試時可以固定），用來選結尾那一句
-export function composeDiary(cat, events, pick = 0.5) {
+// pick 是 0～1 的亂數（測試時可以固定），用來選結尾那一句；who 是玩家的名字，貓會寫進日記
+export function composeDiary(cat, events, pick = 0.5, who = '桐桐') {
   const lines = [];
   const seen = new Set();
   const jumps = events.filter((e) => e.type === 'jump');
@@ -286,7 +286,7 @@ export function composeDiary(cat, events, pick = 0.5) {
     const best = jumps.reduce((a, b) => (b.cm > a.cm ? b : a));
     lines.push(`今天我在${levelName(best.level)}跳了 ${best.cm} 公分${best.perfect ? '，還在空中翻了一個跟斗' : ''}！`);
     if (best.record) lines.push('是新紀錄喔！');
-    if (jumps.some((j) => j.tong)) lines.push('有一次是桐桐幫我按的，好開心。');
+    if (jumps.some((j) => j.tong)) lines.push(`有一次是${who}幫我按的，好開心。`);
     else if (jumps.length >= 3) lines.push(`我一共跳了 ${jumps.length} 次。`);
     seen.add('jump');
   }
@@ -305,7 +305,7 @@ export function composeDiary(cat, events, pick = 0.5) {
     else if (e.type === 'podium') line = `我站上頒獎臺，是第 ${e.rank} 名${e.rank === 1 ? '，還戴了皇冠' : ''}！`;
     else if (e.type === 'watchJump') line = `我在${levelName(e.level)}看大家跳高。`;
     else if (e.type === 'study') line = '我在學習數學島寫作業。';
-    else if (e.type === 'homework') line = e.right ? '桐桐老師改了我的數學作業，我寫對了！' : '我的數學作業寫錯了，下次要更仔細。';
+    else if (e.type === 'homework') line = e.right ? `${who}老師改了我的數學作業，我寫對了！` : '我的數學作業寫錯了，下次要更仔細。';
     if (!line) continue;
     seen.add(e.type);
     lines.push(line);

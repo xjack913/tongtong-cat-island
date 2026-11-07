@@ -7,6 +7,9 @@ import { MATH_UNITS, dayKey, dailyClass, dailyHomework, sanitizeLearnDay, saniti
 import { LESSONS } from './lessons.js';
 import { drawFigure } from './figures.js';
 import { zhuyin, plainText } from './zhuyin.js';
+import {
+  BADGES, BADGE_GROUPS, ISLAND_IDS, NAME_MAX, sanitizeProfile, cleanName, playerName, stampChar, statValue, bump, addSeen, markDay, award, earnedDayText,
+} from './profile.js';
 import { createScene } from './scene.js';
 
 const STORE_KEY = 'tong-cat-island-v1';
@@ -244,9 +247,8 @@ function start(hotData = {}) {
   let followingCoach = false;
   let learnOpen = false;
 
-  // 學習數學島：今天的作業改到哪裡、桐桐老師一共改了幾張、一次就改對幾張
+  // 學習數學島：今天的作業改到哪裡
   let learnDay = sanitizeLearnDay(stored.learn && stored.learn.day, dayKey());
-  const learnStats = sanitizeLearnStats(stored.learn);
 
   // 貓貓日記：舊到新排；第一次打開新版的島時先放三篇介紹新島的日記
   let diaries = sanitizeDiaries(hotData.diaries || stored.diaries, cats.length);
@@ -262,13 +264,25 @@ function start(hotData = {}) {
   let newAfter = diarySeq;
   let unread = 0;
 
-  window.claude?.hot?.snapshot?.(() => ({ records, diaries }));
+  // 島民卡：名字、累積的數字、徽章。舊存檔第一次升級時，用還留著的成績、改作業張數、掌印當起點
+  const hadProfile = !!(hotData.profile || stored.profile);
+  const profile = sanitizeProfile(hotData.profile || stored.profile, cats.length, {
+    jumps: records.filter((r) => r.tong).length,
+    ...sanitizeLearnStats(stored.learn),
+    stamps: diaries.reduce((sum, d) => sum + d.paws, 0),
+  });
+  // 升級前就達標的徽章直接給，不用一次跳一大串提示
+  if (!hadProfile) award(profile, dayKey());
+  const newDay = markDay(profile, dayKey());
+  const who = () => playerName(profile);
+
+  window.claude?.hot?.snapshot?.(() => ({ records, diaries, profile }));
 
   // 第一次來的人先看島的故事，看過就不再跳出來
   let storySeen = !!stored.storySeen;
 
   function save() {
-    writeStore({ records, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay, ...learnStats } });
+    writeStore({ records, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay }, profile });
   }
 
   // 成績太多時只留每隻貓在每座跳臺的最佳，加上最近 1000 跳
@@ -320,12 +334,192 @@ function start(hotData = {}) {
       showResult(`${name}跳了 ${info.cm} 公分${info.perfect ? '，完美跳！' : '！'}`, note);
       if (judge.island || judge.platform) sound.play('record');
     }
-    if (judge.island && !judge.first && records.length > 3) {
+    const islandRecord = judge.island && !judge.first && records.length > 3;
+    if (islandRecord) {
       showToast('全島新紀錄！', `${name}在${level.name}跳了 ${info.cm} 公分`);
       if (!info.tong && info.platform === focus) sound.play('record');
     }
+    if (info.tong) {
+      bump(profile, 'jumps');
+      if (info.perfect) bump(profile, 'perfect');
+      if (info.perfect && info.level === 'high') bump(profile, 'perfectHigh');
+      if (islandRecord) bump(profile, 'records');
+      profile.bestCm = Math.max(profile.bestCm, info.cm);
+      tallied();
+    }
     return judge;
   }
+
+  // ---------- 島民卡：累積數字變了就看有沒有新徽章，存起來 ----------
+  const badgeQueue = [];
+  let badgeTimer = 0;
+  let newBadges = 0;
+
+  function tallied() {
+    // 頁面開著過了半夜，下一次動作就算新的一天
+    markDay(profile, dayKey());
+    const fresh = award(profile, dayKey());
+    save();
+    if (fresh.length) announceBadges(fresh);
+    if (!$('profile-card').hidden) renderProfile();
+  }
+
+  function tally(key) {
+    bump(profile, key);
+    tallied();
+  }
+
+  function see(key, value) {
+    if (addSeen(profile, key, value)) tallied();
+  }
+
+  function announceBadges(list) {
+    badgeQueue.push(...list);
+    if ($('profile-card').hidden) newBadges += list.length;
+    updateProfileBadge();
+    nextBadge();
+  }
+
+  // 一次一個，正在顯示別的提示（例如全島新紀錄）就等它結束
+  function nextBadge() {
+    if (badgeTimer || !badgeQueue.length) return;
+    const wait = (ms) => {
+      badgeTimer = setTimeout(() => {
+        badgeTimer = 0;
+        nextBadge();
+      }, ms);
+    };
+    if (!$('toast').hidden) {
+      wait(500);
+      return;
+    }
+    const badge = badgeQueue.shift();
+    showToast(`拿到徽章：${badge.title}`, badge.text);
+    // 還沒點過畫面就不出聲，不然聲音會排到第一次點擊才一起響
+    if (!navigator.userActivation || navigator.userActivation.hasBeenActive) sound.play('record');
+    wait(3600);
+  }
+
+  function updateProfileBadge() {
+    const badge = $('profile-badge');
+    badge.hidden = newBadges === 0;
+    badge.textContent = String(newBadges);
+    badge.setAttribute('aria-label', `${newBadges} 個新徽章`);
+  }
+
+  // 名字會出現在哪裡都由這裡換：工具列、招牌下面、改作業的標題、排行榜的說明
+  function applyName() {
+    $('profile-label').textContent = profile.name || '島民卡';
+    $('plate-sub').textContent = profile.name ? `島民：${profile.name}` : '50 隻貓貓的跳高比賽';
+    $('learn-title').textContent = `${who()}老師改作業`;
+    $('rank-note').textContent = `每隻貓只算牠跳最高的那一次。名字旁邊蓋了「${stampChar(profile)}」字章的，是${who()}幫忙按的。`;
+    $('help-who').textContent = profile.name ? `島民${profile.name}` : '島主桐桐';
+  }
+
+  let profileEditing = false;
+  // 預留文字的字也要選對讀音（量詞「個」）
+  $('profile-input').placeholder = zhuyin(`最多 ${NAME_MAX} 個字`);
+
+  // asking：第一次問名字（問過一次就不再跳出來）
+  function openProfile(asking = false) {
+    closeCards();
+    if (asking) {
+      profile.asked = true;
+      save();
+    }
+    profileEditing = asking;
+    newBadges = 0;
+    updateProfileBadge();
+    renderProfile();
+    $('profile-card').hidden = false;
+    $('profile-card').scrollTop = 0;
+  }
+
+  const PROFILE_STATS = [
+    ['完美跳', () => profile.counts.perfect, '次'],
+    ['幫貓貓跳', () => profile.counts.jumps, '次'],
+    ['跳最高', () => profile.bestCm, '公分'],
+    ['改作業', () => profile.counts.graded, '張'],
+    ['點過的貓', () => profile.seen.cats.length, '隻'],
+    ['來島上', () => profile.counts.days, '天'],
+  ];
+
+  function renderProfile() {
+    $('profile-title').textContent = profileEditing && !profile.name ? '你的島民卡' : `${who()}的島民卡`;
+    $('profile-form').hidden = !profileEditing;
+    $('profile-rename').hidden = profileEditing;
+    if (profileEditing) {
+      const input = $('profile-input');
+      if (document.activeElement !== input) input.value = profile.name;
+      $('profile-save').disabled = !cleanName(input.value);
+      $('profile-skip').textContent = profile.name ? '先不改' : '繼續當桐桐';
+    }
+    $('profile-stats').replaceChildren(...PROFILE_STATS.map(([label, value, unit]) => {
+      const tile = el('div', 'stat-tile');
+      const number = el('b', '', String(value()));
+      number.append(el('small', '', unit));
+      tile.append(el('span', '', label), number);
+      return tile;
+    }));
+    const earnedCount = BADGES.filter((b) => profile.earned[b.id]).length;
+    $('profile-count').textContent = `徽章 ${earnedCount}／${BADGES.length}`;
+    $('profile-badges').replaceChildren(...BADGE_GROUPS.flatMap((group) => [
+      el('h3', 'badge-group', group.title),
+      ...BADGES.filter((b) => b.group === group.id).map(badgeRow),
+    ]));
+  }
+
+  function badgeRow(badge) {
+    const day = profile.earned[badge.id];
+    const row = el('div', `badge${day ? ' is-earned' : ''}`);
+    row.append($('badge-paw').content.cloneNode(true));
+    const body = el('div', 'badge__body');
+    body.append(el('p', 'badge__title', badge.title), el('p', 'badge__text', badge.text));
+    if (day) {
+      body.append(el('p', 'badge__day', `${earnedDayText(day)}拿到`));
+    } else if (badge.goal > 1) {
+      const value = Math.min(statValue(profile, badge.stat), badge.goal);
+      const bar = el('div', 'badge__bar');
+      const fill = el('i');
+      fill.style.width = `${(value / badge.goal) * 100}%`;
+      bar.append(fill);
+      body.append(bar, el('p', 'badge__day', `${value}／${badge.goal}`));
+    }
+    row.append(body);
+    return row;
+  }
+
+  $('profile-open').addEventListener('click', () => {
+    if ($('profile-card').hidden) openProfile();
+    else closeCards();
+  });
+  $('profile-rename').addEventListener('click', () => {
+    profileEditing = true;
+    renderProfile();
+    $('profile-input').focus();
+  });
+  $('profile-input').addEventListener('input', () => {
+    $('profile-save').disabled = !cleanName($('profile-input').value);
+  });
+  $('profile-skip').addEventListener('click', () => {
+    profileEditing = false;
+    renderProfile();
+    sound.play('pop');
+  });
+  $('profile-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const name = cleanName($('profile-input').value);
+    if (!name) return;
+    profile.name = name;
+    profileEditing = false;
+    $('profile-input').blur();
+    save();
+    applyName();
+    renderProfile();
+    if (!$('learn-card').hidden) renderLearn();
+    sound.play('stamp');
+    showToast(`${name}，歡迎來到貓貓島！`, '貓貓記住你的名字了');
+  });
 
   function refreshBoards() {
     const top = leaderboard(records, 'all', 10);
@@ -418,6 +612,7 @@ function start(hotData = {}) {
     closeCards();
     focus = id;
     track('island_view', { island: id });
+    if (ISLAND_IDS.includes(id)) see('islands', id);
     followingCoach = false;
     const level = LEVELS[id];
     const dock = $('dock');
@@ -512,7 +707,7 @@ function start(hotData = {}) {
   document.addEventListener('keydown', (event) => {
     if ((event.code === 'Space' || event.code === 'Enter') && !$('dock').hidden && !event.repeat) {
       const tag = document.activeElement && document.activeElement.tagName;
-      if (tag === 'TEXTAREA') return;
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return;
       if (event.code === 'Enter' && tag === 'BUTTON' && document.activeElement !== jumpBtn) return;
       event.preventDefault();
       pressJump();
@@ -571,6 +766,7 @@ function start(hotData = {}) {
     sound.unlock();
     if (scene.stageTrick(button.dataset.trick)) {
       track('stage_trick', { trick: button.dataset.trick });
+      tally('tricks');
       return;
     }
     // 上一個動作還沒做完：鈕抖一下
@@ -583,6 +779,7 @@ function start(hotData = {}) {
     scene.stageClap();
     sound.play('clap');
     track('stage_clap');
+    tally('claps');
   });
 
   // ---------- 注音：日記區、學習數學島卡片上的字都加注音 ----------
@@ -600,14 +797,14 @@ function start(hotData = {}) {
     if (c.type === 'characterData') markZhuyin(c.target);
     else c.addedNodes.forEach(markZhuyin);
   }));
-  ['diary-card', 'learn-card', 'lesson-card', 'story-card', 'report-card'].forEach((id) => {
+  ['diary-card', 'learn-card', 'lesson-card', 'story-card', 'report-card', 'profile-card'].forEach((id) => {
     markZhuyin($(id));
     zhuyinWatch.observe($(id), { childList: true, characterData: true, subtree: true });
   });
 
   // ---------- 貓貓日記 ----------
   function writeDiary(index) {
-    const lines = composeDiary(cats[index], memories.get(index) || [], Math.random());
+    const lines = composeDiary(cats[index], memories.get(index) || [], Math.random(), who());
     memories.delete(index);
     diaries.push({ id: ++diarySeq, cat: index, date: dateText(Date.now()), lines, paws: 0 });
     if (diaries.length > DIARY_MAX) diaries = diaries.slice(-DIARY_MAX);
@@ -696,7 +893,7 @@ function start(hotData = {}) {
     if (!diary) return;
     sound.unlock();
     diary.paws += 1;
-    save();
+    tally('stamps');
     renderPaws(diary, true);
     // 掌印蓋在日記最下面，可能被按鈕列擋住：捲過去讓她看到
     $('diary-paw-count').scrollIntoView({ block: 'nearest' });
@@ -826,9 +1023,9 @@ function start(hotData = {}) {
     }
   });
 
-  // ---------- 學習數學島：桐桐老師改作業 ----------
+  // ---------- 學習數學島：玩家當老師改作業 ----------
   // 每天換 20 隻貓來上課，每隻寫一張（9 個單元都會出到）；20 張改完今天就結束，明天換別的貓。
-  // 桐桐按「寫對了／寫錯了」，改錯第一次老師給提示，第二次老師直接講解
+  // 玩家按「寫對了／寫錯了」，改錯第一次老師給提示，第二次老師直接講解
   let stack = [];
   let stackKey = '';
   let sheetIndex = 0;
@@ -887,8 +1084,8 @@ function start(hotData = {}) {
       dot.setAttribute('aria-label', `第 ${i + 1} 張${s.result === 'good' ? '，一次就改對' : s.result === 'help' ? '，老師幫忙' : ''}`);
       return dot;
     }));
-    $('learn-stats').textContent = learnStats.graded
-      ? `桐桐老師一共改了 ${learnStats.graded} 張，一次就改對 ${learnStats.right} 張。`
+    $('learn-stats').textContent = profile.counts.graded
+      ? `${who()}老師一共改了 ${profile.counts.graded} 張，一次就改對 ${profile.counts.right} 張。`
       : '點「寫對了」或「寫錯了」幫貓貓改作業。';
     const finished = sheetIndex >= stack.length;
     $('sheet-body').hidden = finished;
@@ -929,6 +1126,17 @@ function start(hotData = {}) {
     $('learn-next').textContent = sheetIndex === stack.length - 1 ? '看結果' : '下一張';
   }
 
+  // 改好一張：累積張數；今天 20 張都改好了再算一天，全部一次就改對的另外記
+  function tallyGrade(firstTry) {
+    bump(profile, 'graded');
+    if (firstTry) bump(profile, 'right');
+    if (learnDay.results.every((r) => r !== null)) {
+      bump(profile, 'daysDone');
+      if (learnDay.results.every((r) => r === 'good')) bump(profile, 'daysAllRight');
+    }
+    tallied();
+  }
+
   function grade(saysRight, button) {
     const s = stack[sheetIndex];
     if (!s || s.done) return;
@@ -938,9 +1146,7 @@ function start(hotData = {}) {
       s.done = true;
       s.result = s.tries === 0 ? 'good' : 'help';
       learnDay.results[sheetIndex] = s.result;
-      learnStats.graded += 1;
-      if (s.tries === 0) learnStats.right += 1;
-      save();
+      tallyGrade(s.tries === 0);
       track('homework_grade', { unit: s.p.unit, result: s.tries === 0 ? 'first_try' : 'after_hint', cat_right: s.p.right ? 'yes' : 'no' });
       // 先畫好紅筆批改（作業紙會變高），再出現老師的話，捲動位置才算得準
       renderLearn();
@@ -968,8 +1174,7 @@ function start(hotData = {}) {
     s.done = true;
     s.result = 'help';
     learnDay.results[sheetIndex] = s.result;
-    learnStats.graded += 1;
-    save();
+    tallyGrade(false);
     track('homework_grade', { unit: s.p.unit, result: 'explained', cat_right: s.p.right ? 'yes' : 'no' });
     const text = `${s.p.why}${name}寫「${s.p.catAnswer}」，${s.p.right ? '是寫對的' : '是寫錯的'}。`;
     renderLearn();
@@ -1047,7 +1252,10 @@ function start(hotData = {}) {
     lessonUnit = unit;
     lessonPage = page;
     // 翻到最後一頁就算這個單元上完了
-    if (page === LESSONS[unit].length - 1) track('lesson_done', { unit });
+    if (page === LESSONS[unit].length - 1) {
+      track('lesson_done', { unit });
+      see('units', unit);
+    }
     renderLesson();
     $('lesson-card').scrollTop = 0;
     sound.play('page');
@@ -1172,7 +1380,9 @@ function start(hotData = {}) {
       const diary = currentDiary();
       if (!diary) return { from: 'diary', show: '日記：還沒有日記', detail: '日記：還沒有日記' };
       const show = `日記：${cats[diary.cat].name}的日記，${diary.date}`;
-      return { from: 'diary', show, detail: `${show}｜${diary.lines.join('')}` };
+      // 日記裡可能寫著玩家取的名字，回報時換掉
+      const lines = diary.lines.join('');
+      return { from: 'diary', show, detail: `${show}｜${profile.name ? lines.replaceAll(profile.name, '玩家') : lines}` };
     }
     const place = NAV.find((n) => n.id === focus);
     const show = `島上：${place ? place.label : '桐桐貓貓島'}`;
@@ -1295,6 +1505,10 @@ function start(hotData = {}) {
     $('reset-ask').hidden = false;
   }
   document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', closeCards));
+  // 看完島的故事，接著問要叫什麼名字
+  $('story-start').addEventListener('click', () => {
+    if (!profile.asked) openProfile(true);
+  });
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
     if ($('report-card').hidden) closeCards();
@@ -1367,6 +1581,7 @@ function start(hotData = {}) {
     closeCards();
     openCatIndex = index;
     track('cat_open', { what: via });
+    see('cats', index);
     scene.meow(index);
     renderCat();
     $('cat-card').hidden = false;
@@ -1452,8 +1667,8 @@ function start(hotData = {}) {
       li.append(dot);
       const name = el('span', 'rank-row__name', cats[r.cat].name);
       if (r.tong) {
-        const badge = el('span', 'tong-badge', '桐');
-        badge.title = '桐桐幫忙按的';
+        const badge = el('span', 'tong-badge', stampChar(profile));
+        badge.title = `${who()}幫忙按的`;
         name.append(badge);
       }
       li.append(name);
@@ -1467,7 +1682,7 @@ function start(hotData = {}) {
     $('rank-empty').textContent = rankLevel === 'all' ? '還沒有成績，貓貓正在暖身。' : '這座跳臺還沒有成績，貓貓正在排隊。';
     const tongJumps = records.filter((r) => r.tong).length;
     $('rank-summary').textContent = records.length
-      ? `這次一共跳了 ${records.length} 次，桐桐幫忙按了 ${tongJumps} 次。`
+      ? `這次一共跳了 ${records.length} 次，${who()}幫忙按了 ${tongJumps} 次。`
       : '這次還沒有人跳。';
   }
 
@@ -1494,6 +1709,8 @@ function start(hotData = {}) {
     showToast('新的一輪開始！', '大家重新比，看這次誰跳最高');
   });
 
+  const foundInBox = new Map();
+
   // 3D 場景裡點到的東西
   scene.onPick((pick) => {
     sound.unlock();
@@ -1503,10 +1720,16 @@ function start(hotData = {}) {
     else if (pick.type === 'teacher' || pick.type === 'podium') atLearn(openLearn);
     else if (pick.type === 'board') atLearn(openLesson);
     else if (pick.type === 'box') {
-      const who = scene.peekBox(pick.spot);
-      track('box_peek', { result: who !== null ? 'found' : 'empty' });
-      if (who !== null) openCat(who, 'box');
-      else sound.play('pop');
+      const hiding = scene.peekBox(pick.spot);
+      track('box_peek', { result: hiding !== null ? 'found' : 'empty' });
+      if (hiding !== null) {
+        // 同一隻貓一分鐘內再點只算一次，連點同一個紙箱不會一直累積
+        if (Date.now() - (foundInBox.get(hiding) || 0) > 60000) tally('boxes');
+        foundInBox.set(hiding, Date.now());
+        openCat(hiding, 'box');
+      } else {
+        sound.play('pop');
+      }
     }
   });
 
@@ -1529,7 +1752,12 @@ function start(hotData = {}) {
 
   refreshBoards();
   updateNav();
+  applyName();
+  // 第一次來先看故事，看完問名字；老玩家這次升級也問一次；有名字的人每天第一次來打個招呼
   if (!storySeen) openStory();
+  else if (!profile.asked) openProfile(true);
+  else if (profile.name && newDay) showToast(`${profile.name}，歡迎回來！`, `這是你第 ${profile.counts.days} 天來島上`);
+  tallied();
 }
 
 const hot = window.claude?.hot;
