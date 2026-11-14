@@ -108,6 +108,28 @@
   .plate__name { font-size: 27px; line-height: 1.2; color: var(--ink-deep); letter-spacing: 0.04em; }
   .plate__sub { font-size: 14px; color: var(--text-2); }
   .toolbar { display: flex; gap: 8px; }
+  .hud__top { display: flex; align-items: center; gap: 10px; }
+  /* 島主的電和小魚金幣 */
+  .wallet {
+    position: relative; display: inline-flex; align-items: center; gap: 14px; min-height: 40px; padding: 0 14px 0 10px;
+    border: 2.5px solid var(--ink); border-radius: 999px; background: var(--paper); box-shadow: 0 4px 0 var(--ink-deep); color: var(--ink-deep);
+  }
+  .wallet:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink-deep); }
+  .wallet__item { display: inline-flex; align-items: center; gap: 5px; font-size: 18px; line-height: 1; }
+  .wallet__item b { font: 600 21px/1 var(--num); font-variant-numeric: tabular-nums; }
+  .wallet__item small { font: 600 14px/1 var(--num); color: var(--text-2); }
+  .wallet__bolt { font-size: 19px; }
+  .wallet.is-low .wallet__item--power b { color: var(--high); }
+  .wallet.is-bump { animation: wallet-bump 360ms var(--pop); }
+  @keyframes wallet-bump { 40% { transform: scale(1.12); } }
+  .coin { width: 22px; height: 22px; flex: none; }
+  .wallet-pop {
+    position: absolute; left: 50%; top: 100%; margin-top: 6px; padding: 2px 12px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+    background: var(--sun-pale); border: 2px solid var(--gold); color: var(--ink-deep); font: 600 17px/1.5 var(--num);
+    animation: wallet-pop 1900ms var(--ease) forwards;
+  }
+  .wallet-pop--minus { background: var(--paper); border-color: var(--ink); }
+  @keyframes wallet-pop { 0% { transform: translate(-50%, 8px); opacity: 0; } 15% { transform: translate(-50%, 0); opacity: 1; } 75% { opacity: 1; } 100% { transform: translate(-50%, -6px); opacity: 0; } }
 
   /* 右上：這次跳最高 */
   .mini-board {
@@ -399,7 +421,7 @@
 
   /* 日記區、學習數學島的字都帶注音：國字改用注音粉圓（字的右邊直接畫好注音），數字照舊。
      注音只有字高的四分之一，字要放大小朋友才看得清楚：--zy 是內文、--zy-2 是提示和按鈕、--zy-3 是小字 */
-  #diary-card, #learn-card, #lesson-card, #story-card, #report-card, #profile-card, #home-card, #chat-card {
+  #diary-card, #learn-card, #lesson-card, #story-card, #report-card, #profile-card, #home-card, #chat-card, #shop-card {
     --round: "Bpmf Huninn", "Huninn", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
     --num: "Fredoka", "Bpmf Huninn", "Huninn", "Arial Rounded MT Bold", Arial, sans-serif;
     --zy: 29px; --zy-2: calc(var(--zy) * 0.8); --zy-3: calc(var(--zy) * 0.66);
@@ -413,7 +435,7 @@
   .learn-side > .learn-unit { order: -1; }
   .learn-unit { margin-top: 8px; }
   @media (min-width: 900px) {
-    #diary-card, #story-card, #report-card, #profile-card, #home-card, #chat-card { width: min(600px, calc(100% - 32px)); }
+    #diary-card, #story-card, #report-card, #profile-card, #home-card, #chat-card, #shop-card { width: min(600px, calc(100% - 32px)); }
     #learn-card, #lesson-card { width: min(800px, calc(100% - 32px)); }
     /* 黑板課也分兩欄：左邊黑板講重點，右邊白紙放圖和例題，翻頁不用捲就看得到「考考你」 */
     .board { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: auto auto 1fr; column-gap: 16px; align-items: start; }
@@ -433,8 +455,8 @@
     #learn-card .card__label { display: none; }
     #learn-card .sheet__fig svg { max-height: 140px; }
   }
-  #diary-card .card__label, #learn-card .card__label, #lesson-card .card__label, #story-card .card__label, #report-card .card__label, #profile-card .card__label, #home-card .card__label, #chat-card .card__label { font-size: var(--zy-3); }
-  #diary-card .card__title, #learn-card .card__title, #lesson-card .card__title, #story-card .card__title, #report-card .card__title, #profile-card .card__title, #home-card .card__title, #chat-card .card__title { font-size: var(--zy); }
+  #diary-card .card__label, #learn-card .card__label, #lesson-card .card__label, #story-card .card__label, #report-card .card__label, #profile-card .card__label, #home-card .card__label, #chat-card .card__label, #shop-card .card__label { font-size: var(--zy-3); }
+  #diary-card .card__title, #learn-card .card__title, #lesson-card .card__title, #story-card .card__title, #report-card .card__title, #profile-card .card__title, #home-card .card__title, #chat-card .card__title, #shop-card .card__title { font-size: var(--zy); }
   #diary-card .card__text, #diary-card .empty, #lesson-card .card__text, #report-card .card__text { font-size: var(--zy-3); }
   /* 卡片很長要捲的時候，按鈕列固定在卡片底部 */
   .card__dock {
@@ -580,10 +602,7 @@
   /* 問題回報：疊在正在看的卡片上面，關掉就回到原本那張 */
   #report-card { z-index: 8; }
   .report-chip { background: var(--mid-pale); color: var(--mid-deep); }
-  .report-row { display: flex; justify-content: flex-end; margin-top: 4px; }
   .learn-bar { flex-wrap: wrap; }
-  .learn-bar .report-link { margin-left: auto; }
-  .board .report-link { margin-left: 0; }
   .report-where { margin-top: 10px; padding: 8px 12px; border-radius: 14px; background: var(--ink-pale); color: var(--ink-deep); font-size: var(--zy-3); line-height: 1.6; }
   .report-where__tag { display: inline-block; margin-right: 8px; padding: 0 10px; border-radius: 999px; background: var(--paper); font-size: calc(var(--zy) * 0.6); }
   .report-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
@@ -644,6 +663,38 @@
   .home-actions { position: sticky; bottom: calc(var(--pad-b) * -1); display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 8px; margin: 12px 0 calc(var(--pad-b) * -1); padding: 8px 0 var(--pad-b); background: var(--paper); }
   .home-actions .sticker { min-height: 60px; font-size: var(--zy-3); }
   .home-actions .sticker:disabled { opacity: 0.45; cursor: default; }
+  .home-actions--sleepy { grid-template-columns: 1fr 1fr 1fr 1.2fr; }
+  /* 回家睡覺 */
+  .sleep-box { margin-top: 10px; padding: 12px 16px 14px; border: 2px solid var(--line); border-radius: 18px; background: var(--ink-pale); color: var(--ink-deep); }
+  .sleep-box__title { font-size: var(--zy-2); }
+  .sleep-box__power { margin-top: 4px; font: 600 calc(var(--zy) * 1.1) / 1.3 var(--num); font-variant-numeric: tabular-nums; }
+  .sleep-box__power small { font-size: 0.6em; color: var(--text-2); }
+  .sleep-box__note { margin-top: 2px; font-size: var(--zy-3); line-height: 1.5; color: var(--text); }
+  .sleep-box .sticker { width: 100%; min-height: 58px; margin-top: 10px; font-size: var(--zy-3); }
+  /* 貓貓商店 */
+  .shop-chip { background: var(--sun-pale); }
+  .shop-chip .coin { width: 36px; height: 36px; }
+  .shop-have { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: var(--zy-3); color: var(--ink-deep); }
+  .shop-have b { font: 600 calc(var(--zy) * 0.85) / 1.2 var(--num); font-variant-numeric: tabular-nums; }
+  .shop-have span { display: inline-flex; align-items: center; gap: 6px; }
+  .shop-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .shop-item { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 10px 8px 8px; border: 2px solid #EFE4C8; border-radius: 18px; background: #FFFDF6; }
+  .shop-item__icon { width: 56px; height: 56px; transform-origin: 50% 60%; }
+  /* 買了馬上吃掉：咬三口越來越小再變回來；喝掉：瓶子舉起來倒三下 */
+  .shop-item__icon.is-eaten { animation: eaten 1100ms var(--ease); }
+  .shop-item__icon.is-drunk { animation: drunk 1100ms var(--ease); }
+  @keyframes eaten { 0% { transform: scale(1); } 12% { transform: scale(0.8) rotate(-8deg); } 24% { transform: scale(0.86); } 40% { transform: scale(0.58) rotate(8deg); } 52% { transform: scale(0.64); } 68% { transform: scale(0.3) rotate(-8deg); opacity: 0.6; } 80% { transform: scale(0.1); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes drunk { 0% { transform: none; } 15% { transform: translateY(-6px) rotate(-38deg); } 30% { transform: translateY(-6px) rotate(-26deg); } 45% { transform: translateY(-6px) rotate(-42deg); } 60% { transform: translateY(-6px) rotate(-28deg); } 78% { transform: translateY(-6px) rotate(-46deg); opacity: 0.55; } 100% { transform: none; opacity: 1; } }
+  .shop-item__name { font-size: var(--zy-2); color: var(--ink-deep); }
+  .shop-item__gain { font-size: var(--zy-3); color: var(--text); }
+  .shop-buy { min-height: 58px; min-width: 104px; gap: 6px; font-size: var(--zy-3); }
+  .shop-buy b { font: 600 calc(var(--zy) * 0.85) / 1 var(--num); }
+  .shop-buy .coin { width: 26px; height: 26px; }
+  .shop-buy.is-nope { animation: nope 300ms; }
+  .shop-buy.is-short { opacity: 0.55; }
+  .shop-msg { min-height: 1.6em; margin-top: 10px; padding: 8px 14px; border-radius: 16px; background: var(--sun-pale); font-size: var(--zy-3); line-height: 1.55; color: var(--text); }
+  .shop-msg:empty { display: none; }
+  .zzz--home { padding: 0 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.88); font-size: 26px; }
   /* 跟貓聊天 */
   .chat-line { margin-top: 10px; padding: 12px 16px; border-radius: 18px; background: var(--sun-pale); font-size: var(--zy-2); line-height: 1.6; color: var(--text); }
   .chat-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
@@ -670,7 +721,8 @@
   .cloud-restore .sticker { min-height: 52px; font-size: var(--zy-3); }
   .cloud-restore .sticker:disabled { opacity: 0.4; cursor: default; }
 
-  @media (max-width: 1000px) {
+  /* 左上多了錢包：畫面不夠寬的時候，提示放到工具列下面，才不會蓋住電和金幣 */
+  @media (max-width: 1400px) {
     .toast { top: 140px; }
   }
   @media (max-width: 899px) {
@@ -684,7 +736,7 @@
   }
   @media (max-width: 699px) {
     body { font-size: 16px; }
-    #diary-card, #learn-card, #lesson-card, #story-card, #report-card, #profile-card, #home-card, #chat-card { --zy: 23px; }
+    #diary-card, #learn-card, #lesson-card, #story-card, #report-card, #profile-card, #home-card, #chat-card, #shop-card { --zy: 23px; }
     /* 手機太窄：翻頁和「唸給我聽」只留圖示，字還在、讀螢幕的軟體唸得到；「蓋掌印」留字 */
     #diary-prev span, #diary-next span, #diary-read span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .plate { padding: 4px 12px 4px 6px; gap: 6px; }
@@ -694,6 +746,13 @@
     .tool__label { display: none; }
     .toolbar { gap: 5px; }
     .toolbar .sticker { padding: 0 8px; }
+    .hud { gap: 8px; }
+    .hud__top { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .wallet { min-height: 36px; gap: 10px; padding: 0 12px 0 8px; }
+    .wallet__item b { font-size: 19px; }
+    .shop-item { grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; }
+    .shop-item__icon { width: 46px; height: 46px; }
+    .shop-buy { min-width: 86px; min-height: 52px; }
     .mini-board { width: 140px; padding: 8px 10px 10px; }
     .mini-board__title { font-size: 14px; }
     .mini-board__more { display: none; }
@@ -721,10 +780,12 @@
     .home-actions { grid-template-columns: 1fr 1fr; }
     .home-actions .sticker { min-height: 54px; }
     #home-go { grid-column: 1 / -1; }
+    .home-actions--sleepy { grid-template-columns: 1fr 1fr 1fr; }
+    .home-actions--sleepy .sticker { padding: 0 6px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .card, .toast, .peak-tag, .meow { animation: none; }
-    .zzz, .lost-mark, .speech, .trick-tag, .heart, .notes, .paw-print--new, .trick.is-nope .trick__icon, .sheet__seal, .pencil::after, .tip, .grade.is-nope { animation: none; }
+    .zzz, .lost-mark, .speech, .trick-tag, .heart, .notes, .paw-print--new, .trick.is-nope .trick__icon, .sheet__seal, .pencil::after, .tip, .grade.is-nope, .shop-buy.is-nope, .wallet.is-bump, .shop-item__icon.is-eaten, .shop-item__icon.is-drunk { animation: none; }
     .sticker, .jump__face, .trick__icon, .paw-btn { transition: none; }
   }
 </style>
@@ -739,9 +800,10 @@
 </head>
 <body>
 <div class="app" id="app">
-  <div class="scene" id="scene" role="img" aria-label="桐桐貓貓島 3D 地圖：中間是貓貓之家，左上是高階跳臺、上面中間是表演區、右上是中階跳臺和多多紙箱區、右邊是低階跳臺和日記區，最左上角是有黑板的學習數學島，下面有魚池公園和合體公園，左下是排行榜島，下面中間是島主之家，最下面是有七條跑道的跑步田徑場島，島和島之間用木板橋連起來，島上全都是貓，還有一隻綁頭帶、兩腳走路的貓貓教練，和一隻戴眼鏡的貓貓老師。"></div>
+  <div class="scene" id="scene" role="img" aria-label="桐桐貓貓島 3D 地圖：中間是貓貓之家，左上是高階跳臺、上面中間是表演區、右上是中階跳臺和多多紙箱區、右邊是低階跳臺和日記區，最左上角是有黑板的學習數學島，下面有魚池公園和合體公園，左下是排行榜島，下面中間是島主之家，最下面是有七條跑道的跑步田徑場島，它的左邊是有條紋遮陽棚攤子的貓貓商店，島和島之間用木板橋連起來，島上全都是貓，還有一隻綁頭帶、兩腳走路的貓貓教練，和一隻戴眼鏡的貓貓老師；貓貓商店有一位小女孩店員。"></div>
 
   <header class="hud">
+    <div class="hud__top">
     <div class="plate">
       <svg class="stamp" viewBox="0 0 120 120" aria-hidden="true">
         <g fill="#fff" stroke="currentColor" stroke-width="5" stroke-linejoin="round">
@@ -756,6 +818,11 @@
         <h1 class="plate__name">桐桐貓貓島</h1>
         <p class="plate__sub" id="plate-sub">50 隻貓貓的跳高比賽</p>
       </div>
+    </div>
+    <button class="wallet" id="wallet" type="button" aria-label="島主的電和小魚金幣，按一下去貓貓商店">
+      <span class="wallet__item wallet__item--power"><span class="wallet__bolt" aria-hidden="true">⚡</span><b id="wallet-power">30</b><small>／30</small></span>
+      <span class="wallet__item"><svg class="coin" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#F7C531" stroke="#C99000" stroke-width="3"/><g fill="none" stroke="#8A5A00" stroke-width="2.6" stroke-linejoin="round"><ellipse cx="21" cy="24" rx="11" ry="7.5"/><path d="M32 24l8-6.5v13z"/></g><circle cx="16.5" cy="22.5" r="1.8" fill="#8A5A00"/></svg><b id="wallet-coins">0</b></span>
+    </button>
     </div>
     <div class="toolbar" role="toolbar" aria-label="島上工具">
       <button class="sticker" id="profile-open" type="button" aria-label="島主卡">
@@ -905,6 +972,10 @@
       <li><span class="help-icon" aria-hidden="true">家</span><span><b>島主之家</b>這是你的家。回到島上會先來這裡，聽最近島上的新鮮事，還可以選島主的樣子：大人、小孩、男生、女生，或是貓。想照原本的方式玩，就按「在家看島」，島主會待在家裡。</span></li>
       <li><span class="help-icon" aria-hidden="true">走</span><span><b>出門逛島</b>按「出門逛島」或「跟著島主走」，點地上島主就走過去，也可以推左下角的搖桿走路。點貓貓可以跟牠聊天、摸摸牠。</span></li>
       <li><span class="help-icon" aria-hidden="true">玩</span><span><b>島主也來玩</b>跳臺按「換我跳」、表演區按「我也要上臺」、跑步田徑場島按「我也要跑」，公園可以坐下來休息。</span></li>
+      <li><span class="help-icon" aria-hidden="true">⚡</span><span><b>島主的電</b>島主有 30 個電，左上角看得到還有幾個。玩一次要用電：跑步田徑場「我也要跑」20 個、高階跳臺 10 個、中階 5 個、低階 3 個，改作業不用電。電不夠就不能玩，隔天也不會自己補滿，要去貓貓商店買吃的，或是回家睡覺。</span></li>
+      <li><span class="help-icon" aria-hidden="true"><svg class="coin" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#F7C531" stroke="#C99000" stroke-width="3"/><g fill="none" stroke="#8A5A00" stroke-width="2.6" stroke-linejoin="round"><ellipse cx="21" cy="24" rx="11" ry="7.5"/><path d="M32 24l8-6.5v13z"/></g><circle cx="16.5" cy="22.5" r="1.8" fill="#8A5A00"/></svg></span><span><b>小魚金幣</b>玩了就有小魚金幣。跑步前三名 15 個、其他 10 個；高階跳臺破紀錄 20 個、完美跳 10 個、其他 3 個；中階 5、3、1 個；低階 3、2 個；作業一次就改對，一張 1 個。破紀錄是比這座跳臺以前最高的那一次還高。</span></li>
+      <li><span class="help-icon" aria-hidden="true">店</span><span><b>貓貓商店</b>用小魚金幣買東西，買了島主馬上吃掉、喝掉：水果 5 個金幣補 15 個電，水 3 個金幣補 10 個電，果汁 10 個金幣補 10 個電。電最多 30 個。</span></li>
+      <li><span class="help-icon" aria-hidden="true">z</span><span><b>回家睡覺</b>在島主之家按「回家睡覺」，每 1 分鐘補 1 個電，補到 30 個。關掉網頁也照算，睡覺的時候不能玩要用電的遊戲，按「起床」就可以出門。</span></li>
       <li><span class="help-icon" aria-hidden="true">1</span><span><b>選一座跳臺</b>點下面的低階、中階或高階跳臺，鏡頭會飛過去。</span></li>
       <li><span class="help-icon" aria-hidden="true">2</span><span><b>按住大按鈕，放開就跳</b>貓貓走到跳板前面，按鈕變藍色就可以按。</span></li>
       <li><span class="help-icon" aria-hidden="true">3</span><span><b>能量條要抓時機</b>低階一直按住就會滿；中階和高階的能量條會上上下下，最滿的時候放開跳最高。</span></li>
@@ -923,7 +994,7 @@
         <svg viewBox="0 0 120 120" aria-hidden="true"><g fill="#fff" stroke="currentColor" stroke-width="5" stroke-linejoin="round"><circle cx="37" cy="24" r="11"/><circle cx="83" cy="24" r="11"/><path d="M30 52a30 30 0 0 1 60 0z"/></g><g fill="currentColor"><circle cx="49" cy="41" r="3.6"/><circle cx="71" cy="41" r="3.6"/></g><rect x="10" y="50" width="100" height="58" rx="29" fill="#fff" stroke="currentColor" stroke-width="5"/><text x="60" y="81" text-anchor="middle" dominant-baseline="middle" font-size="44" fill="currentColor" font-family="Huninn, PingFang TC, sans-serif">桐</text></svg>
         島的設計師：桐桐
       </p>
-      <p>這座島照桐桐畫的設計圖做：十一座島的形狀和位置、二十座木板橋，都跟她畫的一樣。第二次她又加了表演區、多多紙箱區、日記區、合體公園，還有貓貓教練；後來又說要一座學習數學島，放在高階跳臺上面；再後來又畫了一張跑步田徑場島，有七條跑道和一大片草場。島上的樹是開白花的油桐樹。</p>
+      <p>這座島照桐桐畫的設計圖做：十一座島的形狀和位置、二十座木板橋，都跟她畫的一樣。第二次她又加了表演區、多多紙箱區、日記區、合體公園，還有貓貓教練；後來又說要一座學習數學島，放在高階跳臺上面；再後來又畫了一張跑步田徑場島，有七條跑道和一大片草場；又寫了一張島主的電、小魚金幣和貓貓商店的規則，還畫了商店和店員。島上的樹是開白花的油桐樹。</p>
       <figure>
         <img src="sketch.jpg" alt="桐桐用鉛筆畫的貓貓島設計圖：中間是有「桐」字招牌的房子，周圍有三座跳臺、有階梯舞臺的表演區、畫滿小紙箱的多多紙箱區、有書桌的日記區、有魚池的合體公園、兩座公園和 1、2、3 名的頒獎臺，用木板橋連起來，到處都是貓。" width="1200" height="786" loading="lazy">
         <figcaption>桐桐畫的設計圖（第二版）</figcaption>
@@ -986,7 +1057,6 @@
         <span class="page__who"><i class="dot" id="diary-dot"></i><span><b id="diary-cat"></b>的日記</span></span>
         <span class="page__new" id="diary-new" hidden>新的！</span>
         <span class="page__date" id="diary-date"></span>
-        <button class="link-btn report-link" type="button" data-report>這裡怪怪的</button>
       </header>
       <div class="page__lines" id="diary-lines"></div>
       <div class="page__paws" id="diary-paws" aria-hidden="true"></div>
@@ -1048,7 +1118,6 @@
       <div class="learn-side">
         <div class="learn-bar">
           <ol class="learn-dots" id="learn-dots" aria-label="今天的作業"></ol>
-          <button class="link-btn report-link" type="button" data-report>這裡怪怪的</button>
         </div>
         <p class="learn-unit" id="learn-unit"><span class="sheet__unit" id="sheet-unit"></span></p>
         <div class="tip" id="learn-tip" hidden>
@@ -1098,13 +1167,11 @@
     </div>
     <p class="card__text" id="lesson-intro">這次考試的範圍是一年級上學期的 9 個單元。想先學哪一個？</p>
     <div class="unit-grid" id="lesson-units" role="group" aria-label="選一個單元"></div>
-    <p class="report-row" id="lesson-report"><button class="link-btn report-link" type="button" data-report>這裡怪怪的</button></p>
     <section class="board" id="lesson-board" hidden aria-live="polite">
       <header class="board__head">
         <span class="sheet__unit" id="lesson-unit"></span>
         <ol class="learn-dots" id="lesson-dots" aria-label="這個單元的頁數"></ol>
         <button class="link-btn" id="lesson-back" type="button">換單元</button>
-        <button class="link-btn report-link" type="button" data-report>這裡怪怪的</button>
       </header>
       <h3 class="board__title" id="lesson-page-title"></h3>
       <div class="board__lines" id="lesson-lines"></div>
@@ -1286,6 +1353,12 @@
       <button class="card__close" type="button" data-close aria-label="關閉">×</button>
     </div>
     <p class="home-lede">你是這座島的島主，貓貓都是你的島民。</p>
+    <section class="sleep-box" id="sleep-box" hidden aria-live="polite">
+      <p class="sleep-box__title" id="sleep-title">島主正在睡覺</p>
+      <p class="sleep-box__power"><span aria-hidden="true">⚡</span> <span id="sleep-power">0</span><small>／30</small></p>
+      <p class="sleep-box__note" id="sleep-note"></p>
+      <button class="sticker sticker--solid" id="home-wake" type="button">起床</button>
+    </section>
     <div id="home-pick" hidden>
       <p class="looks-title">你想當什麼樣子的島主？</p>
       <div class="looks" id="home-looks"></div>
@@ -1295,14 +1368,32 @@
       <ul class="home-news" id="home-news"></ul>
     </section>
     <button class="link-btn chat-more" id="home-change" type="button">換島主的樣子</button>
-    <div class="home-actions">
+    <div class="home-actions home-actions--sleepy" id="home-actions">
       <button class="sticker" id="home-read" type="button" aria-pressed="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/></svg>
         <span id="home-read-label">唸給我聽</span>
       </button>
+      <button class="sticker" id="home-sleep" type="button">回家睡覺</button>
       <button class="sticker" id="home-stay" type="button">在家看島</button>
       <button class="sticker sticker--solid" id="home-go" type="button">出門逛島</button>
     </div>
+  </article>
+
+  <article class="card" id="shop-card" hidden aria-labelledby="shop-title">
+    <div class="card__head">
+      <span class="trophy-chip shop-chip" aria-hidden="true"><svg class="coin" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#F7C531" stroke="#C99000" stroke-width="3"/><g fill="none" stroke="#8A5A00" stroke-width="2.6" stroke-linejoin="round"><ellipse cx="21" cy="24" rx="11" ry="7.5"/><path d="M32 24l8-6.5v13z"/></g><circle cx="16.5" cy="22.5" r="1.8" fill="#8A5A00"/></svg></span>
+      <div>
+        <p class="card__label">買了馬上吃掉、喝掉</p>
+        <h2 class="card__title" id="shop-title">貓貓商店</h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <p class="shop-have" aria-live="polite">
+      <span>島主的電 <span aria-hidden="true">⚡</span><b id="shop-power">30</b>／30</span>
+      <span>小魚金幣 <svg class="coin" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#F7C531" stroke="#C99000" stroke-width="3"/><g fill="none" stroke="#8A5A00" stroke-width="2.6" stroke-linejoin="round"><ellipse cx="21" cy="24" rx="11" ry="7.5"/><path d="M32 24l8-6.5v13z"/></g><circle cx="16.5" cy="22.5" r="1.8" fill="#8A5A00"/></svg><b id="shop-coins">0</b></span>
+    </p>
+    <ul class="shop-list" id="shop-list"></ul>
+    <p class="shop-msg" id="shop-msg" role="status"></p>
   </article>
 
   <article class="card" id="chat-card" hidden aria-labelledby="chat-name">
@@ -1333,6 +1424,10 @@
     <button class="look-btn" type="button" data-look="girl" aria-pressed="false" aria-label="小孩，女生"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="11" cy="19" r="5" fill="#3A2A22"/><circle cx="37" cy="19" r="5" fill="#3A2A22"/><path d="M19 29h10l5 12H14z" fill="#8D9CF0"/><rect x="19" y="40" width="4" height="5" fill="#F7D2B4"/><rect x="25" y="40" width="4" height="5" fill="#F7D2B4"/><circle cx="24" cy="19" r="11" fill="#F7D2B4"/><path d="M13 18a11 11 0 0 1 22 0c-6-3-16-3-22 0z" fill="#3A2A22"/></svg><span>小孩<br>女生</span></button>
     <button class="look-btn" type="button" data-look="cat" aria-pressed="false" aria-label="貓"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 12l3 13h22l3-13-9 6H19z" fill="#F2A35A"/><ellipse cx="24" cy="29" rx="15" ry="13" fill="#F2A35A"/><circle cx="18" cy="27" r="2.2" fill="#2B2730"/><circle cx="30" cy="27" r="2.2" fill="#2B2730"/><path d="M21 33c2 2 4 2 6 0" stroke="#2B2730" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M18 8l3 4 3-4 3 4 3-4v6H18z" fill="#F2B200"/></svg><span>貓</span></button>
   </template>
+  <template id="coin-icon"><svg class="coin" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#F7C531" stroke="#C99000" stroke-width="3"/><g fill="none" stroke="#8A5A00" stroke-width="2.6" stroke-linejoin="round"><ellipse cx="21" cy="24" rx="11" ry="7.5"/><path d="M32 24l8-6.5v13z"/></g><circle cx="16.5" cy="22.5" r="1.8" fill="#8A5A00"/></svg></template>
+  <template id="shop-icon-fruit"><svg class="shop-item__icon" viewBox="0 0 56 56" aria-hidden="true"><path d="M30 44c12 2 20-6 21-17-4 8-11 11-21 9z" fill="#FFC93C" stroke="#C99000" stroke-width="2" stroke-linejoin="round"/><circle cx="21" cy="30" r="14" fill="#E8453C" stroke="#B8302A" stroke-width="2"/><path d="M21 17c0-4 2-7 5-8" fill="none" stroke="#8A6446" stroke-width="2.6" stroke-linecap="round"/><path d="M23 14c4-4 9-3 10 0-4 3-8 3-10 0z" fill="#6FBF6A"/></svg></template>
+  <template id="shop-icon-water"><svg class="shop-item__icon" viewBox="0 0 56 56" aria-hidden="true"><rect x="22" y="5" width="12" height="7" rx="2" fill="#3E4BB8"/><path d="M20 14h16l3 8v24a4 4 0 0 1-4 4H21a4 4 0 0 1-4-4V22z" fill="#CDEBF8" stroke="#6FB4D6" stroke-width="2" stroke-linejoin="round"/><path d="M17 28h22M17 34h22M17 40h22" stroke="#6FB4D6" stroke-width="2"/></svg></template>
+  <template id="shop-icon-juice"><svg class="shop-item__icon" viewBox="0 0 56 56" aria-hidden="true"><path d="M30 18l6-12 5 2" fill="none" stroke="#E8466E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 22l5-6h14l5 6v24a4 4 0 0 1-4 4H20a4 4 0 0 1-4-4z" fill="#FFA23D" stroke="#D97B14" stroke-width="2" stroke-linejoin="round"/><path d="M16 22h24" stroke="#D97B14" stroke-width="2"/><circle cx="28" cy="36" r="7" fill="#FFE08A" stroke="#D97B14" stroke-width="2"/></svg></template>
   <template id="badge-paw"><svg class="badge__icon" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></template>
 </div>
 

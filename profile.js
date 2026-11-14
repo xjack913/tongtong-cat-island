@@ -21,10 +21,36 @@ export const AVATARS = [
 const AVATAR_IDS = AVATARS.map((a) => a.id);
 
 // 算「全島走透透」的島，id 跟 app.js 的 NAV 一樣（「看全島」和「貓貓教練」不是島）
-export const ISLAND_IDS = ['home', 'low', 'mid', 'high', 'stage', 'track', 'diary', 'learn', 'boxes', 'combo', 'park1', 'park2', 'rank'];
+export const ISLAND_IDS = ['home', 'low', 'mid', 'high', 'stage', 'track', 'diary', 'learn', 'boxes', 'combo', 'park1', 'park2', 'rank', 'shop'];
 const UNIT_COUNT = 9;
 const COUNT_MAX = 1e9;
-const COUNT_KEYS = ['jumps', 'perfect', 'perfectHigh', 'records', 'graded', 'right', 'daysDone', 'daysAllRight', 'stamps', 'tricks', 'claps', 'boxes', 'days'];
+// 小魚金幣和電也用「只會往上加」的數字記：一共賺到、一共花掉的金幣，一共用掉、一共補回來的電。
+// 這樣跟其他數字一樣，同一臺取大的、不同臺加起來，換裝置也對得起來
+const COUNT_KEYS = ['jumps', 'perfect', 'perfectHigh', 'records', 'graded', 'right', 'daysDone', 'daysAllRight', 'stamps', 'tricks', 'claps', 'boxes', 'days',
+  'coinsIn', 'coinsOut', 'powerOut', 'powerIn',
+  // 徽章用的：在商店買了幾次、睡覺一共補了幾個電、島主跑了幾場比賽、跑進前三名幾次
+  'buys', 'sleepPower', 'races', 'raceTop3'];
+
+// ---------- 島主的電和小魚金幣（照桐桐寫的規則） ----------
+export const POWER_MAX = 30;
+// 玩一次要用掉幾個電：跑步田徑場、三座跳臺；改作業不用電
+export const POWER_COST = { track: 20, high: 10, mid: 5, low: 3 };
+// 跳一次拿到的小魚金幣：破紀錄、完美跳、其他，只拿最高的那一種
+export const JUMP_REWARD = {
+  high: { record: 20, perfect: 10, other: 3 },
+  mid: { record: 5, perfect: 3, other: 1 },
+  low: { record: 3, perfect: 2, other: 0 },
+};
+export const RACE_REWARD = { top: 15, other: 10 };
+export const HOMEWORK_REWARD = 1;
+// 貓貓商店：買了馬上吃掉、喝掉
+export const SHOP_ITEMS = [
+  { id: 'fruit', name: '水果', verb: '吃', price: 5, power: 15 },
+  { id: 'water', name: '水', verb: '喝', price: 3, power: 10 },
+  { id: 'juice', name: '果汁', verb: '喝', price: 10, power: 10 },
+];
+const LEVELS3 = ['low', 'mid', 'high'];
+const CM_MAX = 100000;
 
 // 島主暗號：8 碼，拿掉長得很像的 0、O、1、I、L，小朋友抄的時候才不會抄錯
 export const CODE_CHARS = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -36,6 +62,7 @@ export const BADGE_GROUPS = [
   { id: 'teach', title: '當老師' },
   { id: 'explore', title: '逛島' },
   { id: 'back', title: '常回來' },
+  { id: 'power', title: '電和小魚金幣' },
 ];
 export const BADGES = [
   { id: 'perfect1', group: 'jump', title: '第一次翻跟斗', text: '按出第一個完美跳', stat: 'perfect', goal: 1 },
@@ -60,6 +87,14 @@ export const BADGES = [
   { id: 'days3', group: 'back', title: '又回來玩了', text: '來島上 3 天', stat: 'days', goal: 3 },
   { id: 'days7', group: 'back', title: '常來的島主', text: '來島上 7 天', stat: 'days', goal: 7 },
   { id: 'days30', group: 'back', title: '老島主', text: '來島上 30 天', stat: 'days', goal: 30 },
+  { id: 'coins10', group: 'power', title: '第一桶小魚金幣', text: '賺到 10 個小魚金幣', stat: 'coinsIn', goal: 10 },
+  { id: 'coins100', group: 'power', title: '小魚金幣高手', text: '賺到 100 個小魚金幣', stat: 'coinsIn', goal: 100 },
+  { id: 'coins500', group: 'power', title: '小魚金幣大富翁', text: '賺到 500 個小魚金幣', stat: 'coinsIn', goal: 500 },
+  { id: 'buy1', group: 'power', title: '第一次逛商店', text: '在貓貓商店買 1 次', stat: 'buys', goal: 1 },
+  { id: 'buy20', group: 'power', title: '商店常客', text: '在貓貓商店買 20 次', stat: 'buys', goal: 20 },
+  { id: 'sleep30', group: 'power', title: '睡飽飽', text: '回家睡覺補了 30 個電', stat: 'sleepPower', goal: 30 },
+  { id: 'race1', group: 'power', title: '島主也來跑', text: '跟貓貓一起跑 1 場比賽', stat: 'races', goal: 1 },
+  { id: 'raceTop3', group: 'power', title: '跑進前三名', text: '比賽跑進前三名', stat: 'raceTop3', goal: 1 },
 ];
 const BADGE_IDS = new Set(BADGES.map((b) => b.id));
 
@@ -111,6 +146,7 @@ export function sanitizeDeviceData(raw, catCount) {
     avatar: AVATAR_IDS.includes(from.avatar) ? from.avatar : '',
     avatarAt: isTime(from.avatarAt) ? from.avatarAt : 0,
     bestCm: count(from.bestCm),
+    tops: sanitizeTops(from.tops),
     counts,
     seen: {
       islands: uniqueWhere(seen.islands, (id) => ISLAND_IDS.includes(id)),
@@ -119,6 +155,19 @@ export function sanitizeDeviceData(raw, catCount) {
     },
     earned,
   };
+}
+
+// 算「破紀錄」用的最高成績：cat 是每座跳臺貓跳過最高的、own 是島主自己跳過最高的（公分）。
+// 排行榜的「重新比一次」不會清掉這裡，不然清完第一跳就破紀錄
+function sanitizeTops(raw) {
+  const from = isObject(raw) ? raw : {};
+  const pick = (group) => Object.fromEntries(LEVELS3.map((level) => [level, Math.min(count(isObject(from[group]) && from[group][level]), CM_MAX)]));
+  return { cat: pick('cat'), own: pick('own') };
+}
+
+function mergeTops(a, b) {
+  const pick = (group) => Object.fromEntries(LEVELS3.map((level) => [level, Math.max(a[group][level], b[group][level])]));
+  return { cat: pick('cat'), own: pick('own') };
 }
 
 // raw 是存檔裡的 profile。第一次打開新版時還沒有，就用舊存檔算得出來的數字開始（seed）
@@ -144,8 +193,8 @@ export function isDeviceId(value) {
 
 // 這臺裝置要上傳的部分
 export function ownData(profile) {
-  const { name, nameAt, avatar, avatarAt, bestCm, counts, seen, earned } = profile;
-  return { name, nameAt, avatar, avatarAt, bestCm, counts, seen, earned };
+  const { name, nameAt, avatar, avatarAt, bestCm, tops, counts, seen, earned } = profile;
+  return { name, nameAt, avatar, avatarAt, bestCm, tops, counts, seen, earned };
 }
 
 function earliest(a, b) {
@@ -190,6 +239,7 @@ export function mergeOwn(previous, next) {
     ...latestName(previous, next),
     ...latestAvatar(previous, next),
     bestCm: Math.max(previous.bestCm, next.bestCm),
+    tops: mergeTops(previous.tops, next.tops),
     counts,
     seen: unionSeen(previous.seen, next.seen),
     earned: mergeEarned(previous.earned, next.earned),
@@ -207,6 +257,7 @@ export function mergeDevices(list, catCount) {
       ...latestName(sum, device),
       ...latestAvatar(sum, device),
       bestCm: Math.max(sum.bestCm, device.bestCm),
+      tops: mergeTops(sum.tops, device.tops),
       counts,
       seen: unionSeen(sum.seen, device.seen),
       earned: mergeEarned(sum.earned, device.earned),
@@ -257,6 +308,84 @@ export function statValue(profile, stat) {
 export function bump(profile, key, amount = 1) {
   if (!COUNT_KEYS.includes(key)) throw new Error(`沒有這個數字：${key}`);
   profile.counts[key] = Math.min(profile.counts[key] + amount, COUNT_MAX);
+}
+
+// ---------- 小魚金幣和電 ----------
+// 畫面上的數字都是「這臺加別臺」算出來的。兩臺裝置同時玩的話可能一時對不上，所以最後都夾在合理範圍裡
+export function coins(profile) {
+  return Math.max(0, total(profile, 'coinsIn') - total(profile, 'coinsOut'));
+}
+
+export function power(profile) {
+  return Math.max(0, Math.min(POWER_MAX, POWER_MAX - total(profile, 'powerOut') + total(profile, 'powerIn')));
+}
+
+export function earnCoins(profile, amount) {
+  if (Number.isInteger(amount) && amount > 0) bump(profile, 'coinsIn', amount);
+  return amount > 0 ? amount : 0;
+}
+
+// 電夠才扣，回傳 true；不夠就什麼都不動
+export function usePower(profile, amount) {
+  if (power(profile) < amount) return false;
+  // 兩臺裝置各補各的，加起來可能超過 30：先把多出來的部分抵掉，扣完才會是「現在的電減掉這次用的」
+  const raw = POWER_MAX - total(profile, 'powerOut') + total(profile, 'powerIn');
+  bump(profile, 'powerOut', amount + Math.max(0, raw - POWER_MAX));
+  return true;
+}
+
+// 補電，最多補到 30；回傳真的補了多少
+export function gainPower(profile, amount) {
+  const raw = POWER_MAX - total(profile, 'powerOut') + total(profile, 'powerIn');
+  const gained = Math.max(0, Math.min(amount, POWER_MAX - power(profile)));
+  // raw 比 0 還小（兩臺同時用電）的時候先補回 0，再加這次補的
+  if (gained > 0) bump(profile, 'powerIn', gained + Math.max(0, -raw));
+  return gained;
+}
+
+// 在貓貓商店買東西：金幣不夠、電已經滿了都不能買
+export function buyItem(profile, id) {
+  const item = SHOP_ITEMS.find((i) => i.id === id);
+  if (!item) return { ok: false, reason: 'none' };
+  if (coins(profile) < item.price) return { ok: false, reason: 'coins', item };
+  if (power(profile) >= POWER_MAX) return { ok: false, reason: 'full', item };
+  bump(profile, 'coinsOut', item.price);
+  bump(profile, 'buys');
+  return { ok: true, item, gained: gainPower(profile, item.power) };
+}
+
+// who 是 'cat'（幫貓貓按的）或 'own'（島主自己跳）。先看有沒有破這座跳臺的紀錄，再把紀錄記下來
+export function jumpTop(profile, who, level) {
+  return Math.max(profile.tops[who][level], profile.remote.tops[who][level]);
+}
+
+export function noteJumpTop(profile, who, level, cm) {
+  if (cm > profile.tops[who][level]) profile.tops[who][level] = Math.min(cm, CM_MAX);
+}
+
+// 這一跳是哪一種：比以前最高的還高就是破紀錄。這座跳臺第一次有成績也算（跟排行榜原本的判定一樣），
+// 但紀錄不會被「重新比一次」清掉，所以每座跳臺只有一次
+export function jumpGrade(top, cm, perfect) {
+  if (cm > top) return 'record';
+  return perfect ? 'perfect' : 'other';
+}
+
+export function jumpReward(level, grade) {
+  return JUMP_REWARD[level] ? JUMP_REWARD[level][grade] || 0 : 0;
+}
+
+export function raceReward(place) {
+  return place >= 1 && place <= 3 ? RACE_REWARD.top : RACE_REWARD.other;
+}
+
+// 回家睡覺：sleepAt 是開始睡（或上次補電）的時間，每過 1 分鐘補 1 個電，補到 30 為止。
+// 關掉網頁也照算，下次打開一次補齊。回傳補了多少、和新的 sleepAt（不滿 1 分鐘的零頭留著）
+export function sleepGain(profile, sleepAt, now) {
+  const minutes = Math.floor((now - sleepAt) / 60000);
+  if (!(minutes > 0)) return { gained: 0, sleepAt: now < sleepAt ? now : sleepAt };
+  const gained = gainPower(profile, minutes);
+  if (gained > 0) bump(profile, 'sleepPower', gained);
+  return { gained, sleepAt: power(profile) >= POWER_MAX ? now : sleepAt + minutes * 60000 };
 }
 
 // 第一次收集到才回傳 true

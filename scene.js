@@ -777,6 +777,150 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     island.flowers.push([x, z]);
   }
 
+  // ---------- 貓貓商店：桐桐畫的六角形島，條紋遮陽棚的攤子，櫃檯後面站著小女孩店員 ----------
+  const shop = { island: null, frontNode: null, clerk: null, wave: 0, cheer: 0 };
+  function buildShop(island) {
+    const g = island.group;
+    const sz = -0.55;
+    const stall = new THREE.Group();
+    stall.position.set(0, TOP, sz);
+    g.add(stall);
+    // 櫃檯和後面的架子
+    put(stall, makeMesh(new THREE.BoxGeometry(2.3, 0.56, 0.5), mat(C.wood)), 0, 0.28, 0.42);
+    put(stall, makeMesh(new THREE.BoxGeometry(2.42, 0.06, 0.62), mat(C.cream)), 0, 0.59, 0.42);
+    put(stall, makeMesh(new THREE.BoxGeometry(2.3, 1.5, 0.08), mat(0xfff2d8)), 0, 0.75, -0.62);
+    put(stall, makeMesh(new THREE.BoxGeometry(2.1, 0.05, 0.22), mat(C.woodDark)), 0, 1.02, -0.5);
+    // 四根柱子撐著紅白條紋的遮陽棚
+    [[-1.2, -0.62], [1.2, -0.62], [-1.2, 0.68], [1.2, 0.68]].forEach(([x, z]) => {
+      put(stall, makeMesh(new THREE.CylinderGeometry(0.04, 0.045, 1.72, 8), mat(C.woodDark)), x, 0.86, z);
+    });
+    const awning = new THREE.Group();
+    awning.position.set(0, 1.82, 0.03);
+    awning.rotation.x = 0.2;
+    stall.add(awning);
+    const stripes = 8;
+    const stripeW = 2.64 / stripes;
+    for (let i = 0; i < stripes; i++) {
+      const color = i % 2 ? C.white : 0xe8466e;
+      const x = -1.32 + stripeW * (i + 0.5);
+      put(awning, makeMesh(new THREE.BoxGeometry(stripeW, 0.05, 1.6), mat(color)), x, 0, 0);
+      // 前面垂下來的一小片
+      put(awning, makeMesh(new THREE.BoxGeometry(stripeW, 0.18, 0.04), mat(color)), x, -0.1, 0.8);
+    }
+    // 招牌
+    const signTexture = paintTexture(512, 128, (ctx, w, h) => {
+      ctx.fillStyle = '#FFF4D1';
+      roundRectPath(ctx, 4, 4, w - 8, h - 8, 36);
+      ctx.fill();
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = '#E8466E';
+      ctx.stroke();
+      ctx.fillStyle = '#2A3490';
+      ctx.font = `72px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('貓貓商店', w / 2, h / 2 + 4);
+    });
+    put(stall, makeMesh(new THREE.BoxGeometry(1.5, 0.4, 0.05), mat(C.woodDark)), 0, 2.22, 0.3);
+    put(stall, new THREE.Mesh(new THREE.PlaneGeometry(1.42, 0.355), new THREE.MeshBasicMaterial({ map: signTexture, transparent: true, toneMapped: false })), 0, 2.22, 0.33);
+    // 櫃檯上的東西：水果（蘋果、香蕉）、水、果汁
+    const top = 0.62;
+    put(stall, makeMesh(new THREE.BoxGeometry(0.5, 0.04, 0.3), mat(C.lemon)), -0.72, top + 0.02, 0.42);
+    put(stall, makeMesh(new THREE.SphereGeometry(0.09, 12, 10), mat(0xe8453c, { flatShading: false })), -0.84, top + 0.12, 0.44);
+    put(stall, makeMesh(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 5), mat(C.trunk)), -0.84, top + 0.225, 0.44);
+    const banana = put(stall, makeMesh(new THREE.TorusGeometry(0.1, 0.032, 8, 12, Math.PI * 0.8), mat(C.sun, { flatShading: false })), -0.6, top + 0.08, 0.42);
+    banana.rotation.set(Math.PI / 2, 0, 0.3);
+    put(stall, makeMesh(new THREE.CylinderGeometry(0.055, 0.06, 0.22, 10), mat(0xa9dcf2, { flatShading: false, transparent: true, opacity: 0.85 })), 0.05, top + 0.11, 0.44);
+    put(stall, makeMesh(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 8), mat(C.ink)), 0.05, top + 0.245, 0.44);
+    put(stall, makeMesh(new THREE.BoxGeometry(0.13, 0.2, 0.09), mat(0xffa23d)), 0.75, top + 0.1, 0.44);
+    const straw = put(stall, makeMesh(new THREE.CylinderGeometry(0.008, 0.008, 0.12, 5), mat(C.white)), 0.78, top + 0.24, 0.44);
+    straw.rotation.z = -0.35;
+    // 架子上再擺幾瓶
+    [-0.7, -0.35, 0.35, 0.7].forEach((x, i) => {
+      if (i % 2) put(stall, makeMesh(new THREE.BoxGeometry(0.12, 0.18, 0.09), mat(0xffa23d)), x, 1.135, -0.5);
+      else put(stall, makeMesh(new THREE.CylinderGeometry(0.05, 0.055, 0.2, 10), mat(0xa9dcf2, { flatShading: false })), x, 1.145, -0.5);
+    });
+    // 旁邊立一枚小魚金幣的牌子（照桐桐畫的：橢圓裡一條小魚）
+    const coinTexture = paintTexture(256, 256, (ctx, w, h) => {
+      ctx.fillStyle = '#F7C531';
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, 118, 0, TAU);
+      ctx.fill();
+      ctx.lineWidth = 12;
+      ctx.strokeStyle = '#C99000';
+      ctx.stroke();
+      ctx.lineWidth = 11;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#8A5A00';
+      ctx.beginPath();
+      ctx.ellipse(112, 128, 62, 42, 0, 0, TAU);
+      ctx.moveTo(172, 128);
+      ctx.lineTo(214, 92);
+      ctx.lineTo(214, 164);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fillStyle = '#8A5A00';
+      ctx.beginPath();
+      ctx.arc(86, 118, 9, 0, TAU);
+      ctx.fill();
+    });
+    const coinSign = new THREE.Group();
+    coinSign.position.set(1.75, 0, 0.55);
+    stall.add(coinSign);
+    put(coinSign, makeMesh(new THREE.CylinderGeometry(0.03, 0.035, 0.9, 8), mat(C.woodDark)), 0, 0.45, 0);
+    const coin = put(coinSign, makeMesh(new THREE.CylinderGeometry(0.3, 0.3, 0.05, 28), mat(C.gold, { flatShading: false })), 0, 1.15, 0);
+    coin.rotation.x = Math.PI / 2;
+    put(coinSign, new THREE.Mesh(new THREE.CircleGeometry(0.29, 28), new THREE.MeshBasicMaterial({ map: coinTexture, transparent: true, toneMapped: false })), 0, 1.15, 0.027);
+    pickable(stall, { type: 'shop' });
+    island.obstacles.push({ x: 0, z: sz + 0.03, w: 2.7, d: 1.55 });
+    island.obstacles.push({ x: 1.75, z: sz + 0.55, r: 0.2 });
+
+    // 店員：站在櫃檯後面的小凳子上，看得到上半身
+    const model = buildHuman('clerk');
+    put(stall, makeMesh(new THREE.BoxGeometry(0.5, 0.2, 0.36), mat(C.woodDark)), 0, 0.1, -0.12);
+    model.root.position.set(0, 0.2, -0.12);
+    stall.add(model.root);
+    model.meshes.forEach((mesh) => {
+      mesh.userData.pick = { type: 'shop' };
+      pickables.push(mesh);
+    });
+    shop.clerk = { model, bubbleY: model.height + 0.3, speech: null };
+    shop.island = island;
+
+    // 攤子前面的小廣場
+    const plaza = flatMesh(new THREE.Shape().absarc(0, 0, 0.72, 0, TAU), C.path, TOP + 0.011);
+    plaza.position.set(0, TOP + 0.011, 0.85);
+    g.add(plaza);
+    shop.frontNode = addNode(island, 0, 0.85, 'spot');
+    spur(island, shop.frontNode);
+    // 貓貓也會來逛：坐在攤子前面看水果，或在旁邊的長椅上發呆
+    [-0.95, 0.95].forEach((x) => {
+      addSpot(island, { approach: [x, 0.75], pos: [x, TOP + 0.005, 0.62], face: Math.PI, poses: ['sit', 'loaf'], kind: 'rest', doing: '在貓貓商店看水果', draw: false });
+    });
+    addBench(island, -2.05, 0.95, 0.35, { width: 0.9, seats: 2, kind: 'rest', doing: '在貓貓商店的長椅上發呆' });
+    [[1.5, 1.3], [-1.2, 1.55], [2.1, 0.2], [-2.2, -0.2]].forEach(([x, z]) => flowerSpot(island, x, z));
+    island.extraTrees = [[-2.3, -1.3], [2.35, -1.25], [2.3, 1.45]];
+    island.treeLimit = 3;
+    island.labelY = TOP + 2.95;
+    island.labelZ = sz;
+  }
+
+  // 店員平常站著，偶爾揮揮手；有人買東西就舉手歡呼、說一句話
+  function stepShop(dt, t) {
+    const clerk = shop.clerk;
+    if (!clerk) return;
+    shop.cheer = Math.max(0, shop.cheer - dt);
+    shop.wave -= dt;
+    if (shop.wave < -7) shop.wave = 1.6;
+    animateHuman(clerk.model, shop.cheer > 0 ? 'cheer' : shop.wave > 0 ? 'wave' : 'stand', false, dt, t);
+  }
+  function shopSay(text, cheer = false) {
+    if (!shop.clerk) return;
+    if (cheer) shop.cheer = 1.6;
+    else shop.wave = 1.6;
+    say(shop.clerk, text, 2.4);
+  }
+
   // ---------- 貓貓之家：藍屋頂房子，屋頂上掛桐桐的印章招牌 ----------
   let homeDoor = null;
   function buildHome(island) {
@@ -1175,7 +1319,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   }
 
   // ---------- 島主之家：玩家的家（原本是紙箱公園）。一棟小房子、信箱、門前小廣場和兩張長椅 ----------
-  const ownerHome = { doorNode: null };
+  const ownerHome = { doorNode: null, island: null, zzz: null };
   function buildOwnerHome(island) {
     const g = island.group;
     const hz = -0.7;
@@ -1247,6 +1391,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     const plaza = flatMesh(new THREE.Shape().absarc(0, 0, 0.62, 0, TAU), C.path, TOP + 0.011);
     plaza.position.set(0, TOP + 0.011, 0.5);
     g.add(plaza);
+    ownerHome.island = island;
     ownerHome.doorNode = addNode(island, 0, 0.42, 'spot');
     spur(island, ownerHome.doorNode);
 
@@ -1989,6 +2134,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     else if (island.kind === 'learn') buildLearn(island);
     else if (island.kind === 'track') buildTrack(island);
     else if (island.kind === 'owner') buildOwnerHome(island);
+    else if (island.kind === 'shop') buildShop(island);
     else if (island.id === 'park2') buildPark2(island);
   });
   const platformById = Object.fromEntries(platforms.map((p) => [p.id, p]));
@@ -3108,7 +3254,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   }
 
   // ---------- 島主：換樣子 ----------
-  const OWNER_CAT_POSE = { stand: 'upright', walk: 'uprightWalk', run: 'run', sit: 'sit', cheer: 'cheer', wave: 'wave', pet: 'point', crouch: 'crouch', jump: 'air', sing: 'sing', ready: 'wiggle' };
+  const OWNER_CAT_POSE = { eat: 'point', drink: 'point', stand: 'upright', walk: 'uprightWalk', run: 'run', sit: 'sit', cheer: 'cheer', wave: 'wave', pet: 'point', crouch: 'crouch', jump: 'air', sing: 'sing', ready: 'wiggle' };
 
   function setOwnerLook(kind) {
     if (owner.kind === kind) return;
@@ -3120,6 +3266,8 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       for (let i = pickables.length - 1; i >= 0; i--) if (list.includes(pickables[i])) pickables.splice(i, 1);
       if (old.meshes) disposeModel(old);
     }
+    owner.food = null;
+    owner.eating = false;
     owner.kind = kind;
     owner.model = null;
     if (!kind) return;
@@ -3132,13 +3280,15 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       owner.tag.position.set(0, 0.98, 0);
     } else {
       model = buildHuman(kind);
-      owner.bubbleY = model.height + 0.3;
+      owner.bubbleY = model.height + 0.62;
       owner.tag.position.set(0, model.height / model.root.scale.x + 0.16, 0);
     }
     (model.pickables || model.meshes).forEach((mesh) => {
       mesh.userData.pick = { type: 'owner' };
       pickables.push(mesh);
     });
+    // 正在睡覺的時候換樣子：人還在屋子裡
+    model.root.visible = !owner.asleep;
     model.root.add(owner.tag);
     scene.add(model.root);
     owner.model = model;
@@ -3160,7 +3310,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
   // ---------- 島主：走路 ----------
   const OWNER_WALK = 1.8;
   const OWNER_RUN = 3.4;
-  const ownerBusy = () => !owner.model || owner.state === 'air' || owner.state === 'charge' || (!!race.ownerIn && race.phase !== 'finish');
+  const ownerBusy = () => !owner.model || !!owner.asleep || owner.state === 'air' || owner.state === 'charge' || (!!race.ownerIn && race.phase !== 'finish');
 
   // 放下手上的事：從椅子起來、下舞臺、離開軟墊
   function ownerStop() {
@@ -3230,6 +3380,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     if (island.kind === 'jump') return platformById[island.id].exitNode;
     if (island.kind === 'stage') return show.waitNode;
     if (island.kind === 'track') return race.gateNode;
+    if (island.kind === 'shop') return shop.frontNode;
     return island.ringNodes.slice().sort((a, b) => nodes[b].z - nodes[a].z)[0];
   }
 
@@ -3322,6 +3473,110 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       owner.pose = 'pet';
       owner.poseT = 1.1;
     }
+  }
+
+  // ---------- 島主：回家睡覺。人進屋子裡，屋頂上冒 z Z；睡覺的時候不能走路、不能玩 ----------
+  function ownerSleep(on) {
+    if (on === !!owner.asleep) return true;
+    if (on) {
+      if (owner.state === 'air' || owner.state === 'charge' || (race.ownerIn && race.phase !== 'finish')) return false;
+      chatEnd();
+      ownerStop();
+      owner.path = null;
+      owner.onArrive = null;
+      owner.state = 'idle';
+      owner.moving = false;
+      owner.pose = 'stand';
+      owner.node = ownerHome.doorNode;
+      owner.pos.copy(nodes[owner.node].v);
+      owner.islandId = 'park1';
+      owner.heading = 0;
+      owner.targetHeading = 0;
+      owner.asleep = true;
+      if (owner.model) owner.model.root.visible = false;
+      if (!ownerHome.zzz) {
+        const el = document.createElement('div');
+        el.className = 'zzz zzz--home';
+        el.textContent = 'z Z';
+        const wrap = document.createElement('div');
+        wrap.setAttribute('aria-hidden', 'true');
+        wrap.append(el);
+        ownerHome.zzz = new CSS2DObject(wrap);
+        ownerHome.zzz.position.set(1.45, TOP + 2.1, -0.7);
+      }
+      ownerHome.island.group.add(ownerHome.zzz);
+      return true;
+    }
+    owner.asleep = false;
+    if (ownerHome.zzz) ownerHome.zzz.removeFromParent();
+    if (owner.model) {
+      owner.model.root.visible = true;
+      owner.pose = 'cheer';
+      owner.poseT = 1.2;
+      say(owner, '睡飽了！', 1.6, 'trick-tag');
+    }
+    return true;
+  }
+
+  // ---------- 島主：在貓貓商店買了東西，當場吃掉、喝掉 ----------
+  function makeFood(kind) {
+    const g = new THREE.Group();
+    if (kind === 'fruit') {
+      put(g, makeMesh(new THREE.SphereGeometry(0.075, 12, 10), mat(0xe8453c, { flatShading: false })), 0, 0, 0);
+      put(g, makeMesh(new THREE.CylinderGeometry(0.007, 0.007, 0.04, 5), mat(C.trunk)), 0, 0.085, 0);
+    } else if (kind === 'water') {
+      put(g, makeMesh(new THREE.CylinderGeometry(0.045, 0.05, 0.18, 10), mat(0xa9dcf2, { flatShading: false })), 0, 0.02, 0);
+      put(g, makeMesh(new THREE.CylinderGeometry(0.025, 0.025, 0.04, 8), mat(C.ink)), 0, 0.13, 0);
+    } else {
+      put(g, makeMesh(new THREE.BoxGeometry(0.1, 0.16, 0.07), mat(0xffa23d)), 0, 0.02, 0);
+      const straw = put(g, makeMesh(new THREE.CylinderGeometry(0.007, 0.007, 0.1, 5), mat(C.white)), 0.02, 0.14, 0);
+      straw.rotation.z = -0.3;
+    }
+    return g;
+  }
+  function dropFood() {
+    if (!owner.food) return;
+    owner.food.removeFromParent();
+    owner.food.traverse((o) => {
+      if (o.isMesh) {
+        o.geometry.dispose();
+        o.material.dispose();
+      }
+    });
+    owner.food = null;
+  }
+  // 回傳 true 表示島主有做動作（沒選樣子、在睡覺、正在比賽或跳的時候不做）
+  function ownerEat(kind) {
+    if (ownerBusy()) return false;
+    // 人不在商店（例如在家看島）：先過來，到了再吃
+    if (owner.islandId !== 'shop' && owner.state !== 'walk') ownerGoIsland('shop');
+    if (owner.state !== 'idle') {
+      owner.wantFood = kind;
+      return true;
+    }
+    owner.wantFood = null;
+    dropFood();
+    const drinking = kind !== 'fruit';
+    owner.trick = null;
+    owner.pose = drinking ? 'drink' : 'eat';
+    owner.poseT = 2.6;
+    owner.eating = true;
+    // 轉過來面向鏡頭，看得到在吃
+    if (!owner.sitSpot) owner.targetHeading = 0;
+    const food = makeFood(kind);
+    if (owner.model.isCat) {
+      // 貓的樣子：東西飄在嘴巴前面
+      food.position.set(0, 0.62, 0.3);
+      owner.model.root.add(food);
+    } else {
+      // 人的樣子：拿在右手上
+      food.position.set(0, -0.3, 0.05);
+      food.rotation.x = Math.PI;
+      owner.model.arms[1].add(food);
+    }
+    owner.food = food;
+    say(owner, drinking ? '咕嚕咕嚕！' : '啊姆啊姆！', 2.2, 'trick-tag');
+    return true;
   }
 
   // ---------- 島主：坐下來 ----------
@@ -3634,6 +3889,17 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     if (owner.poseT > 0) {
       owner.poseT -= dt;
       if (owner.poseT <= 0 && owner.state === 'idle' && !owner.trick) owner.pose = owner.sitSpot ? 'sit' : 'stand';
+    }
+    // 買的時候還在走路：到了站好再吃
+    if (owner.wantFood && owner.state === 'idle') {
+      if (owner.islandId === 'shop') ownerEat(owner.wantFood);
+      else owner.wantFood = null;
+    }
+    // 吃完了、或吃到一半走開：手上的東西收掉
+    if (owner.eating && owner.pose !== 'eat' && owner.pose !== 'drink') {
+      owner.eating = false;
+      dropFood();
+      if (owner.state === 'idle') say(owner, '♥', 1.2, 'heart');
     }
     // 聊天的時候貓和島主看著對方
     if (owner.chatting !== null) {
@@ -3999,7 +4265,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     const p = platformById[cat.platform];
     cat.pose = 'wiggle';
     cat.targetHeading = Math.PI / 2;
-    if (p.user) return;
+    if (p.user && userCanJump) return;
     cat.timer -= dt;
     if (cat.timer > 0) return;
     cat.state = 'crouch';
@@ -4361,6 +4627,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     marker.visible = false;
   }
 
+  let userCanJump = true;
   function setUser(p, on) {
     if (p.user === on) return;
     p.user = on;
@@ -4425,6 +4692,11 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       const distance = Math.max(10.5 / Math.tan(halfH), 6.6 / Math.tan(halfVv)) * 1.05;
       offset = new THREE.Vector3(0, 0.95, 1).normalize().multiplyScalar(distance);
       target = W(island, TRACK.center.x, TOP + 0.3, TRACK.center.z);
+    } else if (island.kind === 'shop') {
+      // 從攤子前面看櫃檯和店員
+      const distance = Math.max(3.3 / Math.tan(halfH), 2.5 / Math.tan(halfVv)) * 1.05;
+      offset = new THREE.Vector3(0.1, 0.5, 1).normalize().multiplyScalar(distance);
+      target = W(island, 0, TOP + 0.95, -0.1);
     } else if (island.kind === 'stage') {
       // 從觀眾席後面看舞臺
       const distance = Math.max(3.1 / Math.tan(halfH), 1.9 / Math.tan(halfVv)) * 1.05;
@@ -4477,9 +4749,10 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(pickables, false).find((h) => h.object.visible && (h.object.userData.pick.type !== 'cat' || cats[h.object.userData.pick.index].model.root.visible));
+    const hit = raycaster.intersectObjects(pickables, false).find((h) => h.object.visible && (h.object.userData.pick.type !== 'cat' || cats[h.object.userData.pick.index].model.root.visible)
+      && (h.object.userData.pick.type !== 'owner' || owner.model.root.visible));
     // 直接點到貓、教練、老師、黑板或講台就算數；黑板、講台不用讓給旁邊的貓
-    if (hit && ['cat', 'coach', 'teacher', 'owner', 'ownerHome', 'board', 'podium'].includes(hit.object.userData.pick.type)) {
+    if (hit && ['cat', 'coach', 'teacher', 'owner', 'ownerHome', 'shop', 'board', 'podium'].includes(hit.object.userData.pick.type)) {
       pickHandlers.forEach((cb) => cb(hit.object.userData.pick));
       return;
     }
@@ -4528,6 +4801,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     updateTeacher(dt);
     applyPose(teacher, dt, t);
     updateOwner(dt, t);
+    stepShop(dt, t);
     // 整隻躲起來的貓，紙箱偶爾會晃一晃
     boxSpots.forEach((spot) => {
       const cat = spot.occupant !== null ? cats[spot.occupant] : null;
@@ -4570,7 +4844,7 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
       cat.tag.visible = cat.model.root.visible && (cat.followed || onStage || performing || racing || camera.position.distanceTo(cat.pos) < TAG_DISTANCE);
       if (cat.zzz) cat.zzz.visible = cat.tag.visible;
     }
-    owner.tag.visible = !!owner.model;
+    owner.tag.visible = !!owner.model && owner.model.root.visible;
     coach.tag.visible = coach.followed || camera.position.distanceTo(coach.pos) < TAG_DISTANCE * 1.4;
     teacher.tag.visible = teacher.model.root.visible && camera.position.distanceTo(teacher.pos) < TAG_DISTANCE * 1.4;
     for (let i = transient.length - 1; i >= 0; i--) {
@@ -4902,6 +5176,12 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     ownerStick,
     ownerGoIsland,
     ownerSit,
+    ownerSleep,
+    ownerEat,
+    shopSay,
+    setUserCanJump(on) {
+      userCanJump = !!on;
+    },
     ownerCanSit: (id) => !!owner.model && seatsOn(id).length > 0,
     ownerStage,
     ownerTrick,

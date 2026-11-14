@@ -11,6 +11,7 @@ import { zhuyin, plainText } from './zhuyin.js';
 import {
   BADGES, BADGE_GROUPS, ISLAND_IDS, NAME_MAX, sanitizeProfile, sanitizeDeviceData, cleanName, playerName, stampChar, statValue, total, bestCm, seenCount, bump, addSeen, markDay, award, earnedDayText,
   normalizeCode, formatCode, ownData, applyRemote,
+  POWER_MAX, POWER_COST, SHOP_ITEMS, HOMEWORK_REWARD, coins, power, earnCoins, usePower, buyItem, jumpTop, noteJumpTop, jumpGrade, jumpReward, raceReward, sleepGain,
 } from './profile.js';
 import { composeNews, sanitizeNews, recordNews, recordJumpNews, recordRaceNews, chatGreeting, chatPet, chatDoing, chatBest, chatDiary, chatBusy } from './talk.js';
 import { createScene } from './scene.js';
@@ -20,6 +21,7 @@ const RING = 2 * Math.PI * 54;
 const NAV = [
   { id: 'park1', label: '島主之家' },
   { id: 'owner', label: '跟著島主走' },
+  { id: 'shop', label: '貓貓商店' },
   { id: 'home', label: '貓貓之家' },
   { id: 'low', label: '低階跳臺', level: 'low' },
   { id: 'mid', label: '中階跳臺', level: 'mid' },
@@ -146,6 +148,17 @@ function createSound(enabled) {
     },
     pop() {
       tone('sine', 420, 900, 0.12, 0.14);
+    },
+    // 吃東西：咬三口
+    munch() {
+      [0, 0.32, 0.64].forEach((d) => {
+        tone('square', 190, 120, 0.09, 0.07, d);
+        tone('triangle', 300, 160, 0.1, 0.1, d + 0.03);
+      });
+    },
+    // 喝東西：咕嚕三聲
+    gulp() {
+      [0, 0.34, 0.68].forEach((d) => tone('sine', 300, 560, 0.16, 0.16, d));
     },
     page() {
       tone('triangle', 520, 700, 0.08, 0.06);
@@ -299,11 +312,20 @@ function start(hotData = {}) {
   // 在家看島：島主待在家裡，玩法回到原本的樣子（點島飛過去看、點貓看資料、跳臺按鈕讓貓跳）。只存在這臺
   let atHome = stored.stayHome === true;
 
+  // 回家睡覺：開始睡（或上次補電）的時間，0 是醒著。只存在這臺；關掉網頁也照算，下次打開一次補齊
+  let sleepAt = Number.isFinite(stored.sleepAt) && stored.sleepAt > 0 ? stored.sleepAt : 0;
+  const asleep = () => sleepAt > 0;
+  // 算破紀錄用的跳臺最高成績：舊存檔用現在排行榜上的成績當起點，之後「重新比一次」也不會清掉
+  LEVEL_KEYS.forEach((level) => {
+    const top = topRecord(records, level);
+    if (top) noteJumpTop(profile, 'cat', level, top.cm);
+  });
+
   // 第一次來的人先看島的故事，看過就不再跳出來
   let storySeen = !!stored.storySeen;
 
   function save() {
-    writeStore({ records, race: raceBoard, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay }, profile, news: newsLog, stayHome: atHome });
+    writeStore({ records, race: raceBoard, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay }, profile, news: newsLog, stayHome: atHome, sleepAt });
   }
 
   // ---------- 搖桿：跟著島主走的時候出現在左下角，推哪邊島主就往哪邊走（點地上走路照樣可以） ----------
@@ -387,17 +409,31 @@ function start(hotData = {}) {
         if (results.length) raceBoard = addRaceResult(raceBoard, results);
         save();
         refreshBoards();
-        if (focus !== 'track') return;
         const place = order.indexOf(ownerIndex);
-        showToast('比賽結束！', place >= 0 ? `你跑了第 ${place + 1} 名` : `第一名是${nameOf(order[0])}`);
+        const won = place >= 0 ? raceReward(place + 1) : 0;
+        if (place >= 0) {
+          bump(profile, 'races');
+          if (place < 3) bump(profile, 'raceTop3');
+          track('race_finish', { result: place < 3 ? 'top3' : 'other' });
+        }
+        if (won) gotCoins(won);
+        if (focus !== 'track') return;
+        showToast('比賽結束！', place >= 0 ? `你跑了第 ${place + 1} 名，拿到 ${won} 個小魚金幣` : `第一名是${nameOf(order[0])}`);
       },
       ownerJump({ level, cm, perfect }) {
-        showResult(`${ownerLabel()}跳了 ${cm} 公分${perfect ? '，完美跳！' : '！'}`, '');
+        // 跟島主自己在這座跳臺跳過最高的那一次比
+        const grade = jumpGrade(jumpTop(profile, 'own', level), cm, perfect);
+        noteJumpTop(profile, 'own', level, cm);
+        const won = jumpReward(level, grade);
+        showResult(`${ownerLabel()}跳了 ${cm} 公分${perfect ? '，完美跳！' : '！'}`, `${grade === 'record' ? '破了自己的紀錄！' : ''}${coinNote(won)}`);
+        if (grade === 'record') sound.play('record');
+        track('owner_jump', { level, cm, perfect: perfect ? 'yes' : 'no', record: grade === 'record' ? 'own' : 'none' });
         if (perfect) {
           bump(profile, 'perfect');
           if (level === 'high') bump(profile, 'perfectHigh');
-          tallied();
         }
+        if (won) gotCoins(won);
+        else tallied();
       },
     },
   });
@@ -405,6 +441,10 @@ function start(hotData = {}) {
   // ---------- 一跳到最高點：記成績、更新排行榜、破紀錄就慶祝 ----------
   function onJump(info) {
     const judge = judgeJump(records, info);
+    // 小魚金幣看的「破紀錄」：比這座跳臺以前最高的那一次還高（貓自己跳的也算進紀錄）
+    const grade = jumpGrade(jumpTop(profile, 'cat', info.level), info.cm, info.perfect);
+    noteJumpTop(profile, 'cat', info.level, info.cm);
+    const won = info.tong ? jumpReward(info.level, grade) : 0;
     jumpCount += 1;
     records.push({ cat: info.cat, level: info.level, cm: info.cm, tong: !!info.tong, at: jumpCount });
     prune();
@@ -421,7 +461,7 @@ function start(hotData = {}) {
       if (judge.island && !judge.first) note = '全島新紀錄！';
       else if (judge.platform) note = `${level.short}跳臺新紀錄！`;
       else if (judge.personal) note = '牠自己的新紀錄！';
-      showResult(`${name}跳了 ${info.cm} 公分${info.perfect ? '，完美跳！' : '！'}`, note);
+      showResult(`${name}跳了 ${info.cm} 公分${info.perfect ? '，完美跳！' : '！'}`, `${note}${coinNote(won)}`);
       if (judge.island || judge.platform) sound.play('record');
     }
     const islandRecord = judge.island && !judge.first && records.length > 3;
@@ -437,7 +477,8 @@ function start(hotData = {}) {
       if (info.perfect && info.level === 'high') bump(profile, 'perfectHigh');
       if (islandRecord) bump(profile, 'records');
       profile.bestCm = Math.max(profile.bestCm, info.cm);
-      tallied();
+      if (won) gotCoins(won);
+      else tallied();
     }
     return judge;
   }
@@ -454,6 +495,7 @@ function start(hotData = {}) {
     save();
     if (fresh.length) announceBadges(fresh);
     if (!$('profile-card').hidden) renderProfile();
+    renderWallet();
     scheduleSync();
   }
 
@@ -461,6 +503,203 @@ function start(hotData = {}) {
     bump(profile, key);
     tallied();
   }
+
+  // ---------- 島主的電和小魚金幣 ----------
+  const wallet = $('wallet');
+  function renderWallet() {
+    const p = power(profile);
+    $('wallet-power').textContent = String(p);
+    $('wallet-coins').textContent = String(coins(profile));
+    wallet.classList.toggle('is-low', p < POWER_COST.low);
+    wallet.setAttribute('aria-label', `島主的電 ${p} 個，小魚金幣 ${coins(profile)} 個，按一下去貓貓商店`);
+    if (!$('shop-card').hidden) renderShop();
+    if (!$('home-card').hidden) renderSleep();
+    syncPlayable();
+  }
+  // 錢包下面冒一下「＋10」這種小字
+  function walletPop(text, minus = false) {
+    const pop = el('span', `wallet-pop${minus ? ' wallet-pop--minus' : ''}`, text);
+    pop.setAttribute('aria-hidden', 'true');
+    wallet.querySelectorAll('.wallet-pop').forEach((old) => old.remove());
+    wallet.append(pop);
+    setTimeout(() => pop.remove(), 1900);
+    wallet.classList.remove('is-bump');
+    void wallet.offsetWidth;
+    wallet.classList.add('is-bump');
+  }
+  const coinNote = (won) => (won ? `拿到 ${won} 個小魚金幣` : '');
+  function gotCoins(amount) {
+    earnCoins(profile, amount);
+    walletPop(`小魚金幣 ＋${amount}`);
+    tallied();
+  }
+  // 這座島玩一次要幾個電（不用電的島是 0）
+  const costOf = (id) => POWER_COST[id] || 0;
+  // 電不夠、或島主在睡覺：玩家按不了跳臺，貓就自己跳，不會一直排隊等
+  function syncPlayable() {
+    scene.setUserCanJump(!asleep() && power(profile) >= costOf(focus));
+  }
+  // 要用電的遊戲開始前先問：可以玩就回傳 true（還沒扣）；不行就跳提示
+  function canPlay(id) {
+    if (asleep()) {
+      showToast('島主正在睡覺', '回島主之家按「起床」，才可以玩');
+      return false;
+    }
+    const cost = costOf(id);
+    const have = power(profile);
+    if (have >= cost) return true;
+    track('power_short', { what: id });
+    showToast('電不夠了！', `要 ${cost} 個電，現在有 ${have} 個。去商店買吃的，或回家睡覺`);
+    return false;
+  }
+  function spendPower(id) {
+    const cost = costOf(id);
+    if (!cost || !usePower(profile, cost)) return;
+    walletPop(`⚡ −${cost}`, true);
+    tallied();
+  }
+  wallet.addEventListener('click', () => {
+    if (focus === 'shop' && $('shop-card').hidden) openShop();
+    else if (focus !== 'shop') goIsland('shop');
+    else closeCards();
+  });
+
+  // ---------- 貓貓商店：用小魚金幣買吃的、喝的，買了馬上補電 ----------
+  function renderShop() {
+    const have = coins(profile);
+    $('shop-power').textContent = String(power(profile));
+    $('shop-coins').textContent = String(have);
+    document.querySelectorAll('#shop-list .shop-buy').forEach((button) => {
+      const item = SHOP_ITEMS.find((i) => i.id === button.dataset.item);
+      button.classList.toggle('is-short', have < item.price || power(profile) >= POWER_MAX);
+    });
+  }
+  $('shop-list').replaceChildren(...SHOP_ITEMS.map((item) => {
+    const li = el('li', 'shop-item');
+    li.append($(`shop-icon-${item.id}`).content.cloneNode(true));
+    const body = el('div');
+    body.append(el('p', 'shop-item__name', item.name), el('p', 'shop-item__gain', `補 ${item.power} 個電`));
+    const button = el('button', 'sticker sticker--solid shop-buy');
+    button.type = 'button';
+    button.dataset.item = item.id;
+    button.setAttribute('aria-label', `買${item.name}，${item.price} 個小魚金幣，補 ${item.power} 個電`);
+    button.append($('coin-icon').content.cloneNode(true), el('b', '', String(item.price)), '買');
+    button.addEventListener('click', () => buy(item.id, button));
+    li.append(body, button);
+    return li;
+  }));
+  function shopSay(text) {
+    $('shop-msg').textContent = text;
+  }
+  function buy(id, button) {
+    sound.unlock();
+    const before = power(profile);
+    const result = buyItem(profile, id);
+    const item = result.item;
+    if (!result.ok) {
+      button.classList.remove('is-nope');
+      void button.offsetWidth;
+      button.classList.add('is-nope');
+      track('shop_buy', { what: id, result: result.reason === 'coins' ? 'no_coins' : 'full' });
+      if (result.reason === 'coins') shopSay(`小魚金幣不夠。${item.name}要 ${item.price} 個金幣，現在有 ${coins(profile)} 個。`);
+      else if (result.reason === 'full') shopSay('電是滿的，現在不用買東西。');
+      return;
+    }
+    sound.play('pop');
+    sound.play(item.verb === '吃' ? 'munch' : 'gulp');
+    scene.shopSay(`${item.name}來了！`, true);
+    // 島主當場吃掉、喝掉；商品的圖也被咬幾口
+    scene.ownerEat(id);
+    const icon = button.closest('.shop-item').querySelector('.shop-item__icon');
+    icon.classList.remove('is-eaten', 'is-drunk');
+    void icon.getBoundingClientRect();
+    icon.classList.add(item.verb === '吃' ? 'is-eaten' : 'is-drunk');
+    // 手機上卡片會蓋住島主：鏡頭讓出卡片的位置
+    if (focus === 'shop') scene.focus('shop', insets());
+    track('shop_buy', { what: id, result: 'ok' });
+    walletPop(`⚡ ＋${result.gained}`);
+    shopSay(result.gained < item.power
+      ? `${item.verb}了${item.name}，電補滿了！（${before} 個變 ${power(profile)} 個）`
+      : `${item.verb}了${item.name}，補了 ${result.gained} 個電！（${before} 個變 ${power(profile)} 個）`);
+    tallied();
+  }
+  function openShop() {
+    closeCards();
+    shopSay('');
+    renderShop();
+    $('shop-card').hidden = false;
+    $('shop-card').scrollTop = 0;
+    scene.shopSay('歡迎光臨！');
+    track('shop_open');
+  }
+
+  // ---------- 回家睡覺：每 1 分鐘補 1 個電，補到 30 個；睡覺的時候不能玩要用電的遊戲 ----------
+  function renderSleep() {
+    const sleeping = asleep();
+    $('sleep-box').hidden = !sleeping;
+    $('home-actions').hidden = sleeping;
+    $('home-change').hidden = sleeping || !profile.avatar;
+    if (!sleeping) return;
+    const have = power(profile);
+    $('sleep-power').textContent = String(have);
+    $('sleep-title').textContent = have >= POWER_MAX ? '電補滿了！' : `${ownerLabel()}正在睡覺`;
+    $('sleep-note').textContent = have >= POWER_MAX
+      ? '可以起床出門玩了。'
+      : `每 1 分鐘補 1 個電，再睡 ${POWER_MAX - have} 分鐘就滿了。關掉網頁也照算。`;
+  }
+  // 把睡著這段時間的電補上；回傳補了幾個
+  function sleepTick() {
+    if (!asleep()) return 0;
+    const result = sleepGain(profile, sleepAt, Date.now());
+    const moved = result.sleepAt !== sleepAt;
+    sleepAt = result.sleepAt;
+    if (result.gained) {
+      walletPop(`⚡ ＋${result.gained}`);
+      tallied();
+      if (power(profile) >= POWER_MAX) showToast('電補滿了！', '回島主之家按「起床」，就可以出門玩');
+    } else if (moved) {
+      save();
+    }
+    return result.gained;
+  }
+  function goSleep() {
+    if (asleep()) return;
+    if (!scene.ownerSleep(true)) {
+      showToast('等一下再睡', '島主正在比賽或跳到一半');
+      return;
+    }
+    sleepAt = Date.now();
+    atHome = true;
+    ownerJumping = false;
+    ownerOnStage = false;
+    save();
+    syncOwnerButtons();
+    updateNav();
+    renderWallet();
+    track('owner_sleep');
+  }
+  function wakeUp() {
+    if (!asleep()) return;
+    sleepTick();
+    track('owner_wake', { result: power(profile) >= POWER_MAX ? 'full' : 'early' });
+    sleepAt = 0;
+    scene.ownerSleep(false);
+    save();
+    renderWallet();
+    showToast('起床了！', `現在有 ${power(profile)} 個電`);
+  }
+  $('home-sleep').addEventListener('click', () => {
+    sound.unlock();
+    firstVisit = false;
+    goSleep();
+    renderHome();
+    $('home-card').scrollTop = 0;
+  });
+  $('home-wake').addEventListener('click', () => {
+    sound.unlock();
+    wakeUp();
+    renderHome();
+  });
 
   function see(key, value) {
     if (addSeen(profile, key, value)) tallied();
@@ -536,6 +775,9 @@ function start(hotData = {}) {
   }
 
   const PROFILE_STATS = [
+    ['島主的電', () => power(profile), '個'],
+    ['小魚金幣', () => coins(profile), '個'],
+    ['賺過的金幣', () => total(profile, 'coinsIn'), '個'],
     ['完美跳', () => total(profile, 'perfect'), '次'],
     ['幫貓貓跳', () => total(profile, 'jumps'), '次'],
     ['跳最高', () => bestCm(profile), '公分'],
@@ -691,6 +933,7 @@ function start(hotData = {}) {
   function receiveOthers(others) {
     const renamed = applyRemote(profile, sanitizeDeviceData(others, cats.length));
     if (renamed) applyName();
+    renderWallet();
     const fresh = award(profile, dayKey());
     save();
     if (fresh.length) announceBadges(fresh);
@@ -976,7 +1219,7 @@ function start(hotData = {}) {
     $('race-dock').hidden = id !== 'track';
     if (level) {
       dock.className = `dock dock--${id}`;
-      $('dock-level').textContent = `${starsText(id)} ${level.name}`;
+      $('dock-level').textContent = `${starsText(id)} ${level.name}　一次 ⚡${costOf(id)}`;
       $('dock-hint').textContent = LEVEL_HINT[id];
       $('dock-result').textContent = '';
       renderDockBest();
@@ -988,6 +1231,8 @@ function start(hotData = {}) {
       showToast('跑步田徑場島', '七隻貓到齊，按「開始比賽」就開跑');
     } else if (id === 'park1') {
       openHome();
+    } else if (id === 'shop') {
+      openShop();
     } else if (id === 'rank') {
       openRank();
     } else if (id === 'diary') {
@@ -1001,6 +1246,7 @@ function start(hotData = {}) {
     measureBottom();
     scene.focus(id, insets());
     updateNav();
+    syncPlayable();
   }
 
   // ---------- 島主也來玩：跳臺、舞臺、跑道上的按鈕 ----------
@@ -1047,10 +1293,18 @@ function start(hotData = {}) {
   function pressJump() {
     if (holding || !LEVELS[focus]) return;
     sound.unlock();
+    if (!canPlay(focus)) return;
     if (ownerJumping ? !scene.ownerJumpPress() : !scene.press()) return;
+    spendPower(focus);
     holding = true;
     jumpBtn.classList.add('is-holding');
     sound.startCharge();
+  }
+
+  // 現在不能跳的原因（可以跳就是空字串）
+  function jumpBlocked() {
+    if (asleep()) return '睡覺中';
+    return power(profile) < costOf(focus) ? '電不夠' : '';
   }
 
   function releaseJump() {
@@ -1097,8 +1351,9 @@ function start(hotData = {}) {
     if (ownerJumping) {
       const own = scene.ownerJumpView();
       if (!own.charging && holding) releaseJump();
-      jumpBtn.disabled = !(own.charging || own.ready);
-      setText('jump-label', own.charging ? '放開！' : own.ready ? '按住' : '等一下');
+      const stuck = !own.charging && jumpBlocked();
+      jumpBtn.disabled = !stuck && !(own.charging || own.ready);
+      setText('jump-label', stuck || (own.charging ? '放開！' : own.ready ? '按住' : '等一下'));
       jumpFill.style.strokeDashoffset = String(RING * (1 - own.meter));
       jumpBtn.classList.toggle('is-perfect', own.charging && own.meter >= PERFECT);
       if (own.charging) sound.updateCharge(own.meter);
@@ -1110,8 +1365,9 @@ function start(hotData = {}) {
     if (!view) return;
     const charging = view.charging !== null;
     if (!charging && holding) releaseJump();
-    jumpBtn.disabled = !(charging || view.ready !== null);
-    setText('jump-label', charging ? '放開！' : view.ready !== null ? '按住' : '等一下');
+    const stuck = !charging && jumpBlocked();
+    jumpBtn.disabled = !stuck && !(charging || view.ready !== null);
+    setText('jump-label', stuck || (charging ? '放開！' : view.ready !== null ? '按住' : '等一下'));
     jumpFill.style.strokeDashoffset = String(RING * (1 - (charging ? view.meter : 0)));
     jumpBtn.classList.toggle('is-perfect', charging && view.meter >= PERFECT);
     if (charging) sound.updateCharge(view.meter);
@@ -1162,6 +1418,7 @@ function start(hotData = {}) {
     setText('race-go', running ? '加速！' : '開始比賽');
     $('race-go').disabled = !(view.phase === 'ready' || running);
     $('race-owner').hidden = !profile.avatar || atHome || view.ownerIn || !['gather', 'ready'].includes(view.phase);
+    setText('race-owner', `我也要跑 ⚡${POWER_COST.track}`);
   }
   $('race-go').addEventListener('click', () => {
     sound.unlock();
@@ -1170,7 +1427,10 @@ function start(hotData = {}) {
   });
   $('race-owner').addEventListener('click', () => {
     sound.unlock();
-    if (scene.raceJoin()) showToast('島主也要跑！', '開跑後連按「加速！」，跑得更快');
+    if (!canPlay('track') || !scene.raceJoin()) return;
+    spendPower('track');
+    track('race_join');
+    showToast('島主也要跑！', '開跑後連按「加速！」，跑得更快');
   });
 
   // ---------- 表演區按鈕：點動作，臺上的貓就表演；拍手，臺下的貓一起拍 ----------
@@ -1244,7 +1504,7 @@ function start(hotData = {}) {
     if (c.type === 'characterData') markZhuyin(c.target);
     else c.addedNodes.forEach(markZhuyin);
   }));
-  ['diary-card', 'learn-card', 'lesson-card', 'story-card', 'report-card', 'profile-card', 'home-card', 'chat-card'].forEach((id) => {
+  ['diary-card', 'learn-card', 'lesson-card', 'story-card', 'report-card', 'profile-card', 'home-card', 'chat-card', 'shop-card'].forEach((id) => {
     markZhuyin($(id));
     zhuyinWatch.observe($(id), { childList: true, characterData: true, subtree: true });
   });
@@ -1582,7 +1842,8 @@ function start(hotData = {}) {
       bump(profile, 'daysDone');
       if (learnDay.results.every((r) => r === 'good')) bump(profile, 'daysAllRight');
     }
-    tallied();
+    if (firstTry) gotCoins(HOMEWORK_REWARD);
+    else tallied();
   }
 
   function grade(saysRight, button) {
@@ -1598,7 +1859,8 @@ function start(hotData = {}) {
       track('homework_grade', { unit: s.p.unit, result: s.tries === 0 ? 'first_try' : 'after_hint', cat_right: s.p.right ? 'yes' : 'no' });
       // 先畫好紅筆批改（作業紙會變高），再出現老師的話，捲動位置才算得準
       renderLearn();
-      setTip('good', s.p.right ? `改對了！${name}寫對了。` : `改對了！${name}寫錯了，答案應該是 ${s.p.answer}。`);
+      const coin = s.tries === 0 ? `拿到 ${HOMEWORK_REWARD} 個小魚金幣！` : '';
+      setTip('good', s.p.right ? `改對了！${name}寫對了。${coin}` : `改對了！${name}寫錯了，答案應該是 ${s.p.answer}。${coin}`);
       sound.play('stamp');
       scene.meow(s.cat);
       scene.note(s.cat, { type: 'homework', right: s.p.right });
@@ -1721,7 +1983,6 @@ function start(hotData = {}) {
     const picking = lessonUnit === null;
     $('lesson-intro').hidden = !picking;
     lessonUnits.hidden = !picking;
-    $('lesson-report').hidden = !picking;
     $('lesson-board').hidden = picking;
     $('lesson-dock').hidden = picking;
     if (picking) return;
@@ -1853,7 +2114,7 @@ function start(hotData = {}) {
     $('report-ok').hidden = true;
     $('report-card').hidden = false;
     $('report-card').scrollTop = 0;
-    track('report_open', { what: via === 'toolbar' ? 'toolbar' : reportWhere.from });
+    track('report_open', { what: reportWhere.from });
   }
 
   function closeReport() {
@@ -1865,7 +2126,6 @@ function start(hotData = {}) {
     if ($('report-card').hidden) openReport('toolbar');
     else closeReport();
   });
-  document.querySelectorAll('[data-report]').forEach((button) => button.addEventListener('click', () => openReport('card')));
   $('report-close').addEventListener('click', closeReport);
   $('report-ok').addEventListener('click', closeReport);
   reportKinds.forEach((button) => button.addEventListener('click', () => {
@@ -2077,6 +2337,7 @@ function start(hotData = {}) {
     $('home-change').hidden = noLook;
     $('home-go').textContent = noLook ? '先選島主的樣子' : '出門逛島';
     $('home-go').disabled = noLook;
+    renderSleep();
   }
 
   function openHome() {
@@ -2123,6 +2384,11 @@ function start(hotData = {}) {
 
   // 鏡頭跟著島主走：點地上或推搖桿就走、點貓貓就聊天
   function followOwner() {
+    if (asleep()) {
+      goIsland('park1', true, true);
+      showToast('島主正在睡覺', '按「起床」才可以出門逛島');
+      return;
+    }
     if (!profile.avatar) {
       goIsland('park1');
       showToast('先選島主的樣子', '選好就可以出門逛島');
@@ -2410,6 +2676,9 @@ function start(hotData = {}) {
     else if (pick.type === 'ownerHome') {
       if (focus === 'park1') openHome();
       else goIsland('park1');
+    } else if (pick.type === 'shop') {
+      if (focus === 'shop') openShop();
+      else goIsland('shop');
     } else if (pick.type === 'cat') meetCat(pick.index, '3d');
     else if (pick.type === 'coach') openCoach();
     else if (pick.type === 'teacher' || pick.type === 'podium') atLearn(openLearn);
@@ -2437,6 +2706,8 @@ function start(hotData = {}) {
     }
     if (diaryOpen) renderWriters();
     if (coachOpen) renderCoach();
+    sleepTick();
+    if (asleep() && !$('home-card').hidden) renderSleep();
   }, 1000);
 
   window.addEventListener('resize', () => {
@@ -2449,6 +2720,14 @@ function start(hotData = {}) {
   updateNav();
   applyName();
   syncOwnerButtons();
+  if (asleep()) {
+    atHome = true;
+    scene.ownerSleep(true);
+    const before = power(profile);
+    const gained = sleepTick();
+    if (gained) setTimeout(() => showToast('睡得好飽！', `睡覺的時候補了 ${gained} 個電（${before} 個變 ${power(profile)} 個）`), 600);
+  }
+  renderWallet();
   // 第一次來先看故事，看完問名字和樣子；再來就直接回到島主之家，先聽最近的新鮮事
   if (!storySeen) {
     openStory();

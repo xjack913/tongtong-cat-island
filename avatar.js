@@ -8,6 +8,8 @@ const LOOKS = {
   woman: { scale: 0.97, hair: 0x5c3a28, hairStyle: 'long', top: 0xe8466e, bottom: 0xe8466e, skirt: true },
   boy: { scale: 0.78, hair: 0x2e2622, hairStyle: 'short', top: 0xffc93c, bottom: 0x3e4bb8, skirt: false },
   girl: { scale: 0.78, hair: 0x3a2a22, hairStyle: 'pigtails', top: 0x8d9cf0, bottom: 0xff8fab, skirt: true },
+  // 貓貓商店的店員：桐桐畫的綁兩邊頭髮的小女孩，穿綠色圍裙洋裝，跟島主的小孩樣子分得出來
+  clerk: { scale: 0.8, hair: 0x7a4a2a, hairStyle: 'pigtails', top: 0x4fb388, bottom: 0xfff2d8, skirt: true },
 };
 const LEG_LENGTH = 0.3;
 
@@ -23,6 +25,9 @@ const POSE_ANGLES = {
   jump: { arm: [-2.5, -2.5], leg: [0.35, -0.35], lean: 0, lift: 0 },
   sing: { arm: [-1.1, 0], leg: [0, 0], lean: -0.06, lift: 0 },
   ready: { arm: [0.4, -0.5], leg: [-0.45, 0.35], lean: 0.26, lift: -0.03 },
+  // 吃東西：右手拿到嘴邊一口一口咬；喝東西：右手舉高、頭往後仰
+  eat: { arm: [0, -2.05], leg: [0, 0], lean: 0.04, lift: 0 },
+  drink: { arm: [0, -2.3], leg: [0, 0], lean: -0.08, lift: 0 },
 };
 
 function material(color, extra = {}) {
@@ -82,7 +87,7 @@ export function buildHuman(kind) {
   // 頭比較大，看起來可愛；小孩的頭再大一點
   const head = new THREE.Group();
   head.position.y = shoulderY + 0.19;
-  if (kind === 'boy' || kind === 'girl') head.scale.setScalar(1.14);
+  if (kind === 'boy' || kind === 'girl' || kind === 'clerk') head.scale.setScalar(1.14);
   body.add(head);
   add(head, new THREE.SphereGeometry(0.19, 16, 12), SKIN, 0, 0, 0, { flatShading: false });
   const hair = new THREE.SphereGeometry(0.2, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55);
@@ -116,6 +121,7 @@ export function animateHuman(model, pose, moving, dt, t) {
   let armR = target.arm[1];
   if (pose === 'wave') armR += Math.sin(t * 9) * 0.3;
   if (pose === 'cheer') armR += Math.sin(t * 14) * 0.2;
+  if (pose === 'eat') armR += Math.max(0, Math.sin(t * 11)) * 0.45;
   const wanted = {
     arm: [target.arm[0] + s, armR - s],
     leg: [target.leg[0] - s, target.leg[1] + s],
@@ -131,6 +137,9 @@ export function animateHuman(model, pose, moving, dt, t) {
   model.body.rotation.x = a.lean;
   model.body.position.y = -0.55 + a.lift + (swinging ? Math.abs(Math.sin(model.gait)) * 0.03 : 0);
   model.head.rotation.z = pose === 'sing' ? Math.sin(t * 3.2) * 0.14 : 0;
+  // 吃的時候點頭嚼、喝的時候仰頭
+  const nod = pose === 'eat' ? Math.sin(t * 11) * 0.1 : pose === 'drink' ? -0.38 : 0;
+  model.head.rotation.x += (nod - model.head.rotation.x) * k;
 }
 
 export function disposeModel(model) {
