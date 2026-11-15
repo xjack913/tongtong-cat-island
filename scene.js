@@ -830,10 +830,10 @@ export function createScene(container, { cats: catData, hooks = {}, reducedMotio
     put(stall, makeMesh(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 5), mat(C.trunk)), -0.84, top + 0.225, 0.44);
     const banana = put(stall, makeMesh(new THREE.TorusGeometry(0.1, 0.032, 8, 12, Math.PI * 0.8), mat(C.sun, { flatShading: false })), -0.6, top + 0.08, 0.42);
     banana.rotation.set(Math.PI / 2, 0, 0.3);
-    put(stall, makeMesh(new THREE.CylinderGeometry(0.055, 0.06, 0.22, 10), mat(0xa9dcf2, { flatShading: false, transparent: true, opacity: 0.85 })), 0.05, top + 0.11, 0.44);
-    put(stall, makeMesh(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 8), mat(C.ink)), 0.05, top + 0.245, 0.44);
-    put(stall, makeMesh(new THREE.BoxGeometry(0.13, 0.2, 0.09), mat(0xffa23d)), 0.75, top + 0.1, 0.44);
-    const straw = put(stall, makeMesh(new THREE.CylinderGeometry(0.008, 0.008, 0.12, 5), mat(C.white)), 0.78, top + 0.24, 0.44);
+    put(stall, makeMesh(new THREE.CylinderGeometry(0.055, 0.06, 0.22, 10), mat(0xa9dcf2, { flatShading: false, transparent: true, opacity: 0.85 })), 0.46, top + 0.11, 0.44);
+    put(stall, makeMesh(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 8), mat(C.ink)), 0.46, top + 0.245, 0.44);
+    put(stall, makeMesh(new THREE.BoxGeometry(0.13, 0.2, 0.09), mat(0xffa23d)), 0.82, top + 0.1, 0.44);
+    const straw = put(stall, makeMesh(new THREE.CylinderGeometry(0.008, 0.008, 0.12, 5), mat(C.white)), 0.85, top + 0.24, 0.44);
     straw.rotation.z = -0.35;
     // 架子上再擺幾瓶
     [-0.7, -0.35, 0.35, 0.7].forEach((x, i) => {
