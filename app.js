@@ -6,7 +6,7 @@ import {
   ISLANDS, UNLOCK, newlyOpened, needBadge, CAT_ICON, LOCK_ICON,
 } from './logic.js';
 import {
-  ADOPT_PRICE, ISLAND_MAX, newStarter, rerollStarter, sanitizeStarter, dailyOffer, sanitizePending, arrived, waitText, canAdopt,
+  ADOPT_PRICE, ISLAND_MAX, OFFER_COUNT, newStarter, rerollStarter, sanitizeStarter, dailyOffer, sanitizePending, arrived, waitText, canAdopt,
 } from './adopt.js';
 import { MATH_UNITS, BATCH_MAX, dayKey, homeworkBatch, sanitizeHomework, writeHomework, nextSheetIn, takeBatch, sanitizeLearnStats } from './math.js';
 import { LESSONS } from './lessons.js';
@@ -309,7 +309,7 @@ function start(hotData = {}) {
   let learnOpen = false;
 
   // 學習數學島：貓寫好放在講桌上的作業、正在改的那一疊
-  let homework = sanitizeHomework(stored.hw, Date.now());
+  let homework = sanitizeHomework(stored.hw, Date.now(), cats.length);
 
   // 貓貓日記：舊到新排。島上一開始沒有貓，所以不再先放介紹用的日記，等領養的貓自己寫
   let diaries = sanitizeDiaries(hotData.diaries || stored.diaries, cats.length);
@@ -363,9 +363,12 @@ function start(hotData = {}) {
   const owned = () => ownedCats(profile);
   let starter = sanitizeStarter(stored.starter, cats.length);
   let pending = sanitizePending(stored.pending, cats.length);
-  let offer = stored.offer && stored.offer.day === dayKey() && Array.isArray(stored.offer.cats) ? stored.offer : null;
+  // 今天的候選：存檔壞了（編號不對、重複、太多隻）就不用，重新抽今天的 3 隻
+  const offerOk = (o) => !!o && o.day === dayKey() && Array.isArray(o.cats) && o.cats.length >= 1 && o.cats.length <= OFFER_COUNT
+    && o.cats.every((i) => Number.isInteger(i) && i >= 0 && i < cats.length) && new Set(o.cats).size === o.cats.length;
+  let offer = offerOk(stored.offer) ? { day: stored.offer.day, cats: stored.offer.cats.slice() } : null;
   let introduced = Array.isArray(stored.introduced)
-    ? stored.introduced.filter((id) => id in UNLOCK)
+    ? stored.introduced.filter((id) => Object.hasOwn(UNLOCK, id))
     : (owned().length ? Object.keys(UNLOCK).filter((id) => owned().length >= UNLOCK[id]) : []);
   const opened = (id) => !(id in UNLOCK) || owned().length >= UNLOCK[id];
   // 每座島還要幾隻貓才開

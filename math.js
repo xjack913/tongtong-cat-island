@@ -473,7 +473,8 @@ export function batchWriters(start, size, cats) {
 
 // 作業的狀態：at 算到哪個時間、pile 講桌上還沒改的張數、seq 下一張的編號、
 // batch 正在改的這一疊（start 第一張編號、cats 誰寫的、results 每張的結果：good 一次就改對、help 老師幫忙、null 還沒改）
-export function sanitizeHomework(value, now = Date.now()) {
+// catCount 是貓的總數：誰寫的編號超出範圍（存檔壞了）就不接那一疊，免得改作業卡打不開
+export function sanitizeHomework(value, now = Date.now(), catCount = 1000) {
   const int = (n, max) => Number.isInteger(n) && n >= 0 && n <= max;
   const hw = { at: now, pile: 0, seq: 0, batch: null };
   if (!value || typeof value !== 'object') return hw;
@@ -482,7 +483,7 @@ export function sanitizeHomework(value, now = Date.now()) {
   if (int(value.seq, 1e9)) hw.seq = value.seq;
   const b = value.batch;
   if (b && int(b.start, 1e9) && Array.isArray(b.cats) && Array.isArray(b.results) && b.results.length >= 1 && b.results.length <= BATCH_MAX
-    && b.cats.length === b.results.length && b.cats.every((c) => int(c, 999))) {
+    && b.cats.length === b.results.length && b.cats.every((c) => int(c, catCount - 1))) {
     hw.batch = { start: b.start, cats: b.cats.slice(), results: b.results.map((r) => (r === 'good' || r === 'help' ? r : null)) };
   }
   return hw;
@@ -495,7 +496,8 @@ export function writeHomework(hw, catCount, now = Date.now()) {
   const per = SHEET_MS / catCount;
   const written = Math.floor((now - hw.at) / per);
   if (!written) return { ...hw, written: 0 };
-  return { ...hw, pile: hw.pile + written, at: hw.at + written * per, written };
+  // 張數最多記到一百萬（跟存檔檢查的上限一樣，不然下次打開會被當成壞掉的存檔歸零）
+  return { ...hw, pile: Math.min(1e6, hw.pile + written), at: hw.at + written * per, written };
 }
 
 // 下一張還要多久寫好（毫秒）
