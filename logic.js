@@ -226,7 +226,7 @@ export const CAT_LIST = [
   ['豆腐', 'white'], ['米糕', 'white'], ['牛奶', 'white'], ['白糖', 'oddEyes'],
   ['杏仁', 'cream'], ['蛋捲', 'cream'], ['奶酥', 'cream'],
   ['紫米', 'lavender'], ['山藥', 'lavender'], ['藍莓派', 'blue'], ['銀耳', 'gray'], ['芝麻球', 'gray'],
-  ['冬瓜茶', 'calico'], ['八寶粥', 'calico'], ['什錦', 'calico'],
+  ['冬瓜茶', 'calico'], ['八寶粥', 'calico'], ['糖果', 'calico'],
   ['湯包', 'tuxedo'], ['黑白配', 'tuxedo'], ['巧克力', 'tuxedo'],
   ['蛋黃酥', 'pudding'], ['雞蛋布丁', 'pudding'], ['豆奶', 'tan'], ['麥芽', 'tan'], ['可頌', 'latte'],
   ['桂花', 'brownTabby'], ['滷蛋', 'darkBrown'], ['蜜餞', 'chestnut'], ['紅糖', 'cinnamon'],

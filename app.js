@@ -802,7 +802,7 @@ function start(hotData = {}) {
   // 名字會出現在哪裡都由這裡換：工具列、招牌下面、改作業的標題、排行榜的說明
   function applyName() {
     $('profile-label').textContent = profile.name || '島主卡';
-    $('plate-sub').textContent = profile.name ? `島主：${profile.name}` : '50 隻貓貓的跳高比賽';
+    $('plate-sub').textContent = profile.name ? `島主：${profile.name}` : '領養貓貓，一起玩的島';
     scene.setOwnerName(who());
     scene.setOwnerLook(profile.avatar);
     markLooks();
@@ -2373,7 +2373,7 @@ function start(hotData = {}) {
     closeCards();
     unlockIds = ids;
     const names = ids.map((id) => ISLAND_NAME[id]);
-    $('unlock-title').textContent = ids.length === 1 ? `${names[0]}開放了！` : `${ids.length} 座新的島開放了！`;
+    $('unlock-title').textContent = ids.length === 1 ? `${names[0]}開放了！` : `一次開了 ${ids.length} 座島！`;
     $('unlock-lede').textContent = `島上現在有 ${owned().length} 隻貓。假扮成貓的人說：`;
     $('unlock-list').replaceChildren(...ids.map((id) => {
       const box = el('section', 'unlock-item');
