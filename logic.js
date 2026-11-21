@@ -30,7 +30,31 @@ export const ISLANDS = [
   { id: 'track', kind: 'track', name: '跑步田徑場島', ring: 0.92, outline: [[513, 1012], [993, 1046], [1140, 1286], [1010, 1527], [642, 1574], [381, 1415]] },
   // 貓貓商店是桐桐畫的六角形島（左邊尖尖的），放在排行榜下面、島主之家左邊的空地
   { id: 'shop', kind: 'shop', name: '貓貓商店', ring: 0.78, outline: [[215, 1085], [265, 995], [400, 990], [445, 1080], [400, 1178], [262, 1180]] },
+  // 貓貓領養島：桐桐畫在右下角，橋接魚池公園和跑步田徑場島。島上本來沒有貓，要來這裡找假扮成貓的人領養
+  { id: 'adopt', kind: 'adopt', name: '貓貓領養島', ring: 0.76, outline: [[1185, 985], [1320, 965], [1395, 1050], [1345, 1150], [1205, 1160], [1160, 1075]] },
+  // 貓貓考試島：桐桐畫在左下角，接在貓貓商店下面、跑步田徑場島左邊。要考什麼桐桐還在想，先蓋島
+  { id: 'exam', kind: 'exam', name: '貓貓考試島', ring: 0.76, outline: [[150, 1255], [300, 1245], [345, 1325], [300, 1405], [160, 1410], [115, 1330]] },
 ];
+
+// 島上要有幾隻貓，這座島才會開放（照桐桐設計圖上每座島旁邊寫的數字）。
+// 貓貓領養島一開始就開著，不然沒辦法領養第一批貓
+export const UNLOCK = {
+  adopt: 0, home: 3, park1: 3, learn: 3, low: 3, shop: 4, exam: 4, combo: 5, mid: 7,
+  diary: 10, boxes: 15, high: 20, rank: 25, park2: 30, stage: 35, track: 40,
+};
+
+export function catsNeeded(id) {
+  return UNLOCK[id] ?? 0;
+}
+
+export function islandOpen(id, catCount) {
+  return catCount >= catsNeeded(id);
+}
+
+// 貓的數量從 before 變成 after，這次剛好開放的島（照要的貓數排）
+export function newlyOpened(before, after) {
+  return Object.keys(UNLOCK).filter((id) => UNLOCK[id] > before && UNLOCK[id] <= after).sort((a, b) => UNLOCK[a] - UNLOCK[b]);
+}
 
 // 二十五座木板橋：points 是草稿上的橋頭、轉折與橋尾（第一點靠 a 島、最後一點靠 b 島）。
 // 表演區往下那座橋接在高階到中階的長橋上：join 是 [接到第幾座橋, 那座橋的第幾個點]
@@ -61,6 +85,10 @@ export const BRIDGES = [
   { a: 'park2', b: 'track', points: [[1040, 950], [985, 1075]] },
   // 貓貓商店的橋接在排行榜到島主之家那座橋的轉角上，兩邊都走得到
   { a: 'shop', join: [11, 1], points: [[330, 1000], [330, 925]] },
+  { a: 'park2', b: 'adopt', points: [[1120, 930], [1200, 995]] },
+  { a: 'adopt', b: 'track', points: [[1180, 1125], [1070, 1215]] },
+  { a: 'shop', b: 'exam', points: [[300, 1170], [255, 1260]] },
+  { a: 'exam', b: 'track', points: [[335, 1330], [430, 1340]] },
 ];
 
 // 跑步田徑場：橢圓跑道，七條跑道（第 1 道在最裡面）。單位是公尺，center 是跑道中心在島上的位置，
@@ -177,8 +205,8 @@ export const COATS = {
   tortie: { label: '玳瑁貓', body: '#3B3133', patches: ['#E08A3C', '#C46A2A', '#E08A3C'], headPatch: '#E08A3C', eye: '#E2C25A' },
 };
 
-// 50 隻貓的名字與花色（台灣小吃與甜點名，配花色取）。新來的貓只能接在最後面，
-// 排行榜存的是編號，前面的貓換位置舊成績就會對錯貓
+// 100 隻貓的名字與花色（台灣小吃與甜點名，配花色取）。新來的貓只能接在最後面，
+// 排行榜存的是編號，前面的貓換位置舊成績就會對錯貓。後面 50 隻是貓貓領養島加的，島上最多住 100 隻
 export const CAT_LIST = [
   ['小橘', 'orange'], ['地瓜', 'orangeWhite'], ['南瓜', 'orange'], ['蜜柑', 'orangeWhite'],
   ['鳳梨酥', 'golden'], ['雞蛋糕', 'golden'], ['鬆餅', 'golden'],
@@ -193,10 +221,22 @@ export const CAT_LIST = [
   ['焦糖', 'siamese'], ['摩卡', 'siamese'], ['咖哩', 'tortie'],
   ['肉圓', 'cream'], ['車輪餅', 'cinnamon'], ['紅豆', 'chestnut'], ['珍珠', 'blackSocks'], ['米漿', 'latte'],
   ['豆漿', 'white'], ['芒果', 'orangeWhite'], ['烏龍', 'tortie'], ['芋泥', 'lavender'], ['雪花冰', 'oddEyes'],
+  ['蛋塔', 'golden'], ['蜂蜜', 'golden'], ['地瓜球', 'orange'], ['柿餅', 'orangeWhite'], ['木瓜', 'orange'], ['柳丁', 'orangeWhite'],
+  ['黑豆', 'black'], ['海苔', 'black'], ['墨魚', 'blackSocks'], ['燒仙草', 'black'],
+  ['豆腐', 'white'], ['米糕', 'white'], ['牛奶', 'white'], ['白糖', 'oddEyes'],
+  ['杏仁', 'cream'], ['蛋捲', 'cream'], ['奶酥', 'cream'],
+  ['紫米', 'lavender'], ['山藥', 'lavender'], ['藍莓派', 'blue'], ['銀耳', 'gray'], ['芝麻球', 'gray'],
+  ['冬瓜茶', 'calico'], ['八寶粥', 'calico'], ['什錦', 'calico'],
+  ['湯包', 'tuxedo'], ['黑白配', 'tuxedo'], ['巧克力', 'tuxedo'],
+  ['蛋黃酥', 'pudding'], ['雞蛋布丁', 'pudding'], ['豆奶', 'tan'], ['麥芽', 'tan'], ['可頌', 'latte'],
+  ['桂花', 'brownTabby'], ['滷蛋', 'darkBrown'], ['蜜餞', 'chestnut'], ['紅糖', 'cinnamon'],
+  ['奶蓋', 'siamese'], ['可麗露', 'siamese'], ['麻花捲', 'tortie'],
+  ['刈包', 'cream'], ['烤地瓜', 'cinnamon'], ['花豆', 'chestnut'], ['粉圓', 'blackSocks'], ['奶綠', 'latte'],
+  ['奶凍', 'white'], ['蜜桃', 'orangeWhite'], ['紅麴', 'tortie'], ['芋粿', 'lavender'], ['剉冰', 'oddEyes'],
 ];
 
 // 圓滾滾的名字就做胖一點
-const CHUBBY = new Set(['波霸', '湯圓', '饅頭', '麻糬', '肉圓', '布丁']);
+const CHUBBY = new Set(['波霸', '湯圓', '饅頭', '麻糬', '肉圓', '布丁', '湯包', '地瓜球', '芝麻球', '刈包']);
 
 export function mulberry32(seed) {
   let a = seed >>> 0;

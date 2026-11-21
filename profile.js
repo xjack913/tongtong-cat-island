@@ -21,7 +21,9 @@ export const AVATARS = [
 const AVATAR_IDS = AVATARS.map((a) => a.id);
 
 // 算「全島走透透」的島，id 跟 app.js 的 NAV 一樣（「看全島」和「貓貓教練」不是島）
-export const ISLAND_IDS = ['home', 'low', 'mid', 'high', 'stage', 'track', 'diary', 'learn', 'boxes', 'combo', 'park1', 'park2', 'rank', 'shop'];
+export const ISLAND_IDS = ['home', 'low', 'mid', 'high', 'stage', 'track', 'diary', 'learn', 'boxes', 'combo', 'park1', 'park2', 'rank', 'shop', 'adopt', 'exam'];
+// 島上最多住幾隻貓（跟 adopt.js 的 ISLAND_MAX 一樣）
+const ADOPTED_MAX = 100;
 const UNIT_COUNT = 9;
 const COUNT_MAX = 1e9;
 // 小魚金幣和電也用「只會往上加」的數字記：一共賺到、一共花掉的金幣，一共用掉、一共補回來的電。
@@ -153,8 +155,23 @@ export function sanitizeDeviceData(raw, catCount) {
       cats: uniqueWhere(seen.cats, (n) => Number.isInteger(n) && n >= 0 && n < catCount),
       units: uniqueWhere(seen.units, (n) => Number.isInteger(n) && n >= 1 && n <= UNIT_COUNT),
     },
+    // 領養的貓（編號）：只會變多，不會離開。不同裝置取聯集
+    adopted: uniqueWhere(from.adopted, (n) => Number.isInteger(n) && n >= 0 && n < catCount).slice(0, ADOPTED_MAX),
     earned,
   };
+}
+
+// 島上的貓：這臺和別臺領養的合起來，照領養的先後排（這臺的在前面）
+export function ownedCats(profile) {
+  return [...new Set([...profile.adopted, ...profile.remote.adopted])].slice(0, ADOPTED_MAX);
+}
+
+export function adoptCat(profile, cat) {
+  if (!profile.adopted.includes(cat) && ownedCats(profile).length < ADOPTED_MAX) profile.adopted.push(cat);
+}
+
+function unionAdopted(a, b) {
+  return [...new Set([...a.adopted, ...b.adopted])].slice(0, ADOPTED_MAX);
 }
 
 // 算「破紀錄」用的最高成績：cat 是每座跳臺貓跳過最高的、own 是島主自己跳過最高的（公分）。
@@ -193,8 +210,8 @@ export function isDeviceId(value) {
 
 // 這臺裝置要上傳的部分
 export function ownData(profile) {
-  const { name, nameAt, avatar, avatarAt, bestCm, tops, counts, seen, earned } = profile;
-  return { name, nameAt, avatar, avatarAt, bestCm, tops, counts, seen, earned };
+  const { name, nameAt, avatar, avatarAt, bestCm, tops, counts, seen, adopted, earned } = profile;
+  return { name, nameAt, avatar, avatarAt, bestCm, tops, counts, seen, adopted, earned };
 }
 
 function earliest(a, b) {
@@ -242,6 +259,7 @@ export function mergeOwn(previous, next) {
     tops: mergeTops(previous.tops, next.tops),
     counts,
     seen: unionSeen(previous.seen, next.seen),
+    adopted: unionAdopted(previous, next),
     earned: mergeEarned(previous.earned, next.earned),
   };
 }
@@ -260,6 +278,7 @@ export function mergeDevices(list, catCount) {
       tops: mergeTops(sum.tops, device.tops),
       counts,
       seen: unionSeen(sum.seen, device.seen),
+      adopted: unionAdopted(sum, device),
       earned: mergeEarned(sum.earned, device.earned),
     };
   }, sanitizeDeviceData(null, catCount));

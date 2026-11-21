@@ -443,9 +443,13 @@ function shuffle(list, rand) {
   return list;
 }
 
-// 今天來上課的貓（貓的編號）
-export function dailyClass(key, catCount, size = CLASS_SIZE) {
-  return shuffle(Array.from({ length: catCount }, (_, i) => i), dayRandom(key, 1)).slice(0, size);
+// 今天每張作業是哪隻貓寫的（貓的編號）。pool 是可以來上課的貓：數字就是 0～n-1 全部的貓，
+// 陣列就是島上領養的貓。島上的貓不到 20 隻時，大家輪流多寫幾張，一天一樣是 20 張
+export function dailyClass(key, pool, size = CLASS_SIZE) {
+  const list = Array.isArray(pool) ? pool.slice().sort((a, b) => a - b) : Array.from({ length: pool }, (_, i) => i);
+  if (!list.length) return [];
+  const order = shuffle(list, dayRandom(key, 1));
+  return Array.from({ length: size }, (_, i) => order[i % order.length]);
 }
 
 // 今天的作業：9 個單元每個先出一樣多張（20 張就是每個 2 張），剩下的再挑不同的單元各加一張，順序打亂；

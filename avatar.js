@@ -10,6 +10,8 @@ const LOOKS = {
   girl: { scale: 0.78, hair: 0x3a2a22, hairStyle: 'pigtails', top: 0x8d9cf0, bottom: 0xff8fab, skirt: true },
   // 貓貓商店的店員：桐桐畫的綁兩邊頭髮的小女孩，穿綠色圍裙洋裝，跟島主的小孩樣子分得出來
   clerk: { scale: 0.8, hair: 0x7a4a2a, hairStyle: 'pigtails', top: 0x4fb388, bottom: 0xfff2d8, skirt: true },
+  // 貓貓領養島的「假扮成貓的人」：穿一整套橘色貓裝的大人，頭套有貓耳朵和鬍鬚，後面有一條尾巴
+  catsuit: { scale: 0.96, hair: 0xf2a35a, hairStyle: 'hood', top: 0xf2a35a, bottom: 0xf2a35a, skirt: false, cat: true },
 };
 const LEG_LENGTH = 0.3;
 
@@ -104,6 +106,26 @@ export function buildHuman(kind) {
   });
   const mouth = add(head, new THREE.TorusGeometry(0.03, 0.007, 6, 12, Math.PI), 0xb8485a, 0, -0.04, 0.183);
   mouth.rotation.z = Math.PI;
+
+  // 貓裝：頭套兩邊尖尖的耳朵（裡面粉紅色）、臉頰兩邊各三根鬍鬚、屁股後面一條翹起來的尾巴
+  if (look.cat) {
+    [-1, 1].forEach((side) => {
+      const ear = add(head, new THREE.ConeGeometry(0.075, 0.15, 4), look.top, side * 0.115, 0.2, -0.02);
+      ear.rotation.set(0, Math.PI / 4, side * -0.35);
+      const inner = add(head, new THREE.ConeGeometry(0.04, 0.09, 4), 0xf4a7b4, side * 0.112, 0.19, 0.02);
+      inner.rotation.set(0, Math.PI / 4, side * -0.35);
+      [-1, 0, 1].forEach((k) => {
+        const whisker = add(head, new THREE.CylinderGeometry(0.004, 0.004, 0.13, 4), 0x5b4435, side * 0.17, -0.03 + k * 0.025, 0.15);
+        whisker.rotation.z = Math.PI / 2 + side * k * 0.18;
+      });
+    });
+    add(head, new THREE.SphereGeometry(0.022, 8, 6), 0xe8466e, 0, -0.015, 0.19, { flatShading: false });
+    const tail = add(body, new THREE.CylinderGeometry(0.03, 0.04, 0.42, 8), look.top, 0, hipY + 0.12, -0.24);
+    tail.rotation.x = -0.7;
+    add(body, new THREE.SphereGeometry(0.045, 8, 6), 0xffffff, 0, hipY + 0.29, -0.38);
+    // 肚子上一塊白色
+    add(body, new THREE.SphereGeometry(0.1, 10, 8), 0xfff2d8, 0, hipY + 0.15, 0.08).scale.set(1, 1.3, 0.5);
+  }
 
   root.scale.setScalar(look.scale);
   return { kind, root, spin, body, legs, arms, head, meshes, height: (shoulderY + 0.42) * look.scale, angles: { arm: [0, 0], leg: [0, 0], lean: 0, lift: 0 }, gait: 0 };
