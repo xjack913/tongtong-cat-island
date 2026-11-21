@@ -2830,7 +2830,8 @@ export function createScene(container, { cats: catData, present = null, open = n
   // ---------- 晃來晃去、不知道要做什麼的貓：頭上冒問號，等教練來 ----------
   function goLost(cat) {
     const here = nodes[cat.node] && islandById[nodes[cat.node].island];
-    const island = here || pickOne(islands);
+    const open = openIslands();
+    const island = here && isOpen(here.id) ? here : pickOne(open.length ? open : islands);
     const target = pickOne(island.ringNodes);
     go(cat, target, () => {
       cat.state = 'lost';
@@ -3010,7 +3011,7 @@ export function createScene(container, { cats: catData, present = null, open = n
   };
 
   function goPerform(cat, fast = false) {
-    if (show.waiting !== null || !show.island) return false;
+    if (show.waiting !== null || !show.island || !isOpen('stage')) return false;
     show.waiting = cat.index;
     go(cat, show.waitNode, () => {
       cat.state = 'stageWait';
@@ -3122,7 +3123,7 @@ export function createScene(container, { cats: catData, present = null, open = n
   }
 
   function stepShow(dt) {
-    if (!show.island) return;
+    if (!show.island || !isOpen('stage')) return;
     if (show.performer === null && show.waiting !== null) {
       const cat = cats[show.waiting];
       if (cat.state === 'stageWait') {
@@ -3321,7 +3322,7 @@ export function createScene(container, { cats: catData, present = null, open = n
   }
 
   function stepRace(dt) {
-    if (!race.island) return;
+    if (!race.island || !isOpen('track')) return;
     race.t += dt;
     race.top = race.phase === 'running' || race.phase === 'finish' ? raceStanding().slice(0, 3) : [];
     if (race.phase === 'idle') {
@@ -3386,7 +3387,7 @@ export function createScene(container, { cats: catData, present = null, open = n
 
   // 去草場奔跑：走到島邊的步道，在草地上繞著跑一段，再回到步道
   function goField(cat, fast = false) {
-    if (!race.island) return false;
+    if (!race.island || !isOpen('track')) return false;
     const ring = pickOne(race.island.ringNodes);
     go(cat, ring, () => runOnField(cat, ring), { speed: fast ? RUN : cat.speed, purpose: 'field', doing: '要去跑步田徑場的草場奔跑' });
     return true;
@@ -4177,7 +4178,8 @@ export function createScene(container, { cats: catData, present = null, open = n
   function wander(cat) {
     const here = nodes[cat.node].island;
     let island = islandById[here];
-    if (random() < 0.35) island = pickOne(islands);
+    const open = openIslands();
+    if (random() < 0.35 || !isOpen(here)) island = open.length ? pickOne(open) : island;
     const target = pickOne(island.ringNodes);
     go(cat, target, () => {
       const p = nodes[target].v.clone();
@@ -4191,7 +4193,7 @@ export function createScene(container, { cats: catData, present = null, open = n
   }
 
   function goJump(cat, prefer = null, fast = false) {
-    const options = platforms.filter((p) => p.queue.length + p.incoming.size < p.queueMax);
+    const options = platforms.filter((p) => isOpen(p.id) && p.queue.length + p.incoming.size < p.queueMax);
     if (!options.length) return false;
     let p = prefer && options.includes(prefer) ? prefer : null;
     if (!p) {
@@ -4229,7 +4231,7 @@ export function createScene(container, { cats: catData, present = null, open = n
   };
 
   function goSpot(cat, kind, filter = () => true, speed = cat.speed) {
-    const free = spots.filter((s) => s.kind === kind && s.occupant === null && !s.ownerHere && filter(s));
+    const free = spots.filter((s) => s.kind === kind && s.occupant === null && !s.ownerHere && isOpen(s.island) && filter(s));
     if (!free.length) return false;
     const spot = pickOne(free);
     spot.occupant = cat.index;
@@ -4264,6 +4266,7 @@ export function createScene(container, { cats: catData, present = null, open = n
   }
 
   function goHome(cat) {
+    if (!isOpen('home')) return false;
     if (random() < 0.3 && homeDoor) {
       go(cat, homeDoor.node, () => {
         setPath(cat, [homeDoor.inside.clone()], cat.speed, () => {
@@ -4980,9 +4983,11 @@ export function createScene(container, { cats: catData, present = null, open = n
     stepRace(dt);
     stepBoard(dt);
     for (const cat of cats) {
+      if (cat.away) continue;
       updateCat(cat, dt);
       applyPose(cat, dt, t);
     }
+    stepAdopt(dt, t);
     updateCoach(dt);
     applyPose(coach, dt, t);
     updateTeacher(dt);
@@ -5153,6 +5158,7 @@ export function createScene(container, { cats: catData, present = null, open = n
   }
 
   function islandOf(cat) {
+    if (cat.away) return null;
     if (['queue', 'ready', 'crouch', 'air', 'land'].includes(cat.state) || cat.purpose === 'climb' || cat.purpose === 'exit') return cat.platform;
     if (cat.state === 'chat') return nodes[cat.node] ? nodes[cat.node].island : null;
     if (cat.state === 'perform' || cat.purpose === 'climbStage' || cat.purpose === 'exitStage') return 'stage';
@@ -5330,6 +5336,36 @@ export function createScene(container, { cats: catData, present = null, open = n
     repaintRankBoard();
   }
 
+  // 開放的島：need 是 { 島 id: 還要幾隻貓 }，0 或沒寫就是開了。沒開的島草地變灰、名牌寫還要幾隻
+  const GRASS_LOCKED = new THREE.Color(0xc9cfc4);
+  function setOpen(need) {
+    openIds = new Set(islands.filter((island) => !(need[island.id] > 0)).map((island) => island.id));
+    islands.forEach((island) => {
+      const left = need[island.id] > 0 ? need[island.id] : 0;
+      island.grass.color.set(left ? GRASS_LOCKED : new THREE.Color(C.grass));
+      island.pill.classList.toggle('island-pill--locked', !!left);
+      island.pillNeed.hidden = !left;
+      island.pillNeed.textContent = left ? `還要 ${left} 隻貓` : '';
+    });
+  }
+
+  // 領養的貓到了：從領養屋門口走出來，先在附近逛逛
+  function arrive(index) {
+    const cat = cats[index];
+    if (!cat || !cat.away) return;
+    cat.away = false;
+    cat.model.root.visible = true;
+    const node = adopt.arriveNode ?? pickOne(openIslands()[0].ringNodes);
+    cat.node = node;
+    cat.pos.copy(nodes[node].v);
+    cat.heading = 0;
+    cat.targetHeading = 0;
+    Object.assign(cat.pp, POSES.stand);
+    idle(cat, 2.5, 4, 'stand');
+    cat.doing = '剛搬來島上，在貓貓領養島看看新家';
+    say(cat, '喵～', 2);
+  }
+
   function dispose() {
     cancelAnimationFrame(frame);
     renderer.domElement.removeEventListener('pointerdown', onPointerDown);
@@ -5366,6 +5402,13 @@ export function createScene(container, { cats: catData, present = null, open = n
     ownerSleep,
     ownerEat,
     shopSay,
+    setOpen,
+    isOpen,
+    arrive,
+    adoptSay,
+    adoptAway(on) {
+      adopt.away = !!on;
+    },
     setUserCanJump(on) {
       userCanJump = !!on;
     },
