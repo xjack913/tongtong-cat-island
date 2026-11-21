@@ -5,6 +5,9 @@ import { mulberry32 } from './logic.js';
 
 // 島上真的蓋了什麼：上次來之後才有的會報給島主聽，最新的放前面
 export const ISLAND_NEWS = [
+  // 日期要改成真的上線那天
+  { day: '2026-11-21', text: '貓貓領養島蓋好了！島上的貓都是你領養的，貓越多，開放的島就越多。' },
+  { day: '2026-11-21', text: '貓貓考試島蓋好了，要考什麼，設計師桐桐還在想。' },
   { day: '2026-11-14', text: '貓貓商店開張了！用小魚金幣可以買水果、水和果汁，幫島主補電。' },
   { day: '2026-11-14', text: '島主現在有 30 個電，玩跳臺和跑步要用電，回家睡覺可以補回來。' },
   { day: '2026-11-07', text: '紙箱公園改建成島主之家了，這裡就是你的家。' },
@@ -31,6 +34,8 @@ function daySeed(day) {
 
 // 同一天看到的小故事都一樣，隔天換新的
 export function dailyGossip(day, names, count = 2) {
+  // 島上的貓不到兩隻，就沒有小故事可以講
+  if (names.length < 2) return [];
   const random = mulberry32(daySeed(day));
   const pool = GOSSIP.slice();
   const out = [];

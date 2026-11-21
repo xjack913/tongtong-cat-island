@@ -573,6 +573,7 @@ function start(hotData = {}) {
     wallet.setAttribute('aria-label', `島主的電 ${p} 個，小魚金幣 ${coins(profile)} 個，按一下去貓貓商店`);
     if (!$('shop-card').hidden) renderShop();
     if (!$('home-card').hidden) renderSleep();
+    if (!$('adopt-card').hidden && adoptAsk === null) renderAdopt();
     syncPlayable();
   }
   // 錢包下面冒一下「＋10」這種小字
@@ -990,7 +991,10 @@ function start(hotData = {}) {
 
   // 收到別臺裝置合起來的資料：畫面上的數字、名字、徽章跟著更新
   function receiveOthers(others) {
+    const before = owned().length;
     const renamed = applyRemote(profile, sanitizeDeviceData(others, cats.length));
+    // 別臺裝置領養的貓也搬來這臺的島上
+    if (owned().length > before) setTimeout(() => catsChanged(before), 0);
     if (renamed) applyName();
     renderWallet();
     const fresh = award(profile, dayKey());
@@ -1597,7 +1601,7 @@ function start(hotData = {}) {
     if (c.type === 'characterData') markZhuyin(c.target);
     else c.addedNodes.forEach(markZhuyin);
   }));
-  ['diary-card', 'learn-card', 'lesson-card', 'story-card', 'report-card', 'profile-card', 'home-card', 'chat-card', 'shop-card'].forEach((id) => {
+  ['diary-card', 'learn-card', 'lesson-card', 'story-card', 'report-card', 'profile-card', 'home-card', 'chat-card', 'shop-card', 'adopt-card', 'unlock-card', 'bridge-card'].forEach((id) => {
     markZhuyin($(id));
     zhuyinWatch.observe($(id), { childList: true, characterData: true, subtree: true });
   });
@@ -2159,6 +2163,280 @@ function start(hotData = {}) {
     track('read_aloud', { what: 'story' });
   });
 
+  // ---------- 貓貓領養島：假扮成貓的人幫島主找貓 ----------
+  const adoptReader = { button: $('adopt-read'), label: $('adopt-read-label'), idle: '唸給我聽' };
+  const unlockReader = { button: $('unlock-read'), label: $('unlock-read-label'), idle: '唸給我聽' };
+  const bridgeReader = { button: $('bridge-read'), label: $('bridge-read-label'), idle: '唸給我聽' };
+  if (!synth) ['adopt-read', 'unlock-read', 'bridge-read'].forEach((id) => { $(id).hidden = true; });
+  const PAW = '<svg viewBox="0 0 48 48" fill="rgba(34,37,58,0.55)" aria-hidden="true"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg>';
+  const COIN = '<svg class="coin" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#F7C531" stroke="#C99000" stroke-width="3"/><g fill="none" stroke="#8A5A00" stroke-width="2.6" stroke-linejoin="round"><ellipse cx="21" cy="24" rx="11" ry="7.5"/><path d="M32 24l8-6.5v13z"/></g><circle cx="16.5" cy="22.5" r="1.8" fill="#8A5A00"/></svg>';
+  let adoptAsk = null;
+  // 剛領完第一批貓：看完開島介紹，接著問名字、選樣子
+  let afterStarter = false;
+
+  const starterMode = () => owned().length === 0;
+
+  // 今天的 3 隻候選：同一天固定，已經在島上的貓拿掉
+  function ensureOffer() {
+    const day = dayKey();
+    if (!offer || offer.day !== day) {
+      offer = { day, cats: dailyOffer(day, cats.length, owned(), profile.cloud.deviceId || profile.firstDay) };
+      save();
+    }
+    const have = new Set(owned());
+    return offer.cats.filter((i) => !have.has(i));
+  }
+
+  function adoptItem(index, button) {
+    const cat = cats[index];
+    const li = el('li', 'shop-item adopt-item');
+    const face = el('span', 'cat-swatch adopt-face');
+    face.style.background = cat.coat.body;
+    face.innerHTML = PAW;
+    const info = el('div');
+    info.append(el('p', 'adopt-item__name', cat.name), el('p', 'adopt-item__about', `${cat.coat.label}，${personality(cat)}`));
+    li.append(face, info);
+    if (button) li.append(button);
+    return li;
+  }
+
+  function renderAdopt() {
+    const list = $('adopt-list');
+    list.replaceChildren();
+    $('adopt-count').textContent = String(owned().length);
+    $('adopt-coins').textContent = String(coins(profile));
+    $('adopt-done').hidden = !starterMode();
+    $('adopt-confirm').hidden = adoptAsk === null;
+    if (starterMode()) {
+      if (!starter) {
+        starter = newStarter(cats.length);
+        save();
+      }
+      $('adopt-say').textContent = '歡迎來到貓貓領養島！我先幫你找了 3 隻貓。每隻有一顆骰子，想換的話可以骰一次。選好了就按「就是牠們了！」';
+      starter.cats.forEach((index, slot) => {
+        const roll = el('button', 'sticker adopt-btn', starter.rolled[slot] ? '骰過了' : '🎲 換一隻');
+        roll.type = 'button';
+        roll.disabled = starter.rolled[slot];
+        roll.addEventListener('click', () => rollStarter(slot, roll));
+        list.append(adoptItem(index, roll));
+      });
+      return;
+    }
+    if (pending) {
+      $('adopt-say').textContent = `我出門去帶${cats[pending.cat].name}回來了，還要 ${waitText(pending, Date.now())}才會到。等牠到了，才可以再領養下一隻喔！`;
+      list.append(adoptItem(pending.cat, null));
+      return;
+    }
+    if (owned().length >= ISLAND_MAX) {
+      $('adopt-say').textContent = `島上已經住滿 ${ISLAND_MAX} 隻貓了！要好好照顧牠們喔。`;
+      return;
+    }
+    const today = ensureOffer();
+    $('adopt-say').textContent = today.length
+      ? `今天有這 ${today.length} 隻貓在等新家。一次可以領養 1 隻，要 ${ADOPT_PRICE} 個小魚金幣，我要花 24 小時才會把牠帶回來喔。`
+      : '今天的貓都找到家了，明天再來看看吧！';
+    today.forEach((index) => {
+      const buy = el('button', 'sticker sticker--solid adopt-btn');
+      buy.type = 'button';
+      buy.innerHTML = COIN;
+      buy.append(el('b', '', String(ADOPT_PRICE)), el('span', '', '領養'));
+      buy.setAttribute('aria-label', `領養${cats[index].name}，要 ${ADOPT_PRICE} 個小魚金幣`);
+      if (coins(profile) < ADOPT_PRICE) buy.classList.add('is-short');
+      buy.addEventListener('click', () => askAdopt(index));
+      list.append(adoptItem(index, buy));
+    });
+  }
+
+  function openAdopt() {
+    closeCards();
+    stopSpeaking();
+    adoptAsk = null;
+    renderAdopt();
+    $('adopt-card').hidden = false;
+    $('adopt-card').scrollTop = 0;
+    scene.adoptSay(starterMode() ? '歡迎！' : pending ? '' : '來領養貓貓嗎？');
+    track('adopt_open', { what: starterMode() ? 'starter' : pending ? 'pending' : 'offer' });
+  }
+
+  function rollStarter(slot, button) {
+    const next = rerollStarter(starter, slot, cats.length);
+    if (next === starter) return;
+    starter = next;
+    save();
+    sound.play('pop');
+    scene.adoptSay('骰子轉轉轉～');
+    renderAdopt();
+    const fresh = $('adopt-list').children[slot];
+    if (fresh) fresh.classList.add('is-picked');
+    track('adopt_roll', { what: cats[starter.cats[slot]].name });
+  }
+
+  $('adopt-done').addEventListener('click', () => {
+    if (!starterMode() || !starter) return;
+    const before = owned().length;
+    starter.cats.forEach((index) => adoptCat(profile, index));
+    const names = starter.cats.map((i) => cats[i].name);
+    starter.cats.forEach((index) => scene.arrive(index));
+    starter = null;
+    afterStarter = true;
+    newsLog = recordNews(newsLog, dayKey(), `${names.join('、')}搬來島上了，是島上的第一批貓貓！`);
+    sound.play('record');
+    scene.adoptSay('好好照顧牠們喔！', true);
+    track('adopt_start', { what: names.join('、') });
+    tallied();
+    catsChanged(before);
+  });
+
+  function askAdopt(index) {
+    const check = canAdopt({ owned: owned(), pending, coins: coins(profile) });
+    if (!check.ok) {
+      if (check.reason === 'coins') {
+        $('adopt-say').textContent = `小魚金幣還不夠喔！領養一隻要 ${ADOPT_PRICE} 個，現在有 ${coins(profile)} 個。去跳臺跳一跳、改改作業，就可以賺小魚金幣。`;
+        track('adopt_short', { what: 'coins' });
+      }
+      sound.play('pop');
+      return;
+    }
+    adoptAsk = index;
+    $('adopt-confirm-text').textContent = `要領養${cats[index].name}嗎？要 ${ADOPT_PRICE} 個小魚金幣。領養了就不能換，要照顧牠一輩子喔！`;
+    $('adopt-confirm').hidden = false;
+    $('adopt-confirm').scrollIntoView({ block: 'nearest' });
+  }
+  $('adopt-no').addEventListener('click', () => {
+    adoptAsk = null;
+    $('adopt-confirm').hidden = true;
+  });
+  $('adopt-yes').addEventListener('click', () => {
+    const index = adoptAsk;
+    adoptAsk = null;
+    if (index === null || !canAdopt({ owned: owned(), pending, coins: coins(profile) }).ok) {
+      renderAdopt();
+      return;
+    }
+    bump(profile, 'coinsOut', ADOPT_PRICE);
+    pending = { cat: index, at: Date.now() };
+    walletPop(`小魚金幣 －${ADOPT_PRICE}`, true);
+    sound.play('stamp');
+    scene.adoptSay(`我去帶${cats[index].name}回來！`, true);
+    track('adopt', { what: cats[index].name });
+    tallied();
+    renderAdopt();
+    showToast('出發去帶貓了！', `${cats[index].name} 24 小時後會搬來島上`);
+    // 說完話才出門
+    setTimeout(() => scene.adoptAway(!!pending), 2600);
+  });
+  $('adopt-read').addEventListener('click', () => {
+    if (speaking === adoptReader) {
+      stopSpeaking();
+      return;
+    }
+    const names = [...$('adopt-list').querySelectorAll('.adopt-item__name')].map((n) => n.textContent).join('、');
+    speak(plainText(`${$('adopt-say').textContent}${names}`), adoptReader);
+    track('read_aloud', { what: 'adopt' });
+  });
+
+  // 帶貓回來了沒（每秒看一次；關掉網頁的時間也算）
+  function checkArrival() {
+    if (!pending || !arrived(pending, Date.now())) return;
+    const index = pending.cat;
+    const before = owned().length;
+    adoptCat(profile, index);
+    pending = null;
+    scene.adoptAway(false);
+    scene.arrive(index);
+    newsLog = recordNews(newsLog, dayKey(), `${cats[index].name}搬來島上了，現在島上有 ${owned().length} 隻貓。`);
+    sound.play('record');
+    showToast(`${cats[index].name}搬來島上了！`, '假扮成貓的人把牠帶回來了');
+    tallied();
+    catsChanged(before);
+  }
+
+  // 島上的貓變多了：開新的島、重新排作業、更新導覽，再介紹新開的島
+  function catsChanged(before) {
+    owned().forEach((index) => scene.arrive(index));
+    scene.setOpen(needMap());
+    updateNav();
+    loadDay();
+    refreshBoards();
+    if (!$('adopt-card').hidden) renderAdopt();
+    const fresh = Object.keys(UNLOCK).filter((id) => UNLOCK[id] > 0 && opened(id) && !introduced.includes(id))
+      .sort((a, b) => UNLOCK[a] - UNLOCK[b]);
+    if (!fresh.length) return;
+    introduced.push(...fresh);
+    save();
+    // 先讓新來的貓走出來，再跳出介紹
+    setTimeout(() => openUnlock(fresh), owned().length > before ? 1400 : 0);
+  }
+
+  let unlockIds = [];
+  function openUnlock(ids) {
+    closeCards();
+    unlockIds = ids;
+    const names = ids.map((id) => ISLAND_NAME[id]);
+    $('unlock-title').textContent = ids.length === 1 ? `${names[0]}開放了！` : `${ids.length} 座新的島開放了！`;
+    $('unlock-lede').textContent = `島上現在有 ${owned().length} 隻貓。假扮成貓的人說：`;
+    $('unlock-list').replaceChildren(...ids.map((id) => {
+      const box = el('section', 'unlock-item');
+      box.append(el('p', 'unlock-item__name', ISLAND_NAME[id]), el('p', 'unlock-item__text', ISLAND_INTRO[id] || ''));
+      return box;
+    }));
+    $('unlock-card').hidden = false;
+    $('unlock-card').scrollTop = 0;
+    track('island_unlock', { island: ids.join(',') });
+  }
+  $('unlock-go').addEventListener('click', () => {
+    if (afterStarter) {
+      afterStarter = false;
+      if (!profile.asked) {
+        openProfile(true);
+        homeAfterProfile = true;
+        return;
+      }
+    }
+    goIsland(unlockIds.includes('park1') ? 'park1' : unlockIds[0]);
+  });
+  $('unlock-read').addEventListener('click', () => {
+    if (speaking === unlockReader) {
+      stopSpeaking();
+      return;
+    }
+    const parts = [...$('unlock-list').querySelectorAll('.unlock-item')].map((box) => box.textContent);
+    speak(plainText(`${$('unlock-title').textContent}${$('unlock-lede').textContent}${parts.join('')}`), unlockReader);
+    track('read_aloud', { what: 'unlock' });
+  });
+
+  // 還沒開放的島：寫還要幾隻貓、開放以後可以做什麼
+  function openLocked(id) {
+    closeCards();
+    $('island-label').textContent = '還沒開放';
+    $('island-title').textContent = ISLAND_NAME[id];
+    $('island-lede').textContent = `島上現在有 ${owned().length} 隻貓，要 ${UNLOCK[id]} 隻貓，這座島才會開放。`;
+    $('island-text').textContent = ISLAND_INTRO[id] ? `開放以後：${ISLAND_INTRO[id]}` : '';
+    $('island-count').textContent = '到貓貓領養島領養更多貓吧！';
+    $('island-cats').replaceChildren();
+    $('island-cats').dataset.key = '';
+    $('island-sit').hidden = true;
+    $('island-card').hidden = false;
+  }
+
+  // 玩過舊版的島主：先講貓貓們去哪裡了
+  function openBridge() {
+    closeCards();
+    bridgeSeen = true;
+    save();
+    $('bridge-card').hidden = false;
+    $('bridge-card').scrollTop = 0;
+  }
+  $('bridge-go').addEventListener('click', () => goIsland('adopt'));
+  $('bridge-read').addEventListener('click', () => {
+    if (speaking === bridgeReader) {
+      stopSpeaking();
+      return;
+    }
+    speak(plainText(`${$('bridge-title').textContent}${$('bridge-text').textContent}`).replace(/\s+/g, ''), bridgeReader);
+    track('read_aloud', { what: 'bridge' });
+  });
+
   // ---------- 問題回報：送到桐爸的 Google 表單（不用登入，回報不公開） ----------
   // 回報卡疊在正在看的卡片上面，自動附上看到哪裡：黑板課哪一頁、哪一張作業、哪一篇日記。
   // 畫面上的字有注音，送出去的是不帶選擇子的原文
@@ -2328,6 +2606,11 @@ function start(hotData = {}) {
   $('profile-go-home').addEventListener('click', closeToHome);
   // 看完島的故事，接著問要叫什麼名字
   $('story-start').addEventListener('click', () => {
+    // 島上還沒有貓：先去貓貓領養島領第一批貓，領完再問名字
+    if (starterMode()) {
+      goIsland('adopt');
+      return;
+    }
     if (profile.asked) {
       goIsland('park1', true, true);
       return;
@@ -2418,7 +2701,7 @@ function start(hotData = {}) {
       previousDay,
       events: newsLog,
       diary: latest ? { name: cats[latest.cat].name, line: latest.lines[0] } : null,
-      names: cats.map((c) => c.name),
+      names: owned().map((i) => cats[i].name),
       // 第一次來還要選樣子，新鮮事少一點，不用捲那麼遠
       limit: firstVisit ? 3 : 5,
     });
@@ -2773,13 +3056,17 @@ function start(hotData = {}) {
       else goIsland(pick.id);
     } else if (pick.type === 'owner') openProfile();
     else if (pick.type === 'ownerHome') {
-      if (focus === 'park1') openHome();
+      if (focus === 'park1' && opened('park1')) openHome();
       else goIsland('park1');
     } else if (pick.type === 'shop') {
-      if (focus === 'shop') openShop();
+      if (focus === 'shop' && opened('shop')) openShop();
       else goIsland('shop');
+    } else if (pick.type === 'adopt') {
+      if (focus === 'adopt') openAdopt();
+      else goIsland('adopt');
     } else if (pick.type === 'cat') meetCat(pick.index, '3d');
     else if (pick.type === 'coach') openCoach();
+    else if (!opened('learn') && ['teacher', 'podium', 'board'].includes(pick.type)) goIsland('learn');
     else if (pick.type === 'teacher' || pick.type === 'podium') atLearn(openLearn);
     else if (pick.type === 'board') atLearn(openLesson);
     else if (pick.type === 'box') {
@@ -2807,6 +3094,12 @@ function start(hotData = {}) {
     if (coachOpen) renderCoach();
     sleepTick();
     if (asleep() && !$('home-card').hidden) renderSleep();
+    checkArrival();
+    // 帶貓中的倒數（字一樣就不換，注音才不會一直重畫）
+    if (pending && !$('adopt-card').hidden) {
+      const line = `我出門去帶${cats[pending.cat].name}回來了，還要 ${waitText(pending, Date.now())}才會到。等牠到了，才可以再領養下一隻喔！`;
+      if (plainText($('adopt-say').textContent) !== line) $('adopt-say').textContent = line;
+    }
   }, 1000);
 
   window.addEventListener('resize', () => {
@@ -2828,8 +3121,15 @@ function start(hotData = {}) {
   }
   renderWallet();
   // 第一次來先看故事，看完問名字和樣子；再來就直接回到島主之家，先聽最近的新鮮事
+  // 關掉網頁的時候貓已經帶回來了，打開就先搬上島
+  checkArrival();
   if (!storySeen) {
     openStory();
+  } else if (!bridgeSeen) {
+    // 玩過舊版的島主：先講貓貓們去夏令營了，再去領養
+    openBridge();
+  } else if (starterMode()) {
+    goIsland('adopt', true, true);
   } else if (!profile.asked) {
     openProfile(true);
     homeAfterProfile = true;
