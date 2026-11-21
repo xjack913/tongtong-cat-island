@@ -682,6 +682,8 @@ export function createScene(container, { cats: catData, present = null, open = n
     const ringShape = shapeOf(scalePts(local, island.ring + d));
     ringShape.holes.push(shapeOf(scalePts(local, island.ring - d), THREE.Path));
     group.add(flatMesh(ringShape, C.path, TOP + 0.012));
+    // 到這裡是島本身（地、沙灘、步道）；之後加上去的房子、跳臺、看板，島還沒開放時都藏在雲霧裡
+    island.terrain = new Set(group.children);
   });
 
   // ---------- 走路的路網：每座島一圈步道節點，再接橋頭、休息點、排隊處 ----------
@@ -5418,6 +5420,15 @@ export function createScene(container, { cats: catData, present = null, open = n
       island.pill.setAttribute('aria-label', left ? `被雲霧包住的島，還要 ${left} 隻貓` : island.name);
       island.pillNeed.hidden = !left;
       island.pillNeed.textContent = left ? `還要 ${left} 隻貓` : '';
+      // 島上的設施：還沒開放就藏起來（高的跳臺、看板才不會從雲裡穿出來），名牌留著
+      island.group.children.forEach((child) => {
+        if (island.terrain.has(child) || child.isCSS2DObject) return;
+        child.visible = !left;
+        // 網頁做的小標籤（身高尺上的高度）不會跟著上一層藏起來，要自己藏
+        child.traverse((o) => {
+          if (o.isCSS2DObject) o.visible = !left;
+        });
+      });
       const fog = fogs.get(island.id);
       if (left && !fog) fogs.set(island.id, makeFog(island));
       else if (!left && fog && fog.clearing < 0) {
