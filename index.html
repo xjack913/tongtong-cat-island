@@ -421,7 +421,7 @@
 
   /* 日記區、學習數學島的字都帶注音：國字改用注音粉圓（字的右邊直接畫好注音），數字照舊。
      注音只有字高的四分之一，字要放大小朋友才看得清楚：--zy 是內文、--zy-2 是提示和按鈕、--zy-3 是小字 */
-  #diary-card, #learn-card, #lesson-card, #story-card, #report-card, #profile-card, #home-card, #chat-card, #shop-card {
+  #diary-card, #learn-card, #lesson-card, #story-card, #report-card, #profile-card, #home-card, #chat-card, #shop-card, #adopt-card, #unlock-card, #bridge-card {
     --round: "Bpmf Huninn", "Huninn", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
     --num: "Fredoka", "Bpmf Huninn", "Huninn", "Arial Rounded MT Bold", Arial, sans-serif;
     --zy: 29px; --zy-2: calc(var(--zy) * 0.8); --zy-3: calc(var(--zy) * 0.66);
@@ -435,7 +435,7 @@
   .learn-side > .learn-unit { order: -1; }
   .learn-unit { margin-top: 8px; }
   @media (min-width: 900px) {
-    #diary-card, #story-card, #report-card, #profile-card, #home-card, #chat-card, #shop-card { width: min(600px, calc(100% - 32px)); }
+    #diary-card, #story-card, #report-card, #profile-card, #home-card, #chat-card, #shop-card, #adopt-card, #unlock-card, #bridge-card { width: min(600px, calc(100% - 32px)); }
     #learn-card, #lesson-card { width: min(800px, calc(100% - 32px)); }
     /* 黑板課也分兩欄：左邊黑板講重點，右邊白紙放圖和例題，翻頁不用捲就看得到「考考你」 */
     .board { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: auto auto 1fr; column-gap: 16px; align-items: start; }
@@ -455,8 +455,9 @@
     #learn-card .card__label { display: none; }
     #learn-card .sheet__fig svg { max-height: 140px; }
   }
-  #diary-card .card__label, #learn-card .card__label, #lesson-card .card__label, #story-card .card__label, #report-card .card__label, #profile-card .card__label, #home-card .card__label, #chat-card .card__label, #shop-card .card__label { font-size: var(--zy-3); }
-  #diary-card .card__title, #learn-card .card__title, #lesson-card .card__title, #story-card .card__title, #report-card .card__title, #profile-card .card__title, #home-card .card__title, #chat-card .card__title, #shop-card .card__title { font-size: var(--zy); }
+  #diary-card .card__label, #learn-card .card__label, #lesson-card .card__label, #story-card .card__label, #report-card .card__label, #profile-card .card__label, #home-card .card__label, #chat-card .card__label, #shop-card .card__label, #adopt-card .card__label, #unlock-card .card__label, #bridge-card .card__label { font-size: var(--zy-3); }
+  #diary-card .card__title, #learn-card .card__title, #lesson-card .card__title, #story-card .card__title, #report-card .card__title, #profile-card .card__title, #home-card .card__title, #chat-card .card__title, #shop-card .card__title, #adopt-card .card__title, #unlock-card .card__title, #bridge-card .card__title { font-size: var(--zy); }
+  #unlock-card .card__text { font-size: var(--zy-3); }
   #diary-card .card__text, #diary-card .empty, #lesson-card .card__text, #report-card .card__text { font-size: var(--zy-3); }
   /* 卡片很長要捲的時候，按鈕列固定在卡片底部 */
   .card__dock {
@@ -694,6 +695,32 @@
   .shop-buy.is-short { opacity: 0.55; }
   .shop-msg { min-height: 1.6em; margin-top: 10px; padding: 8px 14px; border-radius: 16px; background: var(--sun-pale); font-size: var(--zy-3); line-height: 1.55; color: var(--text); }
   .shop-msg:empty { display: none; }
+  /* 貓貓領養島 */
+  .adopt-chip { background: #FFE9D2; }
+  .adopt-chip svg { width: 40px; height: 40px; }
+  .adopt-item { grid-template-columns: 56px minmax(0, 1fr) auto; }
+  .adopt-item.is-picked { border-color: var(--sun); background: var(--sun-pale); }
+  .adopt-face { width: 56px; height: 56px; }
+  .adopt-item__name { font-size: var(--zy-2); color: var(--ink-deep); }
+  .adopt-item__about { font-size: var(--zy-3); line-height: 1.4; color: var(--text); }
+  .adopt-btn { min-height: 58px; min-width: 96px; gap: 6px; font-size: var(--zy-3); }
+  .adopt-btn b { font: 600 calc(var(--zy) * 0.85) / 1 var(--num); }
+  .adopt-btn .coin { width: 26px; height: 26px; }
+  .adopt-btn:disabled { opacity: 0.45; cursor: default; }
+  .adopt-btn.is-rolling { animation: roll 500ms var(--ease); }
+  @keyframes roll { 0% { transform: rotate(0); } 50% { transform: rotate(200deg) scale(1.15); } 100% { transform: rotate(360deg); } }
+  .adopt-confirm { margin-top: 10px; padding: 12px 16px; border: 2px solid var(--sun); border-radius: 18px; background: var(--sun-pale); }
+  .adopt-confirm__text { font-size: var(--zy-2); line-height: 1.55; color: var(--text); }
+  #adopt-card .card__actions .sticker, #unlock-card .card__actions .sticker, #bridge-card .card__actions .sticker { min-height: 58px; font-size: var(--zy-3); }
+  .unlock-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  .unlock-item { padding: 10px 14px 12px; border: 2px solid #EFE4C8; border-radius: 18px; background: #FFFDF6; }
+  .unlock-item__name { font-size: var(--zy-2); color: var(--ink-deep); }
+  .unlock-item__text { margin-top: 2px; font-size: var(--zy-3); line-height: 1.6; color: var(--text); }
+  /* 還沒開放的島：名牌和導覽鈕變灰，寫還要幾隻貓 */
+  .island-pill--locked { background: #E7E9EE !important; color: #6B7280 !important; border-color: #C9CDD6 !important; }
+  .island-pill__need { display: block; font-size: 11px; line-height: 1.2; }
+  .nav-chip.is-locked { opacity: 0.62; }
+  .nav-chip__need { margin-left: 4px; font-size: 12px; }
   .zzz--home { padding: 0 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.88); font-size: 26px; }
   /* 跟貓聊天 */
   .chat-line { margin-top: 10px; padding: 12px 16px; border-radius: 18px; background: var(--sun-pale); font-size: var(--zy-2); line-height: 1.6; color: var(--text); }
@@ -941,9 +968,9 @@
       <button class="card__close" type="button" data-close aria-label="關閉">×</button>
     </div>
     <div class="story" id="story-text">
-      <p>這裡住著 50 隻貓，牠們以前是家貓，被丟掉以後變成了流浪貓。</p>
-      <p>很愛貓的桐桐把牠們接到島上照顧，大家一起玩、一起遊戲、一起學習。</p>
-      <p>現在你也是這座島的島主，貓貓都是你的島民。到每座島上看看大家在做什麼吧！</p>
+      <p>有些家貓被丟掉以後，變成了流浪貓。很愛貓的桐桐，想給牠們一個家。</p>
+      <p>現在你是這座島的島主，可是島上還沒有貓。到右下角的貓貓領養島，找假扮成貓的人領養第一批貓貓吧！</p>
+      <p>島上的貓越多，開放的島就越多。領養的貓要照顧牠一輩子喔！</p>
     </div>
     <div class="story-actions">
       <button class="sticker" id="story-read" type="button" aria-pressed="false">
@@ -969,6 +996,8 @@
       <p>這座島是照桐桐自己畫的設計圖做的，在桐爸的幫忙下，變成一座真的可以玩的島，開放給大家一起來玩。</p>
     </section>
     <ul class="help-list">
+      <li><span class="help-icon" aria-hidden="true">領</span><span><b>貓貓領養島</b>一開始島上沒有貓。假扮成貓的人會先給你 3 隻，每隻有一顆骰子，可以重骰一次換一隻。之後每天有 3 隻貓可以領養，一次選 1 隻、要 50 個小魚金幣，他要 24 小時才會把貓帶回來。島上最多 100 隻，領養的貓不能換，要照顧牠一輩子。</span></li>
+      <li><span class="help-icon" aria-hidden="true">開</span><span><b>貓越多，島越多</b>每座島要島上有夠多的貓才會開放：貓貓之家、島主之家、學習數學島、低階跳臺 3 隻，貓貓商店和貓貓考試島 4 隻，合體公園 5 隻，中階跳臺 7 隻，日記區 10 隻，多多紙箱區 15 隻，高階跳臺 20 隻，排行榜 25 隻，魚池公園 30 隻，表演區 35 隻，跑步田徑場島 40 隻。還沒開放的島是灰色的。</span></li>
       <li><span class="help-icon" aria-hidden="true">家</span><span><b>島主之家</b>這是你的家。回到島上會先來這裡，聽最近島上的新鮮事，還可以選島主的樣子：大人、小孩、男生、女生，或是貓。想照原本的方式玩，就按「在家看島」，島主會待在家裡。</span></li>
       <li><span class="help-icon" aria-hidden="true">走</span><span><b>出門逛島</b>按「出門逛島」或「跟著島主走」，點地上島主就走過去，也可以推左下角的搖桿走路。點貓貓可以跟牠聊天、摸摸牠。</span></li>
       <li><span class="help-icon" aria-hidden="true">玩</span><span><b>島主也來玩</b>跳臺按「換我跳」、表演區按「我也要上臺」、跑步田徑場島按「我也要跑」，公園可以坐下來休息。</span></li>
@@ -984,7 +1013,7 @@
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 4.5l11-2v13.2a3 3 0 1 1-2-2.8V6.1l-7 1.3v10.3a3 3 0 1 1-2-2.8z"/></svg></span><span><b>表演區</b>點轉圈圈、揮手、翻跟斗、唱歌，臺上的貓就會表演；按拍手，臺下的貓一起拍。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>日記區</b>貓貓會把今天做的事寫成日記。按貓掌幫日記蓋掌印，按「唸給我聽」就會唸出來。</span></li>
       <li><span class="help-icon" aria-hidden="true">7</span><span><b>跑步田徑場島</b>七隻貓各站一條跑道，到齊後按「開始比賽」，跑一圈看誰第一名。跑道外面的草場，也常有貓跑來跑去。</span></li>
-      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。點老師或講台就改作業：每天有 20 隻貓來上課、各寫一張，你當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
+      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。點老師或講台就改作業：每天有 20 張作業，島上的貓輪流寫，你當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>島主卡</b>取一個自己的名字。按過幾次完美跳、改過幾張作業都會一直累積，下次來還在，還可以收集徽章。記下島主暗號，換裝置也找得回來。</span></li>
       <li><span class="help-icon" aria-hidden="true">？</span><span><b>貓貓教練</b>頭上綁頭帶、用兩隻腳走路。看到晃來晃去、頭上冒「？」的貓，就會叫牠去跳臺跳。</span></li>
       <li><span class="help-icon" aria-hidden="true">z</span><span><b>累了就休息</b>貓貓會去公園休息、躲進多多紙箱區的紙箱，也會回貓貓之家睡覺。點一下貓貓或紙箱，牠會跟你打招呼。</span></li>
@@ -1394,6 +1423,77 @@
     </p>
     <ul class="shop-list" id="shop-list"></ul>
     <p class="shop-msg" id="shop-msg" role="status"></p>
+  </article>
+
+  <article class="card" id="adopt-card" hidden aria-labelledby="adopt-title">
+    <div class="card__head">
+      <span class="trophy-chip adopt-chip" aria-hidden="true">
+        <svg viewBox="0 0 48 48"><path d="M10 40V18l7 6h14l7-6v22z" fill="#F2A35A"/><path d="M10 18l4-10 5 9M38 18l-4-10-5 9" fill="#F2A35A" stroke="#DD7F33" stroke-width="2" stroke-linejoin="round"/><circle cx="19" cy="28" r="2.2" fill="#3B2F2A"/><circle cx="29" cy="28" r="2.2" fill="#3B2F2A"/><path d="M21 33q3 3 6 0" fill="none" stroke="#3B2F2A" stroke-width="2" stroke-linecap="round"/></svg>
+      </span>
+      <div>
+        <p class="card__label">假扮成貓的人</p>
+        <h2 class="card__title" id="adopt-title">貓貓領養島</h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <p class="chat-line" id="adopt-say" aria-live="polite"></p>
+    <p class="shop-have" id="adopt-have">
+      <span>島上的貓 <b id="adopt-count">0</b>／100</span>
+      <span>小魚金幣 <svg class="coin" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#F7C531" stroke="#C99000" stroke-width="3"/><g fill="none" stroke="#8A5A00" stroke-width="2.6" stroke-linejoin="round"><ellipse cx="21" cy="24" rx="11" ry="7.5"/><path d="M32 24l8-6.5v13z"/></g><circle cx="16.5" cy="22.5" r="1.8" fill="#8A5A00"/></svg><b id="adopt-coins">0</b></span>
+    </p>
+    <ul class="shop-list" id="adopt-list"></ul>
+    <div class="adopt-confirm" id="adopt-confirm" hidden>
+      <p class="adopt-confirm__text" id="adopt-confirm-text"></p>
+      <div class="card__actions">
+        <button class="sticker sticker--solid" id="adopt-yes" type="button">我會照顧牠</button>
+        <button class="sticker" id="adopt-no" type="button">再想想</button>
+      </div>
+    </div>
+    <div class="card__actions">
+      <button class="sticker" id="adopt-read" type="button" aria-pressed="false"><span id="adopt-read-label">唸給我聽</span></button>
+      <button class="sticker sticker--solid" id="adopt-done" type="button" hidden>就是牠們了！</button>
+    </div>
+  </article>
+
+  <article class="card" id="unlock-card" hidden aria-labelledby="unlock-title">
+    <div class="card__head">
+      <span class="trophy-chip adopt-chip" aria-hidden="true">
+        <svg viewBox="0 0 48 48"><path d="M8 34c6-10 26-10 32 0z" fill="#7CC46C"/><path d="M24 12l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z" fill="#FFC93C" stroke="#E8922A" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </span>
+      <div>
+        <p class="card__label">新的島開放了！</p>
+        <h2 class="card__title" id="unlock-title"></h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <p class="card__text" id="unlock-lede"></p>
+    <div class="unlock-list" id="unlock-list"></div>
+    <div class="card__actions">
+      <button class="sticker" id="unlock-read" type="button" aria-pressed="false"><span id="unlock-read-label">唸給我聽</span></button>
+      <button class="sticker sticker--solid" id="unlock-go" type="button">去看看</button>
+    </div>
+  </article>
+
+  <article class="card" id="bridge-card" hidden aria-labelledby="bridge-title">
+    <div class="card__head">
+      <span class="trophy-chip adopt-chip" aria-hidden="true">
+        <svg viewBox="0 0 48 48"><path d="M10 40V18l7 6h14l7-6v22z" fill="#F2A35A"/><path d="M10 18l4-10 5 9M38 18l-4-10-5 9" fill="#F2A35A" stroke="#DD7F33" stroke-width="2" stroke-linejoin="round"/><circle cx="19" cy="28" r="2.2" fill="#3B2F2A"/><circle cx="29" cy="28" r="2.2" fill="#3B2F2A"/><path d="M21 33q3 3 6 0" fill="none" stroke="#3B2F2A" stroke-width="2" stroke-linecap="round"/></svg>
+      </span>
+      <div>
+        <p class="card__label">島上發生了一件大事</p>
+        <h2 class="card__title" id="bridge-title">貓貓們去夏令營了！</h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <div class="story" id="bridge-text">
+      <p>這段時間，島上的貓貓們一起去參加很遠很遠的貓貓夏令營，要去好久好久。島上一下子變得好安靜。</p>
+      <p>這時候，右下角多了一座「貓貓領養島」，島上住著一個假扮成貓的人。他說：「島上不能沒有貓！我來幫你找新的貓貓家人。」</p>
+      <p>先去貓貓領養島，領養你的第一批貓貓吧！島上的貓越多，開放的島就越多。你的小魚金幣、島主卡和徽章都還在喔。</p>
+    </div>
+    <div class="card__actions">
+      <button class="sticker" id="bridge-read" type="button" aria-pressed="false"><span id="bridge-read-label">唸給我聽</span></button>
+      <button class="sticker sticker--solid" id="bridge-go" type="button">去貓貓領養島</button>
+    </div>
   </article>
 
   <article class="card" id="chat-card" hidden aria-labelledby="chat-name">

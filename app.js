@@ -1,16 +1,20 @@
 // 桐桐貓貓島：串起 3D 場景、跳臺大按鈕、表演區按鈕、貓貓日記、學習數學島改作業、排行榜與卡片。所有資料文字一律用 textContent。
 import {
-  LEVELS, LEVEL_KEYS, PERFECT, TRICKS, DIARY_MAX, DIARY_SEED, makeCats, personality, sanitizeRecords, sanitizeDiaries, composeDiary, dateText,
+  LEVELS, LEVEL_KEYS, PERFECT, TRICKS, DIARY_MAX, makeCats, personality, sanitizeRecords, sanitizeDiaries, composeDiary, dateText,
   leaderboard, bestPerCat, topRecord, judgeJump, starsText, mulberry32,
   sanitizeRaceBoard, addRaceResult, raceLeaderboard, raceTopWinner, secondsText,
+  ISLANDS, UNLOCK, newlyOpened,
 } from './logic.js';
+import {
+  ADOPT_PRICE, ISLAND_MAX, newStarter, rerollStarter, sanitizeStarter, dailyOffer, sanitizePending, arrived, waitText, canAdopt,
+} from './adopt.js';
 import { MATH_UNITS, dayKey, dailyClass, dailyHomework, sanitizeLearnDay, sanitizeLearnStats } from './math.js';
 import { LESSONS } from './lessons.js';
 import { drawFigure } from './figures.js';
 import { zhuyin, plainText } from './zhuyin.js';
 import {
   BADGES, BADGE_GROUPS, ISLAND_IDS, NAME_MAX, sanitizeProfile, sanitizeDeviceData, cleanName, playerName, stampChar, statValue, total, bestCm, seenCount, bump, addSeen, markDay, award, earnedDayText,
-  normalizeCode, formatCode, ownData, applyRemote,
+  normalizeCode, formatCode, ownData, applyRemote, ownedCats, adoptCat,
   POWER_MAX, POWER_COST, SHOP_ITEMS, HOMEWORK_REWARD, coins, power, earnCoins, usePower, buyItem, jumpTop, noteJumpTop, jumpGrade, jumpReward, raceReward, sleepGain,
 } from './profile.js';
 import { composeNews, sanitizeNews, recordNews, recordJumpNews, recordRaceNews, chatGreeting, chatPet, chatDoing, chatBest, chatDiary, chatBusy } from './talk.js';
@@ -21,7 +25,9 @@ const RING = 2 * Math.PI * 54;
 const NAV = [
   { id: 'park1', label: '島主之家' },
   { id: 'owner', label: '跟著島主走' },
+  { id: 'adopt', label: '貓貓領養島' },
   { id: 'shop', label: '貓貓商店' },
+  { id: 'exam', label: '貓貓考試島' },
   { id: 'home', label: '貓貓之家' },
   { id: 'low', label: '低階跳臺', level: 'low' },
   { id: 'mid', label: '中階跳臺', level: 'mid' },
@@ -38,11 +44,32 @@ const NAV = [
   { id: 'overview', label: '看全島' },
 ];
 const ISLAND_COPY = {
-  home: { label: '島的中間', title: '貓貓之家', lede: '島上 50 隻貓貓的家。屋頂上的招牌，是設計師桐桐的印章。', text: '跳累的貓會回來睡貓床、吃飯喝水，有時候還會躲進屋子裡。' },
+  home: { label: '島的中間', title: '貓貓之家', lede: '島上貓貓的家。屋頂上的招牌，是設計師桐桐的印章。', text: '跳累的貓會回來睡貓床、吃飯喝水，有時候還會躲進屋子裡。' },
+  exam: { label: '考試的島', title: '貓貓考試島', lede: '教室和考試桌都準備好了。', text: '要考什麼，設計師桐桐還在想，請大家等一等。貓貓已經先來坐坐看了。' },
   boxes: { label: '躲貓貓的島', title: '多多紙箱區', lede: '滿地都是紙箱，貓貓最愛鑽進去躲起來。', text: '有的貓只露出耳朵，有的整隻躲起來，紙箱還會晃來晃去。點一下紙箱，看看誰躲在裡面！' },
   combo: { label: '休息的島', title: '合體公園', lede: '紙箱、魚池、水和飼料，全部合在一起的公園。', text: '貓貓可以躲紙箱、坐在池邊看魚，渴了喝水、餓了吃飼料。' },
   park2: { label: '休息的島', title: '魚池公園', lede: '跳累了就來這裡休息。', text: '池子裡有三條錦鯉游來游去，貓貓最愛坐在旁邊看。' },
 };
+// 新的島開放時，假扮成貓的人介紹這座島在做什麼（卡片上有注音）
+const ISLAND_INTRO = {
+  home: '這是貓貓們的家，屋頂上的招牌是桐桐的印章。貓貓累了會回來睡貓床、吃飯喝水，有時候還會躲進屋子裡。',
+  park1: '這是你的家。回到島上會先來這裡，聽最近島上的新鮮事，還可以選島主的樣子、回家睡覺補電。',
+  learn: '點黑板，戴眼鏡的貓貓老師會上課。點老師或講台，你就可以當老師，改貓貓寫的數學作業。',
+  low: '按住大按鈕蓄力，能量滿了就放開，貓貓就會跳起來。完美跳的時候貓會在空中翻跟斗！玩一次要 3 個電。',
+  shop: '可以用小魚金幣買水果、水和果汁，買了馬上吃掉、喝掉，就會補電。',
+  exam: '教室和考試桌都準備好了。要考什麼，設計師桐桐還在想，請大家等一等。',
+  combo: '紙箱、魚池、水和飼料全部合在一起的公園。貓貓可以躲紙箱、看魚，渴了喝水、餓了吃飼料。',
+  mid: '能量條會上上下下，要在最滿的時候放開，貓貓才跳得高。玩一次要 5 個電。',
+  diary: '貓貓會把今天做的事寫成日記。你可以幫日記蓋貓掌印，也可以按「唸給我聽」。',
+  boxes: '滿地都是紙箱，貓貓最愛鑽進去躲起來。點一下紙箱，看看誰躲在裡面！',
+  high: '這是最高的跳臺，能量條跑很快，看準最滿的時候再放開。玩一次要 10 個電。',
+  rank: '看看哪隻貓跳最高、跑最快。跳最高的前三名，還會站上頒獎臺。',
+  park2: '池子裡有錦鯉游來游去，貓貓最愛坐在池邊看魚，跳累了也會來這裡發呆。',
+  stage: '可以叫臺上的貓轉圈圈、揮手、翻跟斗、唱歌，也可以幫牠拍手。',
+  track: '七隻貓各站一條跑道，到齊了按「開始比賽」就開跑。島主也可以一起跑！',
+};
+const ISLAND_NAME = Object.fromEntries(ISLANDS.map((island) => [island.id, island.name]));
+
 const LEVEL_HINT = {
   low: '一直按住，能量滿了就放開。',
   mid: '能量條會上上下下，最滿的時候放開！',
@@ -253,6 +280,16 @@ function createSound(enabled) {
 function start(hotData = {}) {
   const cats = makeCats();
   const stored = readStore();
+  // 貓貓領養島改版：玩過舊版的人（島上本來就有 50 隻貓）第一次打開新版，島上清空、重新領養。
+  // 舊的跳高、跑步成績和日記不刪，收進 before 存著；小魚金幣、島主卡、徽章都不動
+  const legacy = !!stored.storySeen && stored.adoptV !== 1 && !hotData.records;
+  if (legacy) {
+    stored.before = { records: stored.records || [], race: stored.race || null, diaries: stored.diaries || [], at: Date.now() };
+    stored.records = [];
+    stored.race = null;
+    stored.diaries = [];
+  }
+  let bridgeSeen = !legacy && stored.bridgeSeen !== false;
   let records = sanitizeRecords(hotData.records || stored.records, cats.length);
   let jumpCount = records.reduce((max, r) => Math.max(max, r.at), 0);
   // 跑步比賽的成績：每隻貓跑最快的那一次、第一名幾次（「重新比一次」會跟跳高一起清掉）
@@ -274,13 +311,9 @@ function start(hotData = {}) {
   // 學習數學島：今天的作業改到哪裡
   let learnDay = sanitizeLearnDay(stored.learn && stored.learn.day, dayKey());
 
-  // 貓貓日記：舊到新排；第一次打開新版的島時先放三篇介紹新島的日記
+  // 貓貓日記：舊到新排。島上一開始沒有貓，所以不再先放介紹用的日記，等領養的貓自己寫
   let diaries = sanitizeDiaries(hotData.diaries || stored.diaries, cats.length);
-  let diarySeq = diaries.reduce((max, d) => Math.max(max, d.id), 0);
-  if (!stored.diarySeeded && !hotData.diaries && !diaries.length) {
-    DIARY_SEED.forEach((seed) => diaries.push({ id: ++diarySeq, cat: seed.cat, date: dateText(Date.now()), lines: seed.lines.slice(), paws: 0 }));
-  }
-  if (!stored.diarySeeded) writeStore({ ...stored, diaries, diarySeeded: true });
+  let diarySeq = Math.max(diaries.reduce((max, d) => Math.max(max, d.id), 0), ...((stored.before && stored.before.diaries) || []).map((d) => (Number.isInteger(d.id) ? d.id : 0)), 0);
   const memories = new Map();
   let diaryPage = 0;
   let diaryOpen = false;
@@ -324,9 +357,30 @@ function start(hotData = {}) {
   // 第一次來的人先看島的故事，看過就不再跳出來
   let storySeen = !!stored.storySeen;
 
-  function save() {
-    writeStore({ records, race: raceBoard, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay }, profile, news: newsLog, stayHome: atHome, sleepAt });
+  // ---------- 貓貓領養島：島上的貓、開放的島 ----------
+  // owned 是島上的貓（這臺加別臺領養的）。starter 是第一批正在挑的 3 隻（還沒按確定），
+  // pending 是假扮成貓的人正在帶回來的貓，offer 是今天的 3 隻候選，introduced 是介紹過的島。這四個只存在這臺
+  const owned = () => ownedCats(profile);
+  let starter = sanitizeStarter(stored.starter, cats.length);
+  let pending = sanitizePending(stored.pending, cats.length);
+  let offer = stored.offer && stored.offer.day === dayKey() && Array.isArray(stored.offer.cats) ? stored.offer : null;
+  let introduced = Array.isArray(stored.introduced)
+    ? stored.introduced.filter((id) => id in UNLOCK)
+    : (owned().length ? Object.keys(UNLOCK).filter((id) => owned().length >= UNLOCK[id]) : []);
+  const opened = (id) => !(id in UNLOCK) || owned().length >= UNLOCK[id];
+  // 每座島還要幾隻貓才開
+  function needMap() {
+    const n = owned().length;
+    return Object.fromEntries(Object.keys(UNLOCK).map((id) => [id, Math.max(0, UNLOCK[id] - n)]));
   }
+
+  function save() {
+    writeStore({
+      records, race: raceBoard, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay }, profile, news: newsLog, stayHome: atHome, sleepAt,
+      adoptV: 1, bridgeSeen, before: stored.before, starter, pending, offer, introduced,
+    });
+  }
+  save();
 
   // ---------- 搖桿：跟著島主走的時候出現在左下角，推哪邊島主就往哪邊走（點地上走路照樣可以） ----------
   const stickPad = $('stick');
@@ -383,6 +437,8 @@ function start(hotData = {}) {
 
   const scene = createScene($('scene'), {
     cats,
+    present: owned(),
+    open: Object.keys(UNLOCK).filter(opened),
     reducedMotion,
     hooks: {
       onJump,
@@ -437,6 +493,9 @@ function start(hotData = {}) {
       },
     },
   });
+
+  scene.setOpen(needMap());
+  scene.adoptAway(!!pending);
 
   // ---------- 一跳到最高點：記成績、更新排行榜、破紀錄就慶祝 ----------
   function onJump(info) {
@@ -1115,7 +1174,8 @@ function start(hotData = {}) {
       if (r) best[key] = { cm: r.cm, name: cats[r.cat].name };
     });
     scene.updateBoard({
-      champions: top.slice(0, 3).map((r) => r.cat),
+      // 排行榜島還沒開，貓就不會去站頒獎臺
+      champions: opened('rank') ? top.slice(0, 3).map((r) => r.cat) : [],
       best,
       top: top.slice(0, 5).map((r) => ({ name: cats[r.cat].name, cm: r.cm, level: r.level })),
       raceTop: raceLeaderboard(raceBoard, 5).map((r) => ({ name: cats[r.cat].name, sec: secondsText(r.best) })),
@@ -1149,6 +1209,12 @@ function start(hotData = {}) {
     button.setAttribute('aria-pressed', 'false');
     if (item.level) button.append(el('span', 'nav-chip__stars', starsText(item.level)));
     button.append(el('span', '', item.label));
+    // 還沒開放的島：鈕上加一個鎖和還要幾隻貓
+    if (item.id in UNLOCK) {
+      const need = el('small', 'nav-chip__need');
+      need.hidden = true;
+      button.append(need);
+    }
     if (item.id === 'diary') {
       const badge = el('span', 'nav-chip__badge');
       badge.id = 'diary-badge';
@@ -1172,8 +1238,17 @@ function start(hotData = {}) {
   }
 
   function updateNav() {
+    const need = needMap();
     nav.querySelectorAll('.nav-chip').forEach((button) => {
       button.setAttribute('aria-pressed', String(button.dataset.island === focus));
+      const small = button.querySelector('.nav-chip__need');
+      if (!small) return;
+      const left = need[button.dataset.island] || 0;
+      button.classList.toggle('is-locked', left > 0);
+      small.hidden = !left;
+      small.textContent = left ? `🔒${left}` : '';
+      if (left) button.setAttribute('aria-label', `${ISLAND_NAME[button.dataset.island]}，還要 ${left} 隻貓才開放`);
+      else button.removeAttribute('aria-label');
     });
     syncStick();
   }
@@ -1205,6 +1280,22 @@ function start(hotData = {}) {
     closeCards();
     focus = id;
     if (!auto) track('island_view', { island: id });
+    // 還沒開放的島：鏡頭飛過去看，跳出「還要幾隻貓」的卡片，不能玩
+    if (!opened(id)) {
+      followingCoach = false;
+      ownerJumping = false;
+      ownerOnStage = false;
+      syncOwnerButtons();
+      $('dock').hidden = true;
+      $('stage-dock').hidden = true;
+      $('race-dock').hidden = true;
+      openLocked(id);
+      measureBottom();
+      scene.focus(id, insets());
+      updateNav();
+      syncPlayable();
+      return;
+    }
     if (ISLAND_IDS.includes(id)) see('islands', id);
     followingCoach = false;
     ownerJumping = false;
@@ -1233,6 +1324,8 @@ function start(hotData = {}) {
       openHome();
     } else if (id === 'shop') {
       openShop();
+    } else if (id === 'adopt') {
+      openAdopt();
     } else if (id === 'rank') {
       openRank();
     } else if (id === 'diary') {
@@ -1732,7 +1825,7 @@ function start(hotData = {}) {
   });
 
   // ---------- 學習數學島：玩家當老師改作業 ----------
-  // 每天換 20 隻貓來上課，每隻寫一張（9 個單元都會出到）；20 張改完今天就結束，明天換別的貓。
+  // 每天 20 張作業，由島上的貓來寫（9 個單元都會出到）；貓不到 20 隻就輪流多寫幾張。20 張改完今天就結束。
   // 玩家按「寫對了／寫錯了」，改錯第一次老師給提示，第二次老師直接講解
   let stack = [];
   let stackKey = '';
@@ -1745,10 +1838,16 @@ function start(hotData = {}) {
       learnDay = sanitizeLearnDay(null, key);
       save();
     }
-    if (stackKey === key) return;
-    const classCats = dailyClass(key, cats.length);
+    // 島上的貓變多了，就重新排一次誰寫哪一張（改到哪裡照樣接得下去）
+    const classKey = `${key}|${owned().length}`;
+    if (stackKey === classKey) return;
+    const classCats = dailyClass(key, owned());
+    if (!classCats.length) {
+      stack = [];
+      return;
+    }
     stack = dailyHomework(key).map((p, i) => ({ p, cat: classCats[i], tries: 0, done: learnDay.results[i] !== null, result: learnDay.results[i] }));
-    stackKey = key;
+    stackKey = classKey;
     sheetIndex = stack.findIndex((s) => !s.done);
     if (sheetIndex < 0) sheetIndex = stack.length;
     scene.setClass(classCats);
