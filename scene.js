@@ -2478,10 +2478,12 @@ export function createScene(container, { cats: catData, present = null, open = n
       stars.textContent = '★'.repeat(level.stars);
       stars.setAttribute('aria-hidden', 'true');
       button.append(stars);
+      island.pillStars = stars;
     }
     const name = document.createElement('span');
     name.textContent = island.name;
     button.append(name);
+    island.pillName = name;
     // 還沒開放的島：名牌下面寫還要幾隻貓
     const need = document.createElement('small');
     need.className = 'island-pill__need';
@@ -4988,6 +4990,7 @@ export function createScene(container, { cats: catData, present = null, open = n
       applyPose(cat, dt, t);
     }
     stepAdopt(dt, t);
+    stepFog(dt, t);
     updateCoach(dt);
     applyPose(coach, dt, t);
     updateTeacher(dt);
@@ -5336,17 +5339,93 @@ export function createScene(container, { cats: catData, present = null, open = n
     repaintRankBoard();
   }
 
-  // 開放的島：need 是 { 島 id: 還要幾隻貓 }，0 或沒寫就是開了。沒開的島草地變灰、名牌寫還要幾隻
-  const GRASS_LOCKED = new THREE.Color(0xc9cfc4);
+  // ---------- 雲霧：還沒開放的島整座被雲霧包住，看不出來是什麼島，開放的時候雲霧才散開 ----------
+  const fogs = new Map();
+  function makeFog(island) {
+    const fog = new THREE.Group();
+    fog.position.set(island.cx, 0, island.cz);
+    const material = new THREE.MeshStandardMaterial({ color: 0xf4f6fa, roughness: 1, metalness: 0, transparent: true, opacity: 0.97, flatShading: false });
+    const r = mulberry32(island.index * 977 + 31);
+    const geo = new THREE.IcosahedronGeometry(1, 2);
+    const outline = scalePts(island.local, 1.06);
+    const minX = Math.min(...outline.map((p) => p.x));
+    const maxX = Math.max(...outline.map((p) => p.x));
+    const minZ = Math.min(...outline.map((p) => p.z));
+    const maxZ = Math.max(...outline.map((p) => p.z));
+    const puffs = [];
+    // 島越大雲越多：先鋪一層蓋住整座島，再往上疊一層蓋住房子和跳臺
+    // 大島（田徑場）用比較大朵、比較疏的雲，不然雲太多會卡
+    const step = Math.max(0.95, island.radius / 5.5);
+    const big = step / 0.95;
+    for (let x = minX; x <= maxX + 0.01; x += step) {
+      for (let z = minZ; z <= maxZ + 0.01; z += step) {
+        const px = x + (r() - 0.5) * 0.5;
+        const pz = z + (r() - 0.5) * 0.5;
+        if (!insidePoly(outline, px, pz) && edgeDist(outline, px, pz) > 0.45) continue;
+        [0, 1].forEach((layer) => {
+          if (layer && r() < 0.35) return;
+          const size = (0.75 + r() * 0.55 - layer * 0.12) * big;
+          const puff = new THREE.Mesh(geo, material);
+          puff.scale.set(size * (1 + r() * 0.3), size * 0.78, size * (1 + r() * 0.3));
+          puff.position.set(px, TOP + 0.35 + layer * 1.0 * Math.min(big, 1.3) + r() * 0.35, pz);
+          puff.userData.base = puff.position.y;
+          puff.userData.phase = r() * TAU;
+          puff.castShadow = false;
+          puff.receiveShadow = false;
+          puff.userData.pick = { type: 'island', id: island.id };
+          pickables.push(puff);
+          fog.add(puff);
+          puffs.push(puff);
+        });
+      }
+    }
+    scene.add(fog);
+    return { group: fog, material, puffs, clearing: -1 };
+  }
+  function stepFog(dt, t) {
+    fogs.forEach((fog, id) => {
+      if (fog.clearing < 0) {
+        if (!reducedMotion) fog.puffs.forEach((p) => { p.position.y = p.userData.base + Math.sin(t * 0.6 + p.userData.phase) * 0.06; });
+        return;
+      }
+      // 散開：雲往外飄、變大、變透明，兩秒半後拿掉
+      fog.clearing += dt;
+      const k = Math.min(1, fog.clearing / 2.5);
+      fog.material.opacity = 0.97 * (1 - k);
+      fog.group.scale.setScalar(1 + k * 0.6);
+      fog.group.position.y = k * 1.2;
+      if (k >= 1) {
+        scene.remove(fog.group);
+        fog.puffs.forEach((p) => {
+          const i = pickables.indexOf(p);
+          if (i >= 0) pickables.splice(i, 1);
+        });
+        fog.material.dispose();
+        fogs.delete(id);
+      }
+    });
+  }
+
+  // 開放的島：need 是 { 島 id: 還要幾隻貓 }，0 或沒寫就是開了。
+  // 沒開的島被雲霧包住，名牌只寫「？？？」和還要幾隻貓；開了雲霧才散開、名字才出現
   function setOpen(need) {
     openIds = new Set(islands.filter((island) => !(need[island.id] > 0)).map((island) => island.id));
     islands.forEach((island) => {
       const left = need[island.id] > 0 ? need[island.id] : 0;
-      island.grass.color.set(left ? GRASS_LOCKED : new THREE.Color(C.grass));
       island.pill.classList.toggle('island-pill--locked', !!left);
+      island.pillName.textContent = left ? '？？？' : island.name;
+      if (island.pillStars) island.pillStars.textContent = left ? '' : '★'.repeat(LEVELS[island.def.level].stars);
+      island.pill.setAttribute('aria-label', left ? `被雲霧包住的島，還要 ${left} 隻貓` : island.name);
       island.pillNeed.hidden = !left;
       island.pillNeed.textContent = left ? `還要 ${left} 隻貓` : '';
+      const fog = fogs.get(island.id);
+      if (left && !fog) fogs.set(island.id, makeFog(island));
+      else if (!left && fog && fog.clearing < 0) {
+        // 剛開的島要有散開的動畫；一打開網頁就已經開的島直接拿掉
+        fog.clearing = setOpen.ready && !reducedMotion ? 0 : 2.5;
+      }
     });
+    setOpen.ready = true;
   }
 
   // 領養的貓到了：從領養屋門口走出來，先在附近逛逛

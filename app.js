@@ -1212,7 +1212,7 @@ function start(hotData = {}) {
     button.dataset.island = item.id;
     button.setAttribute('aria-pressed', 'false');
     if (item.level) button.append(el('span', 'nav-chip__stars', starsText(item.level)));
-    button.append(el('span', '', item.label));
+    button.append(el('span', 'nav-chip__name', item.label));
     // 還沒開放的島：鈕上加一個鎖和還要幾隻貓
     if (item.id in UNLOCK) {
       const need = el('small', 'nav-chip__need');
@@ -1249,9 +1249,13 @@ function start(hotData = {}) {
       if (!small) return;
       const left = need[button.dataset.island] || 0;
       button.classList.toggle('is-locked', left > 0);
+      // 還沒開的島不給看名字，開了才知道是什麼島
+      button.querySelector('.nav-chip__name').textContent = left ? '？？？' : NAV.find((n) => n.id === button.dataset.island).label;
+      const stars = button.querySelector('.nav-chip__stars');
+      if (stars) stars.textContent = left ? '' : starsText(button.dataset.island);
       small.hidden = !left;
       small.textContent = left ? `🔒${left}` : '';
-      if (left) button.setAttribute('aria-label', `${ISLAND_NAME[button.dataset.island]}，還要 ${left} 隻貓才開放`);
+      if (left) button.setAttribute('aria-label', `被雲霧包住的島，還要 ${left} 隻貓才開放`);
       else button.removeAttribute('aria-label');
     });
     syncStick();
@@ -2374,7 +2378,7 @@ function start(hotData = {}) {
     unlockIds = ids;
     const names = ids.map((id) => ISLAND_NAME[id]);
     $('unlock-title').textContent = ids.length === 1 ? `${names[0]}開放了！` : `一次開了 ${ids.length} 座島！`;
-    $('unlock-lede').textContent = `島上現在有 ${owned().length} 隻貓。假扮成貓的人說：`;
+    $('unlock-lede').textContent = `雲霧散開了！島上現在有 ${owned().length} 隻貓。假扮成貓的人說：`;
     $('unlock-list').replaceChildren(...ids.map((id) => {
       const box = el('section', 'unlock-item');
       box.append(el('p', 'unlock-item__name', ISLAND_NAME[id]), el('p', 'unlock-item__text', ISLAND_INTRO[id] || ''));
@@ -2405,13 +2409,14 @@ function start(hotData = {}) {
     track('read_aloud', { what: 'unlock' });
   });
 
-  // 還沒開放的島：寫還要幾隻貓、開放以後可以做什麼
+  // 還沒開放的島：被雲霧包住，不說是什麼島，只說還要幾隻貓
   function openLocked(id) {
     closeCards();
+    const left = Math.max(0, UNLOCK[id] - owned().length);
     $('island-label').textContent = '還沒開放';
-    $('island-title').textContent = ISLAND_NAME[id];
-    $('island-lede').textContent = `島上現在有 ${owned().length} 隻貓，要 ${UNLOCK[id]} 隻貓，這座島才會開放。`;
-    $('island-text').textContent = ISLAND_INTRO[id] ? `開放以後：${ISLAND_INTRO[id]}` : '';
+    $('island-title').textContent = '被雲霧包住的島';
+    $('island-lede').textContent = `雲霧好濃，看不出來這是什麼島。島上要有 ${UNLOCK[id]} 隻貓，雲霧才會散開。`;
+    $('island-text').textContent = `現在島上有 ${owned().length} 隻貓，還差 ${left} 隻。`;
     $('island-count').textContent = '到貓貓領養島領養更多貓吧！';
     $('island-cats').replaceChildren();
     $('island-cats').dataset.key = '';
