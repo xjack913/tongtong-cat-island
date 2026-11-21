@@ -2632,8 +2632,18 @@ function start(hotData = {}) {
   $('help-open').addEventListener('click', () => {
     const open = !$('help-card').hidden;
     closeCards();
+    if (!open) renderHelp();
     $('help-card').hidden = open;
   });
+
+  // 「怎麼玩」只介紹已經開放的島：data-need 列的島有一座開了才顯示，data-hide 的島開了就藏起來
+  function renderHelp() {
+    for (const node of $('help-card').querySelectorAll('[data-need], [data-hide]')) {
+      const need = node.dataset.need ? node.dataset.need.split(' ').some((id) => opened(id)) : true;
+      const hide = node.dataset.hide ? node.dataset.hide.split(' ').some((id) => opened(id)) : false;
+      node.hidden = !need || hide;
+    }
+  }
 
   function soundUi() {
     $('sound-toggle').setAttribute('aria-pressed', String(sound.on));

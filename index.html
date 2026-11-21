@@ -269,6 +269,7 @@
   .story-actions .sticker { min-height: 60px; font-size: var(--zy-3); }
   .help-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
   .help-list li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 16px; color: var(--text-2); }
+  #help-card [hidden] { display: none !important; }
   .help-list b { display: block; font-weight: 400; font-size: 17px; color: var(--text); }
   .help-icon { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: var(--ink-pale); color: var(--ink-deep); font: 600 16px var(--num); }
   .help-icon svg { width: 20px; height: 20px; }
@@ -998,33 +999,35 @@
     <ul class="help-list">
       <li><span class="help-icon" aria-hidden="true">領</span><span><b>貓貓領養島</b>一開始島上沒有貓。假扮成貓的人會先給你 3 隻，每隻有一顆骰子，可以重骰一次換一隻。之後每天有 3 隻貓可以領養，一次選 1 隻、要 50 個小魚金幣，他要 24 小時才會把貓帶回來。島上最多 100 隻，領養的貓不能換，要照顧牠一輩子。</span></li>
       <li><span class="help-icon" aria-hidden="true">開</span><span><b>貓越多，島越多</b>還沒開放的島被雲霧包住，看不出來是什麼島，名牌上只寫還要幾隻貓。島上的貓夠多了，雲霧就會散開，假扮成貓的人會介紹這座島。</span></li>
-      <li><span class="help-icon" aria-hidden="true">家</span><span><b>島主之家</b>這是你的家。回到島上會先來這裡，聽最近島上的新鮮事，還可以選島主的樣子：大人、小孩、男生、女生，或是貓。想照原本的方式玩，就按「在家看島」，島主會待在家裡。</span></li>
-      <li><span class="help-icon" aria-hidden="true">走</span><span><b>出門逛島</b>按「出門逛島」或「跟著島主走」，點地上島主就走過去，也可以推左下角的搖桿走路。點貓貓可以跟牠聊天、摸摸牠。</span></li>
-      <li><span class="help-icon" aria-hidden="true">玩</span><span><b>島主也來玩</b>跳臺按「換我跳」、表演區按「我也要上臺」、跑步田徑場島按「我也要跑」，公園可以坐下來休息。</span></li>
-      <li><span class="help-icon" aria-hidden="true">⚡</span><span><b>島主的電</b>島主有 30 個電，左上角看得到還有幾個。玩一次要用電：跑步田徑場「我也要跑」20 個、高階跳臺 10 個、中階 5 個、低階 3 個，改作業不用電。電不夠就不能玩，隔天也不會自己補滿，要去貓貓商店買吃的，或是回家睡覺。</span></li>
-      <li><span class="help-icon" aria-hidden="true"><svg class="coin" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#F7C531" stroke="#C99000" stroke-width="3"/><g fill="none" stroke="#8A5A00" stroke-width="2.6" stroke-linejoin="round"><ellipse cx="21" cy="24" rx="11" ry="7.5"/><path d="M32 24l8-6.5v13z"/></g><circle cx="16.5" cy="22.5" r="1.8" fill="#8A5A00"/></svg></span><span><b>小魚金幣</b>玩了就有小魚金幣。跑步前三名 15 個、其他 10 個；高階跳臺破紀錄 20 個、完美跳 10 個、其他 3 個；中階 5、3、1 個；低階 3、2 個；作業一次就改對，一張 1 個。破紀錄是比這座跳臺以前最高的那一次還高。</span></li>
-      <li><span class="help-icon" aria-hidden="true">店</span><span><b>貓貓商店</b>用小魚金幣買東西，買了島主馬上吃掉、喝掉：水果 5 個金幣補 15 個電，水 3 個金幣補 10 個電，果汁 10 個金幣補 10 個電。電最多 30 個。</span></li>
-      <li><span class="help-icon" aria-hidden="true">z</span><span><b>回家睡覺</b>在島主之家按「回家睡覺」，每 1 分鐘補 1 個電，補到 30 個。關掉網頁也照算，睡覺的時候不能玩要用電的遊戲，按「起床」就可以出門。</span></li>
-      <li><span class="help-icon" aria-hidden="true">1</span><span><b>選一座跳臺</b>點下面的低階、中階或高階跳臺，鏡頭會飛過去。</span></li>
-      <li><span class="help-icon" aria-hidden="true">2</span><span><b>按住大按鈕，放開就跳</b>貓貓走到跳板前面，按鈕變藍色就可以按。</span></li>
-      <li><span class="help-icon" aria-hidden="true">3</span><span><b>能量條要抓時機</b>低階一直按住就會滿；中階和高階的能量條會上上下下，最滿的時候放開跳最高。</span></li>
-      <li><span class="help-icon" aria-hidden="true">4</span><span><b>完美跳會翻跟斗</b>能量條碰到黃色那一段放開，貓貓會在空中翻一圈。</span></li>
-      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v6a5 5 0 0 1-10 0zM11 14h2v3h3v4H8v-4h3z"/></svg></span><span><b>排行榜</b>可以看跳高，也可以看跑步。每隻貓只算牠跳最高、跑最快的那一次。頒獎臺上站的是這次跳最高的前三名，第一名戴皇冠。</span></li>
-      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 4.5l11-2v13.2a3 3 0 1 1-2-2.8V6.1l-7 1.3v10.3a3 3 0 1 1-2-2.8z"/></svg></span><span><b>表演區</b>點轉圈圈、揮手、翻跟斗、唱歌，臺上的貓就會表演；按拍手，臺下的貓一起拍。</span></li>
-      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>日記區</b>貓貓會把今天做的事寫成日記。按貓掌幫日記蓋掌印，按「唸給我聽」就會唸出來。</span></li>
-      <li><span class="help-icon" aria-hidden="true">7</span><span><b>跑步田徑場島</b>七隻貓各站一條跑道，到齊後按「開始比賽」，跑一圈看誰第一名。跑道外面的草場，也常有貓跑來跑去。</span></li>
-      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。點老師或講台就改作業：每天有 20 張作業，島上的貓輪流寫，你當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
-      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>島主卡</b>取一個自己的名字。按過幾次完美跳、改過幾張作業都會一直累積，下次來還在，還可以收集徽章。記下島主暗號，換裝置也找得回來。</span></li>
-      <li><span class="help-icon" aria-hidden="true">？</span><span><b>貓貓教練</b>頭上綁頭帶、用兩隻腳走路。看到晃來晃去、頭上冒「？」的貓，就會叫牠去跳臺跳。</span></li>
-      <li><span class="help-icon" aria-hidden="true">z</span><span><b>累了就休息</b>貓貓會去公園休息、躲進多多紙箱區的紙箱，也會回貓貓之家睡覺。點一下貓貓或紙箱，牠會跟你打招呼。</span></li>
+      <li data-need="park1"><span class="help-icon" aria-hidden="true">家</span><span><b>島主之家</b>這是你的家。回到島上會先來這裡，聽最近島上的新鮮事，還可以選島主的樣子：大人、小孩、男生、女生，或是貓。想照原本的方式玩，就按「在家看島」，島主會待在家裡。</span></li>
+      <li data-need="park1"><span class="help-icon" aria-hidden="true">走</span><span><b>出門逛島</b>按「出門逛島」或「跟著島主走」，點地上島主就走過去，也可以推左下角的搖桿走路。點貓貓可以跟牠聊天、摸摸牠。</span></li>
+      <li data-need="low stage track combo park2"><span class="help-icon" aria-hidden="true">玩</span><span><b>島主也來玩</b><span data-need="low">跳臺按「換我跳」。</span><span data-need="stage">表演區按「我也要上臺」。</span><span data-need="track">跑步田徑場島按「我也要跑」。</span><span data-need="combo park2">公園可以坐下來休息。</span></span></li>
+      <li data-need="low"><span class="help-icon" aria-hidden="true">⚡</span><span><b>島主的電</b>島主有 30 個電，左上角看得到還有幾個。玩一次要用電：<span data-need="track">跑步田徑場「我也要跑」20 個、</span><span data-need="high">高階跳臺 10 個、</span><span data-need="mid">中階 5 個、</span>低階 3 個<span data-need="learn">，改作業不用電</span>。電不夠就不能玩，隔天也不會自己補滿，要<span data-need="shop">去貓貓商店買吃的，或是</span>回家睡覺。</span></li>
+      <li data-need="low learn track"><span class="help-icon" aria-hidden="true"><svg class="coin" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#F7C531" stroke="#C99000" stroke-width="3"/><g fill="none" stroke="#8A5A00" stroke-width="2.6" stroke-linejoin="round"><ellipse cx="21" cy="24" rx="11" ry="7.5"/><path d="M32 24l8-6.5v13z"/></g><circle cx="16.5" cy="22.5" r="1.8" fill="#8A5A00"/></svg></span><span><b>小魚金幣</b>玩了就有小魚金幣。<span data-need="track">跑步前三名 15 個、其他 10 個。</span><span data-need="high">高階跳臺破紀錄 20 個、完美跳 10 個、其他 3 個。</span><span data-need="mid">中階 5、3、1 個。</span><span data-need="low">低階破紀錄 3 個、完美跳 2 個。</span><span data-need="learn">作業一次就改對，一張 1 個。</span><span data-need="low">破紀錄是比這座跳臺以前最高的那一次還高。</span></span></li>
+      <li data-need="shop"><span class="help-icon" aria-hidden="true">店</span><span><b>貓貓商店</b>用小魚金幣買東西，買了島主馬上吃掉、喝掉：水果 5 個金幣補 15 個電，水 3 個金幣補 10 個電，果汁 10 個金幣補 10 個電。電最多 30 個。</span></li>
+      <li data-need="park1"><span class="help-icon" aria-hidden="true">z</span><span><b>回家睡覺</b>在島主之家按「回家睡覺」，每 1 分鐘補 1 個電，補到 30 個。關掉網頁也照算，睡覺的時候不能玩要用電的遊戲，按「起床」就可以出門。</span></li>
+      <li data-need="low"><span class="help-icon" aria-hidden="true">1</span><span><b>選一座跳臺</b>點下面的跳臺按鈕，鏡頭會飛過去。</span></li>
+      <li data-need="low"><span class="help-icon" aria-hidden="true">2</span><span><b>按住大按鈕，放開就跳</b>貓貓走到跳板前面，按鈕變藍色就可以按。</span></li>
+      <li data-need="low"><span class="help-icon" aria-hidden="true">3</span><span><b>能量條要抓時機</b>低階一直按住就會滿<span data-need="mid">；<span data-need="high">中階和高階</span><span data-need="mid" data-hide="high">中階</span>的能量條會上上下下，最滿的時候放開跳最高</span>。</span></li>
+      <li data-need="low"><span class="help-icon" aria-hidden="true">4</span><span><b>完美跳會翻跟斗</b>能量條碰到黃色那一段放開，貓貓會在空中翻一圈。</span></li>
+      <li data-need="rank"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v6a5 5 0 0 1-10 0zM11 14h2v3h3v4H8v-4h3z"/></svg></span><span><b>排行榜</b>可以看跳高<span data-need="track">，也可以看跑步</span>。每隻貓只算牠跳最高<span data-need="track">、跑最快</span>的那一次。頒獎臺上站的是這次跳最高的前三名，第一名戴皇冠。</span></li>
+      <li data-need="stage"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 4.5l11-2v13.2a3 3 0 1 1-2-2.8V6.1l-7 1.3v10.3a3 3 0 1 1-2-2.8z"/></svg></span><span><b>表演區</b>點轉圈圈、揮手、翻跟斗、唱歌，臺上的貓就會表演；按拍手，臺下的貓一起拍。</span></li>
+      <li data-need="diary"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>日記區</b>貓貓會把今天做的事寫成日記。按貓掌幫日記蓋掌印，按「唸給我聽」就會唸出來。</span></li>
+      <li data-need="track"><span class="help-icon" aria-hidden="true">7</span><span><b>跑步田徑場島</b>七隻貓各站一條跑道，到齊後按「開始比賽」，跑一圈看誰第一名。跑道外面的草場，也常有貓跑來跑去。</span></li>
+      <li data-need="learn"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。點老師或講台就改作業：每天有 20 張作業，島上的貓輪流寫，你當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
+      <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>島主卡</b>取一個自己的名字。玩過的東西都會一直累積，下次來還在，還可以收集徽章。記下島主暗號，換裝置也找得回來。</span></li>
+      <li data-need="low"><span class="help-icon" aria-hidden="true">？</span><span><b>貓貓教練</b>頭上綁頭帶、用兩隻腳走路。看到晃來晃去、頭上冒「？」的貓，就會叫牠去跳臺跳。</span></li>
+      <li data-need="home"><span class="help-icon" aria-hidden="true">z</span><span><b>累了就休息</b>貓貓累了會回貓貓之家睡覺<span data-need="combo park2">，也會去公園休息</span><span data-need="boxes">，還會躲進多多紙箱區的紙箱</span>。點一下貓貓<span data-need="boxes">或紙箱</span>，牠會跟你打招呼。</span></li>
     </ul>
     <section class="designer" aria-labelledby="designer-title">
       <p class="designer__name" id="designer-title">
         <svg viewBox="0 0 120 120" aria-hidden="true"><g fill="#fff" stroke="currentColor" stroke-width="5" stroke-linejoin="round"><circle cx="37" cy="24" r="11"/><circle cx="83" cy="24" r="11"/><path d="M30 52a30 30 0 0 1 60 0z"/></g><g fill="currentColor"><circle cx="49" cy="41" r="3.6"/><circle cx="71" cy="41" r="3.6"/></g><rect x="10" y="50" width="100" height="58" rx="29" fill="#fff" stroke="currentColor" stroke-width="5"/><text x="60" y="81" text-anchor="middle" dominant-baseline="middle" font-size="44" fill="currentColor" font-family="Huninn, PingFang TC, sans-serif">桐</text></svg>
         島的設計師：桐桐
       </p>
-      <p>這座島照桐桐畫的設計圖做：十一座島的形狀和位置、二十座木板橋，都跟她畫的一樣。第二次她又加了表演區、多多紙箱區、日記區、合體公園，還有貓貓教練；後來又說要一座學習數學島，放在高階跳臺上面；再後來又畫了一張跑步田徑場島，有七條跑道和一大片草場；又寫了一張島主的電、小魚金幣和貓貓商店的規則，還畫了商店和店員。島上的樹是開白花的油桐樹。</p>
-      <figure>
+      <p>這座島照桐桐畫的設計圖做，島的形狀、位置和木板橋，都跟她畫的一樣。她後來又一直畫新的島、寫新的規則。島上的樹是開白花的油桐樹。</p>
+      <p data-hide="track">等島上的雲霧全部散開，就看得到桐桐畫的設計圖喔！</p>
+      <p data-need="track">桐桐畫的第一張設計圖有十一座島、二十座木板橋。第二次她又加了表演區、多多紙箱區、日記區、合體公園，還有貓貓教練；後來又說要一座學習數學島，放在高階跳臺上面；再後來又畫了一張跑步田徑場島，有七條跑道和一大片草場；又寫了一張島主的電、小魚金幣和貓貓商店的規則，還畫了商店和店員。最新的一張，畫的是貓貓領養島和貓貓考試島。</p>
+      <figure data-need="track">
         <img src="sketch.jpg" alt="桐桐用鉛筆畫的貓貓島設計圖：中間是有「桐」字招牌的房子，周圍有三座跳臺、有階梯舞臺的表演區、畫滿小紙箱的多多紙箱區、有書桌的日記區、有魚池的合體公園、兩座公園和 1、2、3 名的頒獎臺，用木板橋連起來，到處都是貓。" width="1200" height="786" loading="lazy">
         <figcaption>桐桐畫的設計圖（第二版）</figcaption>
       </figure>
