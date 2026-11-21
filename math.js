@@ -412,8 +412,10 @@ export function makeProblem(unit, rand = Math.random) {
   return maker ? maker(rand) : null;
 }
 
-// ---------- 每天的作業：每天換 20 隻貓來上課，每隻寫一張，9 個單元都會出到 ----------
-export const CLASS_SIZE = 20;
+// ---------- 作業：島上的貓自己一直去寫，寫好的放在講桌上，玩家一次最多拿 10 張來改 ----------
+// 沒有一天幾張的上限：貓越多寫越快，關掉網頁也照寫（跟回家睡覺補電一樣，下次打開一次算）
+export const SHEET_MS = 3 * 60 * 1000; // 一隻貓大約 3 分鐘寫好一張
+export const BATCH_MAX = 10; // 一次最多改 10 張
 
 // 今天是哪一天（裝置的當地日期），例如 '2026-10-27'
 export function dayKey(time = Date.now()) {
@@ -421,8 +423,8 @@ export function dayKey(time = Date.now()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// 同一天、同一個 salt 算出來的亂數都一樣，重新整理也是同一批貓、同一批題目
-function dayRandom(key, salt) {
+// 同一個 key、同一個 salt 算出來的亂數都一樣，重新整理也是同一張題目
+function seeded(key, salt) {
   let h = 2166136261 ^ salt;
   for (const c of key) h = Math.imul(h ^ c.codePointAt(0), 16777619);
   let a = h >>> 0;
@@ -443,25 +445,18 @@ function shuffle(list, rand) {
   return list;
 }
 
-// 今天每張作業是哪隻貓寫的（貓的編號）。pool 是可以來上課的貓：數字就是 0～n-1 全部的貓，
-// 陣列就是島上領養的貓。島上的貓不到 20 隻時，大家輪流多寫幾張，一天一樣是 20 張
-export function dailyClass(key, pool, size = CLASS_SIZE) {
-  const list = Array.isArray(pool) ? pool.slice().sort((a, b) => a - b) : Array.from({ length: pool }, (_, i) => i);
-  if (!list.length) return [];
-  const order = shuffle(list, dayRandom(key, 1));
-  return Array.from({ length: size }, (_, i) => order[i % order.length]);
+// 第 seq 張作業出哪個單元：每 9 張是 9 個單元各一張、順序打亂，所以不會一直出同一個單元
+function sheetUnit(seq) {
+  const order = shuffle(MATH_UNITS.map((u) => u.n), seeded(`block${Math.floor(seq / MATH_UNITS.length)}`, 3));
+  return order[seq % MATH_UNITS.length];
 }
 
-// 今天的作業：9 個單元每個先出一樣多張（20 張就是每個 2 張），剩下的再挑不同的單元各加一張，順序打亂；
-// 所以每個單元一天是 2 到 3 張，不會擠在同一個單元。同一天不出一模一樣的題目
-export function dailyHomework(key, size = CLASS_SIZE) {
-  const rand = dayRandom(key, 2);
-  const units = [];
-  for (let k = 0; k < Math.floor(size / MATH_UNITS.length); k++) units.push(...MATH_UNITS.map((u) => u.n));
-  const extra = MATH_UNITS.map((u) => u.n);
-  while (units.length < size) units.push(extra.splice(Math.floor(rand() * extra.length), 1)[0]);
+// 一疊作業：從第 start 張開始的 size 張題目。同一疊不出一模一樣的題目
+export function homeworkBatch(start, size) {
   const list = [];
-  for (const unit of shuffle(units, rand).slice(0, size)) {
+  for (let i = 0; i < size; i++) {
+    const rand = seeded(`sheet${start + i}`, 4);
+    const unit = sheetUnit(start + i);
     let p = makeProblem(unit, rand);
     for (let k = 0; k < 20 && list.some((q) => q.text === p.text && JSON.stringify(q.fig) === JSON.stringify(p.fig)); k++) p = makeProblem(unit, rand);
     list.push(p);
@@ -469,12 +464,56 @@ export function dailyHomework(key, size = CLASS_SIZE) {
   return list;
 }
 
-// 今天改到哪裡：results[i] 是第 i 張的結果（good 一次就改對、help 老師幫忙），還沒改是 null；換一天就重來
-export function sanitizeLearnDay(value, key, size = CLASS_SIZE) {
-  if (!value || value.key !== key || !Array.isArray(value.results) || value.results.length !== size) {
-    return { key, results: new Array(size).fill(null) };
+// 每張作業是哪隻貓寫的：島上的貓輪流寫（cats 是島上的貓的編號）
+export function batchWriters(start, size, cats) {
+  const list = cats.slice().sort((a, b) => a - b);
+  if (!list.length) return [];
+  return Array.from({ length: size }, (_, i) => list[(start + i) % list.length]);
+}
+
+// 作業的狀態：at 算到哪個時間、pile 講桌上還沒改的張數、seq 下一張的編號、
+// batch 正在改的這一疊（start 第一張編號、cats 誰寫的、results 每張的結果：good 一次就改對、help 老師幫忙、null 還沒改）
+export function sanitizeHomework(value, now = Date.now()) {
+  const int = (n, max) => Number.isInteger(n) && n >= 0 && n <= max;
+  const hw = { at: now, pile: 0, seq: 0, batch: null };
+  if (!value || typeof value !== 'object') return hw;
+  if (Number.isFinite(value.at) && value.at <= now) hw.at = value.at;
+  if (int(value.pile, 1e6)) hw.pile = value.pile;
+  if (int(value.seq, 1e9)) hw.seq = value.seq;
+  const b = value.batch;
+  if (b && int(b.start, 1e9) && Array.isArray(b.cats) && Array.isArray(b.results) && b.results.length >= 1 && b.results.length <= BATCH_MAX
+    && b.cats.length === b.results.length && b.cats.every((c) => int(c, 999))) {
+    hw.batch = { start: b.start, cats: b.cats.slice(), results: b.results.map((r) => (r === 'good' || r === 'help' ? r : null)) };
   }
-  return { key, results: value.results.map((r) => (r === 'good' || r === 'help' ? r : null)) };
+  return hw;
+}
+
+// 貓寫作業：catCount 隻貓從 hw.at 寫到 now，寫好幾張就放到講桌上。沒寫完的那一張留著下次接著寫
+export function writeHomework(hw, catCount, now = Date.now()) {
+  if (!(catCount > 0)) return { ...hw, at: now, written: 0 };
+  if (!(now > hw.at)) return { ...hw, at: Math.min(hw.at, now), written: 0 };
+  const per = SHEET_MS / catCount;
+  const written = Math.floor((now - hw.at) / per);
+  if (!written) return { ...hw, written: 0 };
+  return { ...hw, pile: hw.pile + written, at: hw.at + written * per, written };
+}
+
+// 下一張還要多久寫好（毫秒）
+export function nextSheetIn(hw, catCount, now = Date.now()) {
+  if (!(catCount > 0)) return Infinity;
+  return Math.max(0, hw.at + SHEET_MS / catCount - now);
+}
+
+// 從講桌拿一疊來改：最多 10 張
+export function takeBatch(hw, cats) {
+  const size = Math.min(BATCH_MAX, hw.pile);
+  if (!size || !cats.length) return hw;
+  return {
+    ...hw,
+    pile: hw.pile - size,
+    seq: hw.seq + size,
+    batch: { start: hw.seq, cats: batchWriters(hw.seq, size, cats), results: new Array(size).fill(null) },
+  };
 }
 
 export function sanitizeLearnStats(value) {

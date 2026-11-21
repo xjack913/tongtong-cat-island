@@ -51,6 +51,18 @@ export function islandOpen(id, catCount) {
   return catCount >= catsNeeded(id);
 }
 
+// 小圖示（網頁上的名牌、按鈕用）：貓臉、鎖頭、作業紙
+export const CAT_ICON = '<svg class="ico-cat" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 2.5 8.6 7h6.8l5.1-4.5V13a8.5 8.5 0 0 1-17 0z" fill="currentColor"/><circle cx="8.8" cy="12.6" r="1.5" fill="#fff"/><circle cx="15.2" cy="12.6" r="1.5" fill="#fff"/><path d="M10.6 16h2.8L12 17.5z" fill="#fff"/></svg>';
+export const LOCK_ICON = '<svg class="ico-lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7.5a5 5 0 0 1 10 0V10" fill="none" stroke="currentColor" stroke-width="2.6"/><rect x="4" y="10" width="16" height="12" rx="3" fill="currentColor"/><circle cx="12" cy="16" r="2" fill="#fff"/></svg>';
+export const PAPER_ICON = '<svg class="ico-paper" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2" fill="#fff" stroke="currentColor" stroke-width="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+// 還沒開放的島要幾隻貓：不用字，用鎖頭＋貓臉＋「現在幾隻／要幾隻」＋一條進度條
+export function needBadge(have, goal) {
+  const pct = goal > 0 ? Math.max(0, Math.min(100, Math.round((have / goal) * 100))) : 0;
+  return `<span class="need-badge">${LOCK_ICON}${CAT_ICON}<b>${have}</b><span class="need-badge__goal">/${goal}</span></span>`
+    + `<span class="need-bar" aria-hidden="true"><i style="width:${pct}%"></i></span>`;
+}
+
 // 貓的數量從 before 變成 after，這次剛好開放的島（照要的貓數排）
 export function newlyOpened(before, after) {
   return Object.keys(UNLOCK).filter((id) => UNLOCK[id] > before && UNLOCK[id] <= after).sort((a, b) => UNLOCK[a] - UNLOCK[b]);

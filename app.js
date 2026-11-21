@@ -3,12 +3,12 @@ import {
   LEVELS, LEVEL_KEYS, PERFECT, TRICKS, DIARY_MAX, makeCats, personality, sanitizeRecords, sanitizeDiaries, composeDiary, dateText,
   leaderboard, bestPerCat, topRecord, judgeJump, starsText, mulberry32,
   sanitizeRaceBoard, addRaceResult, raceLeaderboard, raceTopWinner, secondsText,
-  ISLANDS, UNLOCK, newlyOpened,
+  ISLANDS, UNLOCK, newlyOpened, needBadge, CAT_ICON, LOCK_ICON,
 } from './logic.js';
 import {
   ADOPT_PRICE, ISLAND_MAX, newStarter, rerollStarter, sanitizeStarter, dailyOffer, sanitizePending, arrived, waitText, canAdopt,
 } from './adopt.js';
-import { MATH_UNITS, dayKey, dailyClass, dailyHomework, sanitizeLearnDay, sanitizeLearnStats } from './math.js';
+import { MATH_UNITS, BATCH_MAX, dayKey, homeworkBatch, sanitizeHomework, writeHomework, nextSheetIn, takeBatch, sanitizeLearnStats } from './math.js';
 import { LESSONS } from './lessons.js';
 import { drawFigure } from './figures.js';
 import { zhuyin, plainText } from './zhuyin.js';
@@ -54,7 +54,7 @@ const ISLAND_COPY = {
 const ISLAND_INTRO = {
   home: '這是貓貓們的家，屋頂上的招牌是桐桐的印章。貓貓累了會回來睡貓床、吃飯喝水，有時候還會躲進屋子裡。',
   park1: '這是你的家。回到島上會先來這裡，聽最近島上的新鮮事，還可以選島主的樣子、回家睡覺補電。',
-  learn: '點黑板，戴眼鏡的貓貓老師會上課。點老師或講台，你就可以當老師，改貓貓寫的數學作業。',
+  learn: '貓貓會自己來寫數學作業，寫好的放在講桌上。點老師或講台，你就可以當老師改作業，一次最多改 10 張，改對了就有小魚金幣！點黑板，戴眼鏡的貓貓老師還會上課。',
   low: '按住大按鈕蓄力，能量滿了就放開，貓貓就會跳起來。完美跳的時候貓會在空中翻跟斗！玩一次要 3 個電。',
   shop: '可以用小魚金幣買水果、水和果汁，買了馬上吃掉、喝掉，就會補電。',
   exam: '教室和考試桌都準備好了。要考什麼，設計師桐桐還在想，請大家等一等。',
@@ -308,8 +308,8 @@ function start(hotData = {}) {
   let followingCoach = false;
   let learnOpen = false;
 
-  // 學習數學島：今天的作業改到哪裡
-  let learnDay = sanitizeLearnDay(stored.learn && stored.learn.day, dayKey());
+  // 學習數學島：貓寫好放在講桌上的作業、正在改的那一疊
+  let homework = sanitizeHomework(stored.hw, Date.now());
 
   // 貓貓日記：舊到新排。島上一開始沒有貓，所以不再先放介紹用的日記，等領養的貓自己寫
   let diaries = sanitizeDiaries(hotData.diaries || stored.diaries, cats.length);
@@ -376,7 +376,7 @@ function start(hotData = {}) {
 
   function save() {
     writeStore({
-      records, race: raceBoard, sound: sound.on, diaries, diarySeeded: true, storySeen, learn: { day: learnDay }, profile, news: newsLog, stayHome: atHome, sleepAt,
+      records, race: raceBoard, sound: sound.on, diaries, diarySeeded: true, storySeen, hw: homework, profile, news: newsLog, stayHome: atHome, sleepAt,
       adoptV: 1, bridgeSeen, before: stored.before, starter, pending, offer, introduced,
     });
   }
@@ -1254,8 +1254,14 @@ function start(hotData = {}) {
       const stars = button.querySelector('.nav-chip__stars');
       if (stars) stars.textContent = left ? '' : starsText(button.dataset.island);
       small.hidden = !left;
-      small.textContent = left ? `🔒${left}` : '';
-      if (left) button.setAttribute('aria-label', `被雲霧包住的島，還要 ${left} 隻貓才開放`);
+      // 不用字：鎖頭、貓臉、現在幾隻／要幾隻
+      const goal = UNLOCK[button.dataset.island];
+      const html = left ? `${LOCK_ICON}${CAT_ICON}<b>${goal - left}</b>/${goal}` : '';
+      if (small.dataset.html !== html) {
+        small.dataset.html = html;
+        small.innerHTML = html;
+      }
+      if (left) button.setAttribute('aria-label', `施工中的島，島上有 ${goal - left} 隻貓，要 ${goal} 隻才開放`);
       else button.removeAttribute('aria-label');
     });
     syncStick();
@@ -1833,41 +1839,56 @@ function start(hotData = {}) {
   });
 
   // ---------- 學習數學島：玩家當老師改作業 ----------
-  // 每天 20 張作業，由島上的貓來寫（9 個單元都會出到）；貓不到 20 隻就輪流多寫幾張。20 張改完今天就結束。
-  // 玩家按「寫對了／寫錯了」，改錯第一次老師給提示，第二次老師直接講解
+  // 島上的貓自己一直去寫作業，寫好的放在講桌上；沒有一天幾張的上限，貓越多寫越快，關掉網頁也照寫。
+  // 玩家一次最多拿 10 張來改，這一疊改完、講桌上還有，就可以再拿一疊。
+  // 按「寫對了／寫錯了」，改錯第一次老師給提示，第二次老師直接講解
   let stack = [];
-  let stackKey = '';
   let sheetIndex = 0;
 
-  // 換一天就換一批貓和題目；同一天改到哪裡記在 learnDay，重新整理也接得下去
-  function loadDay() {
-    const key = dayKey();
-    if (learnDay.key !== key) {
-      learnDay = sanitizeLearnDay(null, key);
-      save();
-    }
-    // 島上的貓變多了，就重新排一次誰寫哪一張（改到哪裡照樣接得下去）
-    const classKey = `${key}|${owned().length}`;
-    if (stackKey === classKey) return;
-    const classCats = dailyClass(key, owned());
-    if (!classCats.length) {
-      stack = [];
-      return;
-    }
-    stack = dailyHomework(key).map((p, i) => ({ p, cat: classCats[i], tries: 0, done: learnDay.results[i] !== null, result: learnDay.results[i] }));
-    stackKey = classKey;
+  // 字一樣就不換（有注音的字換了會整段重畫、閃一下）
+  function setText(id, text) {
+    if (plainText($(id).textContent) !== text) $(id).textContent = text;
+  }
+
+  // 貓寫作業：算到現在寫好了幾張，放到講桌上
+  function writeSheets() {
+    const { written, ...next } = writeHomework(homework, owned().length, Date.now());
+    homework = next;
+    if (written) save();
+    scene.setPile(homework.pile);
+    return written;
+  }
+
+  // 正在改的這一疊：改到哪裡記在 homework.batch，重新整理也接得下去
+  function loadBatch() {
+    const b = homework.batch;
+    stack = b ? homeworkBatch(b.start, b.results.length).map((p, i) => ({ p, cat: b.cats[i], tries: 0, done: b.results[i] !== null, result: b.results[i] })) : [];
     sheetIndex = stack.findIndex((s) => !s.done);
     if (sheetIndex < 0) sheetIndex = stack.length;
-    scene.setClass(classCats);
   }
-  loadDay();
+  const batchDone = () => !homework.batch || homework.batch.results.every((r) => r !== null);
+
+  // 從講桌拿一疊新的來改：上一疊改完了、講桌上還有作業才拿
+  function takeSheets() {
+    if (!batchDone() || !homework.pile || !owned().length) return false;
+    homework = takeBatch(homework, owned());
+    save();
+    scene.setPile(homework.pile);
+    loadBatch();
+    return true;
+  }
+
+  scene.setClass(owned());
+  writeSheets();
+  loadBatch();
 
   function openLearn() {
     sound.unlock();
     closeCards();
     track('class_open', { what: 'homework' });
     learnOpen = true;
-    loadDay();
+    writeSheets();
+    takeSheets();
     renderLearn();
     $('learn-card').hidden = false;
     showSheetTop();
@@ -1892,6 +1913,14 @@ function start(hotData = {}) {
     tip.scrollIntoView({ block: 'nearest' });
   }
 
+  // 講桌上沒有作業的時候：說貓貓還在寫、下一張大約多久
+  function waitLine() {
+    const n = owned().length;
+    if (!n) return '島上還沒有貓，沒有人寫作業。';
+    const minutes = Math.max(1, Math.ceil(nextSheetIn(homework, n, Date.now()) / 60000));
+    return `貓貓正在寫作業，大約 ${minutes} 分鐘會寫好一張，等一下再來改喔！`;
+  }
+
   function renderLearn() {
     const dots = $('learn-dots');
     dots.replaceChildren(...stack.map((s, i) => {
@@ -1899,9 +1928,10 @@ function start(hotData = {}) {
       dot.setAttribute('aria-label', `第 ${i + 1} 張${s.result === 'good' ? '，一次就改對' : s.result === 'help' ? '，老師幫忙' : ''}`);
       return dot;
     }));
-    $('learn-stats').textContent = total(profile, 'graded')
+    dots.hidden = !stack.length;
+    setText('learn-stats', total(profile, 'graded')
       ? `${who()}老師一共改了 ${total(profile, 'graded')} 張，一次就改對 ${total(profile, 'right')} 張。`
-      : '點「寫對了」或「寫錯了」幫貓貓改作業。';
+      : '點「寫對了」或「寫錯了」幫貓貓改作業。');
     const finished = sheetIndex >= stack.length;
     $('sheet-body').hidden = finished;
     $('sheet-done').hidden = !finished;
@@ -1910,13 +1940,24 @@ function start(hotData = {}) {
     if (finished) {
       $('grade-ok').hidden = true;
       $('grade-no').hidden = true;
-      const good = stack.filter((s) => s.result === 'good').length;
-      $('sheet-done-title').textContent = '今天的作業改完了！';
-      $('sheet-done-text').textContent = `${good === stack.length ? `${stack.length} 張全部一次就改對，好棒喔！` : `一次就改對 ${good} 張，其他幾張是貓貓老師陪你一起改好的。`}明天會有別的貓來上課。`;
       $('learn-next').hidden = true;
+      const pile = homework.pile;
+      const more = $('learn-more');
+      more.hidden = !pile;
+      setText('learn-more', `再改 ${Math.min(BATCH_MAX, pile)} 張`);
+      const left = pile ? `講桌上還有 ${pile} 張作業。` : waitLine();
+      if (!stack.length) {
+        setText('sheet-done-title', '講桌上還沒有作業');
+        setText('sheet-done-text', waitLine());
+      } else {
+        const good = stack.filter((s) => s.result === 'good').length;
+        setText('sheet-done-title', '這一疊改完了！');
+        setText('sheet-done-text', `${good === stack.length ? `${stack.length} 張全部一次就改對，好棒喔！` : `一次就改對 ${good} 張，其他幾張是貓貓老師陪你一起改好的。`}${left}`);
+      }
       setTip('', '');
       return;
     }
+    $('learn-more').hidden = true;
     const s = stack[sheetIndex];
     const cat = cats[s.cat];
     $('sheet-dot').style.background = cat.coat.body;
@@ -1941,13 +1982,14 @@ function start(hotData = {}) {
     $('learn-next').textContent = sheetIndex === stack.length - 1 ? '看結果' : '下一張';
   }
 
-  // 改好一張：累積張數；今天 20 張都改好了再算一天，全部一次就改對的另外記
+  // 改好一張：累積張數；一疊 10 張都改好了再算一次，10 張全部一次就改對的另外記
   function tallyGrade(firstTry) {
     bump(profile, 'graded');
     if (firstTry) bump(profile, 'right');
-    if (learnDay.results.every((r) => r !== null)) {
+    const results = homework.batch.results;
+    if (results.length === BATCH_MAX && results.every((r) => r !== null)) {
       bump(profile, 'daysDone');
-      if (learnDay.results.every((r) => r === 'good')) bump(profile, 'daysAllRight');
+      if (results.every((r) => r === 'good')) bump(profile, 'daysAllRight');
     }
     if (firstTry) gotCoins(HOMEWORK_REWARD);
     else tallied();
@@ -1961,7 +2003,7 @@ function start(hotData = {}) {
     if (saysRight === s.p.right) {
       s.done = true;
       s.result = s.tries === 0 ? 'good' : 'help';
-      learnDay.results[sheetIndex] = s.result;
+      homework.batch.results[sheetIndex] = s.result;
       tallyGrade(s.tries === 0);
       track('homework_grade', { unit: s.p.unit, result: s.tries === 0 ? 'first_try' : 'after_hint', cat_right: s.p.right ? 'yes' : 'no' });
       // 先畫好紅筆批改（作業紙會變高），再出現老師的話，捲動位置才算得準
@@ -1990,7 +2032,7 @@ function start(hotData = {}) {
     s.tries = 2;
     s.done = true;
     s.result = 'help';
-    learnDay.results[sheetIndex] = s.result;
+    homework.batch.results[sheetIndex] = s.result;
     tallyGrade(false);
     track('homework_grade', { unit: s.p.unit, result: 'explained', cat_right: s.p.right ? 'yes' : 'no' });
     const text = `${s.p.why}${name}寫「${s.p.catAnswer}」，${s.p.right ? '是寫對的' : '是寫錯的'}。`;
@@ -2007,7 +2049,18 @@ function start(hotData = {}) {
     if (sheetIndex >= stack.length) return;
     const next = stack.findIndex((s, i) => i > sheetIndex && !s.done);
     sheetIndex = next < 0 ? stack.length : next;
-    if (sheetIndex >= stack.length) track('homework_day_done', { first_try: stack.filter((s) => s.result === 'good').length });
+    if (sheetIndex >= stack.length) track('homework_batch_done', { first_try: stack.filter((s) => s.result === 'good').length, size: stack.length });
+    stopSpeaking();
+    setTip('', '');
+    sound.play('page');
+    renderLearn();
+    showSheetTop();
+  });
+
+  // 這一疊改完了，講桌上還有：再拿一疊
+  $('learn-more').addEventListener('click', () => {
+    writeSheets();
+    if (!takeSheets()) return;
     stopSpeaking();
     setTip('', '');
     sound.play('page');
@@ -2360,7 +2413,8 @@ function start(hotData = {}) {
     owned().forEach((index) => scene.arrive(index));
     scene.setOpen(needMap());
     updateNav();
-    loadDay();
+    scene.setClass(owned());
+    writeSheets();
     refreshBoards();
     if (!$('adopt-card').hidden) renderAdopt();
     const fresh = Object.keys(UNLOCK).filter((id) => UNLOCK[id] > 0 && opened(id) && !introduced.includes(id))
@@ -2378,7 +2432,7 @@ function start(hotData = {}) {
     unlockIds = ids;
     const names = ids.map((id) => ISLAND_NAME[id]);
     $('unlock-title').textContent = ids.length === 1 ? `${names[0]}開放了！` : `一次開了 ${ids.length} 座島！`;
-    $('unlock-lede').textContent = `雲霧散開了！島上現在有 ${owned().length} 隻貓。假扮成貓的人說：`;
+    $('unlock-lede').textContent = `施工完成，柵欄拆掉了！島上現在有 ${owned().length} 隻貓。假扮成貓的人說：`;
     $('unlock-list').replaceChildren(...ids.map((id) => {
       const box = el('section', 'unlock-item');
       box.append(el('p', 'unlock-item__name', ISLAND_NAME[id]), el('p', 'unlock-item__text', ISLAND_INTRO[id] || ''));
@@ -2409,16 +2463,17 @@ function start(hotData = {}) {
     track('read_aloud', { what: 'unlock' });
   });
 
-  // 還沒開放的島：被雲霧包住，不說是什麼島，只說還要幾隻貓
+  // 還沒開放的島：圍著柵欄在施工，不說是什麼島，只用圖示說要幾隻貓
   function openLocked(id) {
     closeCards();
     const left = Math.max(0, UNLOCK[id] - owned().length);
     $('island-label').textContent = '還沒開放';
-    $('island-title').textContent = '被雲霧包住的島';
-    $('island-lede').textContent = `雲霧好濃，看不出來這是什麼島。島上要有 ${UNLOCK[id]} 隻貓，雲霧才會散開。`;
+    $('island-title').textContent = '施工中的島';
+    $('island-lede').textContent = `柵欄圍起來了，裡面還在施工，看不出來是什麼島。島上要有 ${UNLOCK[id]} 隻貓才會開放。`;
     $('island-text').textContent = `現在島上有 ${owned().length} 隻貓，還差 ${left} 隻。`;
     $('island-count').textContent = '到貓貓領養島領養更多貓吧！';
-    $('island-cats').replaceChildren();
+    // 跟名牌一樣的圖示，放大一點
+    $('island-cats').innerHTML = `<span class="need-big">${needBadge(owned().length, UNLOCK[id])}</span>`;
     $('island-cats').dataset.key = '';
     $('island-sit').hidden = true;
     $('island-card').hidden = false;
@@ -2462,7 +2517,7 @@ function start(hotData = {}) {
     }
     if (!$('learn-card').hidden) {
       const s = stack[sheetIndex];
-      if (!s) return { from: 'learn', show: '改作業：今天的作業改完了', detail: '改作業：今天的作業改完了' };
+      if (!s) return { from: 'learn', show: '改作業：這一疊改完了', detail: '改作業：這一疊改完了' };
       const name = cats[s.cat].name;
       const show = `改作業：第 ${s.p.unit} 單元 ${MATH_UNITS[s.p.unit - 1].name}，${name}的作業`;
       return { from: 'learn', show, detail: `${show}｜題目：${s.p.text}｜${name}寫：${s.p.catAnswer}｜正確答案：${s.p.answer}` };
@@ -3110,6 +3165,12 @@ function start(hotData = {}) {
     sleepTick();
     if (asleep() && !$('home-card').hidden) renderSleep();
     checkArrival();
+    // 貓一直在寫作業：講桌上的張數、改作業卡片上「還有幾張」跟著變
+    writeSheets();
+    if (learnOpen && !$('learn-card').hidden && sheetIndex >= stack.length) {
+      if (!stack.length) takeSheets();
+      renderLearn();
+    }
     // 帶貓中的倒數（字一樣就不換，注音才不會一直重畫）
     if (pending && !$('adopt-card').hidden) {
       const line = `我出門去帶${cats[pending.cat].name}回來了，還要 ${waitText(pending, Date.now())}才會到。等牠到了，才可以再領養下一隻喔！`;

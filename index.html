@@ -520,7 +520,7 @@
   .learn-dots li.is-now { background: var(--paper); box-shadow: inset 0 0 0 3px var(--ink); }
   .learn-dots li.is-good { background: var(--low); }
   .learn-dots li.is-help { background: var(--mid); }
-  /* 一天 20 張：圓點排兩列，每列 10 顆 */
+  /* 一疊最多 10 張：圓點排一列 */
   #learn-dots { flex-wrap: wrap; max-width: calc(16px * 10 + 6px * 9); }
   .link-btn { min-height: 36px; padding: 0 4px; border: 0; background: transparent; color: var(--ink); font-size: var(--zy-3); text-decoration: underline; text-underline-offset: 3px; }
   .unit-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
@@ -717,11 +717,33 @@
   .unlock-item { padding: 10px 14px 12px; border: 2px solid #EFE4C8; border-radius: 18px; background: #FFFDF6; }
   .unlock-item__name { font-size: var(--zy-2); color: var(--ink-deep); }
   .unlock-item__text { margin-top: 2px; font-size: var(--zy-3); line-height: 1.6; color: var(--text); }
-  /* 還沒開放的島：名牌和導覽鈕變灰，寫還要幾隻貓 */
-  .island-pill--locked { background: #E7E9EE !important; color: #6B7280 !important; border-color: #C9CDD6 !important; }
-  .island-pill__need { display: block; font-size: 11px; line-height: 1.2; }
-  .nav-chip.is-locked { opacity: 0.62; }
-  .nav-chip__need { margin-left: 4px; font-size: 12px; }
+  /* 還沒開放的島：名牌和導覽鈕變灰，用鎖頭、貓臉和「現在幾隻／要幾隻」表示，不用字 */
+  .island-pill--locked { background: #E7E9EE !important; color: #4B5563 !important; border-color: #C9CDD6 !important; }
+  .island-pill__need { display: block; margin-top: 2px; }
+  .island-pill__need[hidden] { display: none; }
+  .need-badge { display: inline-flex; align-items: center; gap: 3px; font: 600 16px var(--num); color: #374151; white-space: nowrap; }
+  .need-badge svg { width: 17px; height: 17px; flex: none; }
+  .need-badge .ico-lock { color: #8A8F99; width: 14px; height: 14px; }
+  .need-badge .ico-cat { color: #E8922A; }
+  .need-badge b { font-weight: 700; color: #C2410C; }
+  .need-badge__goal { color: #374151; }
+  .need-bar { display: block; height: 6px; margin-top: 3px; border-radius: 999px; background: #CFD3DA; overflow: hidden; }
+  .need-bar i { display: block; height: 100%; border-radius: 999px; background: #E8922A; }
+  .need-big { display: inline-block; padding: 10px 16px; border-radius: 16px; background: #F1F2F5; }
+  .need-big .need-badge { font-size: 28px; gap: 6px; }
+  .need-big .need-badge svg { width: 30px; height: 30px; }
+  .need-big .need-badge .ico-lock { width: 24px; height: 24px; }
+  .need-big .need-bar { height: 10px; margin-top: 6px; }
+  .nav-chip.is-locked { opacity: 0.75; }
+  .nav-chip__need { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; font: 600 14px var(--num); }
+  .nav-chip__need[hidden] { display: none; }
+  .nav-chip__need svg { width: 15px; height: 15px; }
+  .nav-chip__need .ico-lock { width: 12px; height: 12px; }
+  .nav-chip__need .ico-cat { color: #E8922A; }
+  /* 講桌上還沒改的作業有幾張 */
+  .pile-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px 3px 6px; border: 2px solid var(--ink); border-radius: 999px; background: #fff; color: var(--ink-deep); font: 700 17px var(--num); cursor: pointer; pointer-events: auto; }
+  .pile-tag[hidden] { display: none; }
+  .pile-tag svg { width: 20px; height: 20px; }
   .zzz--home { padding: 0 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.88); font-size: 26px; }
   /* 跟貓聊天 */
   .chat-line { margin-top: 10px; padding: 12px 16px; border-radius: 18px; background: var(--sun-pale); font-size: var(--zy-2); line-height: 1.6; color: var(--text); }
@@ -998,7 +1020,7 @@
     </section>
     <ul class="help-list">
       <li><span class="help-icon" aria-hidden="true">領</span><span><b>貓貓領養島</b>一開始島上沒有貓。假扮成貓的人會先給你 3 隻，每隻有一顆骰子，可以重骰一次換一隻。之後每天有 3 隻貓可以領養，一次選 1 隻、要 50 個小魚金幣，他要 24 小時才會把貓帶回來。島上最多 100 隻，領養的貓不能換，要照顧牠一輩子。</span></li>
-      <li><span class="help-icon" aria-hidden="true">開</span><span><b>貓越多，島越多</b>還沒開放的島被雲霧包住，看不出來是什麼島，名牌上只寫還要幾隻貓。島上的貓夠多了，雲霧就會散開，假扮成貓的人會介紹這座島。</span></li>
+      <li><span class="help-icon" aria-hidden="true">開</span><span><b>貓越多，島越多</b>還沒開放的島用柵欄圍起來，裡面在施工，看不出來是什麼島。名牌上的貓臉和數字，是島上現在有幾隻貓、要幾隻才會開放。外圍的步道和橋還是可以走。貓夠多了就會蓋好，假扮成貓的人會介紹這座島。</span></li>
       <li data-need="park1"><span class="help-icon" aria-hidden="true">家</span><span><b>島主之家</b>這是你的家。回到島上會先來這裡，聽最近島上的新鮮事，還可以選島主的樣子：大人、小孩、男生、女生，或是貓。想照原本的方式玩，就按「在家看島」，島主會待在家裡。</span></li>
       <li data-need="park1"><span class="help-icon" aria-hidden="true">走</span><span><b>出門逛島</b>按「出門逛島」或「跟著島主走」，點地上島主就走過去，也可以推左下角的搖桿走路。點貓貓可以跟牠聊天、摸摸牠。</span></li>
       <li data-need="low stage track combo park2"><span class="help-icon" aria-hidden="true">玩</span><span><b>島主也來玩</b><span data-need="low">跳臺按「換我跳」。</span><span data-need="stage">表演區按「我也要上臺」。</span><span data-need="track">跑步田徑場島按「我也要跑」。</span><span data-need="combo park2">公園可以坐下來休息。</span></span></li>
@@ -1014,7 +1036,7 @@
       <li data-need="stage"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 4.5l11-2v13.2a3 3 0 1 1-2-2.8V6.1l-7 1.3v10.3a3 3 0 1 1-2-2.8z"/></svg></span><span><b>表演區</b>點轉圈圈、揮手、翻跟斗、唱歌，臺上的貓就會表演；按拍手，臺下的貓一起拍。</span></li>
       <li data-need="diary"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>日記區</b>貓貓會把今天做的事寫成日記。按貓掌幫日記蓋掌印，按「唸給我聽」就會唸出來。</span></li>
       <li data-need="track"><span class="help-icon" aria-hidden="true">7</span><span><b>跑步田徑場島</b>七隻貓各站一條跑道，到齊後按「開始比賽」，跑一圈看誰第一名。跑道外面的草場，也常有貓跑來跑去。</span></li>
-      <li data-need="learn"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。點老師或講台就改作業：每天有 20 張作業，島上的貓輪流寫，你當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
+      <li data-need="learn"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。島上的貓會自己一直來寫作業，寫好的放在講桌上，貓越多寫越快。點老師或講台就改作業，一次最多改 10 張，你當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>島主卡</b>取一個自己的名字。玩過的東西都會一直累積，下次來還在，還可以收集徽章。記下島主暗號，換裝置也找得回來。</span></li>
       <li data-need="low"><span class="help-icon" aria-hidden="true">？</span><span><b>貓貓教練</b>頭上綁頭帶、用兩隻腳走路。看到晃來晃去、頭上冒「？」的貓，就會叫牠去跳臺跳。</span></li>
       <li data-need="home"><span class="help-icon" aria-hidden="true">z</span><span><b>累了就休息</b>貓貓累了會回貓貓之家睡覺<span data-need="combo park2">，也會去公園休息</span><span data-need="boxes">，還會躲進多多紙箱區的紙箱</span>。點一下貓貓<span data-need="boxes">或紙箱</span>，牠會跟你打招呼。</span></li>
@@ -1025,7 +1047,7 @@
         島的設計師：桐桐
       </p>
       <p>這座島照桐桐畫的設計圖做，島的形狀、位置和木板橋，都跟她畫的一樣。她後來又一直畫新的島、寫新的規則。島上的樹是開白花的油桐樹。</p>
-      <p data-hide="track">等島上的雲霧全部散開，就看得到桐桐畫的設計圖喔！</p>
+      <p data-hide="track">等所有的島都蓋好，就看得到桐桐畫的設計圖喔！</p>
       <p data-need="track">桐桐畫的第一張設計圖有十一座島、二十座木板橋。第二次她又加了表演區、多多紙箱區、日記區、合體公園，還有貓貓教練；後來又說要一座學習數學島，放在高階跳臺上面；再後來又畫了一張跑步田徑場島，有七條跑道和一大片草場；又寫了一張島主的電、小魚金幣和貓貓商店的規則，還畫了商店和店員。最新的一張，畫的是貓貓領養島和貓貓考試島。</p>
       <figure data-need="track">
         <img src="sketch.jpg" alt="桐桐用鉛筆畫的貓貓島設計圖：中間是有「桐」字招牌的房子，周圍有三座跳臺、有階梯舞臺的表演區、畫滿小紙箱的多多紙箱區、有書桌的日記區、有魚池的合體公園、兩座公園和 1、2、3 名的頒獎臺，用木板橋連起來，到處都是貓。" width="1200" height="786" loading="lazy">
@@ -1149,7 +1171,7 @@
       </section>
       <div class="learn-side">
         <div class="learn-bar">
-          <ol class="learn-dots" id="learn-dots" aria-label="今天的作業"></ol>
+          <ol class="learn-dots" id="learn-dots" aria-label="這一疊作業"></ol>
         </div>
         <p class="learn-unit" id="learn-unit"><span class="sheet__unit" id="sheet-unit"></span></p>
         <div class="tip" id="learn-tip" hidden>
@@ -1184,6 +1206,7 @@
           <span>寫錯了</span>
         </button>
         <button class="sticker sticker--solid grade-next" id="learn-next" type="button" hidden>下一張</button>
+        <button class="sticker sticker--solid grade-next" id="learn-more" type="button" hidden>再改 10 張</button>
       </div>
     </div>
   </article>

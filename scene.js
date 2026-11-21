@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ISLANDS, BRIDGES, LEVELS, SKETCH, PERFECT, TRICKS, TRICK_KEYS, TRACK, fromSketch, meterAt, peakHeight, toCm, autoPower, maxCm, mulberry32, laneRadius, trackOuter, insideTrack, trackPoint } from './logic.js';
+import { ISLANDS, BRIDGES, LEVELS, UNLOCK, needBadge, PAPER_ICON, SKETCH, PERFECT, TRICKS, TRICK_KEYS, TRACK, fromSketch, meterAt, peakHeight, toCm, autoPower, maxCm, mulberry32, laneRadius, trackOuter, insideTrack, trackPoint } from './logic.js';
 import { buildHuman, animateHuman, disposeModel } from './avatar.js';
 
 const TAU = Math.PI * 2;
@@ -682,7 +682,9 @@ export function createScene(container, { cats: catData, present = null, open = n
     const ringShape = shapeOf(scalePts(local, island.ring + d));
     ringShape.holes.push(shapeOf(scalePts(local, island.ring - d), THREE.Path));
     group.add(flatMesh(ringShape, C.path, TOP + 0.012));
-    // 到這裡是島本身（地、沙灘、步道）；之後加上去的房子、跳臺、看板，島還沒開放時都藏在雲霧裡
+    // 還沒開放時圍柵欄的地方：步道再往裡面一點，外圍的步道照樣可以走
+    island.fence = scalePts(local, island.ring - d - 0.16 / island.radius);
+    // 到這裡是島本身（地、沙灘、步道）；之後加上去的房子、跳臺、看板，島還沒開放時都藏起來
     island.terrain = new Set(group.children);
   });
 
@@ -2027,7 +2029,7 @@ export function createScene(container, { cats: catData, present = null, open = n
   }
 
   // ---------- 學習數學島：黑板、講桌上一疊作業、一排課桌，貓貓老師站在黑板前 ----------
-  // classCats：今天來上課的貓（app 每天換一批），只有牠們會去課桌寫作業
+  // classCats：島上的貓都會自己去課桌寫作業
   const learn = { island: null, teacherPos: null, faceClass: 0.15, faceBoard: 1.98, classCats: null };
   const inClass = (cat) => !learn.classCats || learn.classCats.has(cat.index);
   function buildLearn(island) {
@@ -2115,6 +2117,19 @@ export function createScene(container, { cats: catData, present = null, open = n
     put(desk, makeMesh(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 5), mat(C.trunk), false), 0.32, 0.71, -0.06);
     pickable(desk, { type: 'podium' });
     island.obstacles.push({ x: -2.1, z: -0.75, w: 1.1, d: 0.6 });
+    // 講桌上面的小牌子：貓寫好、還沒改的作業有幾張（圖示加數字）
+    const pileEl = document.createElement('button');
+    pileEl.type = 'button';
+    pileEl.className = 'pile-tag';
+    pileEl.hidden = true;
+    pileEl.addEventListener('click', (event) => {
+      event.stopPropagation();
+      pickHandlers.forEach((cb) => cb({ type: 'podium' }));
+    });
+    learn.pileEl = pileEl;
+    learn.pileTag = new CSS2DObject(pileEl);
+    learn.pileTag.position.set(-2.1, TOP + 1.15, -0.75);
+    g.add(learn.pileTag);
     learn.island = island;
     learn.teacherPos = W(island, -1.0, TOP + 0.005, -0.8);
     island.obstacles.push({ x: -1.0, z: -0.8, r: 0.3 });
@@ -2608,6 +2623,11 @@ export function createScene(container, { cats: catData, present = null, open = n
   }
 
   // ---------- 找路（Dijkstra） ----------
+  function shutNode(i) {
+    const node = nodes[i];
+    if (!node.island || isOpen(node.island)) return false;
+    return insidePoly(islandById[node.island].fence, node.x, node.z);
+  }
   function routePoints(from, to) {
     if (from === to) return [];
     const n = nodes.length;
@@ -2628,6 +2648,8 @@ export function createScene(container, { cats: catData, present = null, open = n
       if (u < 0 || u === to) break;
       done[u] = 1;
       for (const e of adj[u]) {
+        // 還沒開放的島：柵欄裡面的路不能穿過去（目的地本身除外）
+        if (e.to !== to && shutNode(e.to)) continue;
         const nd = dist[u] + e.len;
         if (nd < dist[e.to]) {
           dist[e.to] = nd;
@@ -3534,7 +3556,7 @@ export function createScene(container, { cats: catData, present = null, open = n
     if (!insidePoly(island.local, lx, lz)) return false;
     ownerStop();
     const ring = nearestRing(island, lx, lz);
-    const open = edgeDist(island.local, lx, lz) > 0.25 && !blocked(island, lx, lz, 0.15);
+    const open = edgeDist(island.local, lx, lz) > 0.25 && !blocked(island, lx, lz, 0.15) && !fenced(island, lx, lz);
     const dest = open ? W(island, lx, TOP + 0.005, lz) : null;
     const done = () => {
       owner.islandId = island.id;
@@ -3972,6 +3994,7 @@ export function createScene(container, { cats: catData, present = null, open = n
   function walkable(x, z, strict = true) {
     const island = islandAt(x, z);
     if (island) {
+      if (fenced(island, x - island.cx, z - island.cz)) return false;
       if (!strict) return true;
       const lx = x - island.cx;
       const lz = z - island.cz;
@@ -4992,7 +5015,7 @@ export function createScene(container, { cats: catData, present = null, open = n
       applyPose(cat, dt, t);
     }
     stepAdopt(dt, t);
-    stepFog(dt, t);
+    stepSites(dt);
     updateCoach(dt);
     applyPose(coach, dt, t);
     updateTeacher(dt);
@@ -5341,86 +5364,132 @@ export function createScene(container, { cats: catData, present = null, open = n
     repaintRankBoard();
   }
 
-  // ---------- 雲霧：還沒開放的島整座被雲霧包住，看不出來是什麼島，開放的時候雲霧才散開 ----------
-  const fogs = new Map();
-  function makeFog(island) {
-    const fog = new THREE.Group();
-    fog.position.set(island.cx, 0, island.cz);
-    const material = new THREE.MeshStandardMaterial({ color: 0xf4f6fa, roughness: 1, metalness: 0, transparent: true, opacity: 0.97, flatShading: false });
-    const r = mulberry32(island.index * 977 + 31);
-    const geo = new THREE.IcosahedronGeometry(1, 2);
-    const outline = scalePts(island.local, 1.06);
-    const minX = Math.min(...outline.map((p) => p.x));
-    const maxX = Math.max(...outline.map((p) => p.x));
-    const minZ = Math.min(...outline.map((p) => p.z));
-    const maxZ = Math.max(...outline.map((p) => p.z));
-    const puffs = [];
-    // 島越大雲越多：先鋪一層蓋住整座島，再往上疊一層蓋住房子和跳臺
-    // 大島（田徑場）用比較大朵、比較疏的雲，不然雲太多會卡
-    const step = Math.max(0.95, island.radius / 5.5);
-    const big = step / 0.95;
-    for (let x = minX; x <= maxX + 0.01; x += step) {
-      for (let z = minZ; z <= maxZ + 0.01; z += step) {
-        const px = x + (r() - 0.5) * 0.5;
-        const pz = z + (r() - 0.5) * 0.5;
-        if (!insidePoly(outline, px, pz) && edgeDist(outline, px, pz) > 0.45) continue;
-        [0, 1].forEach((layer) => {
-          if (layer && r() < 0.35) return;
-          const size = (0.75 + r() * 0.55 - layer * 0.12) * big;
-          const puff = new THREE.Mesh(geo, material);
-          puff.scale.set(size * (1 + r() * 0.3), size * 0.78, size * (1 + r() * 0.3));
-          puff.position.set(px, TOP + 0.35 + layer * 1.0 * Math.min(big, 1.3) + r() * 0.35, pz);
-          puff.userData.base = puff.position.y;
-          puff.userData.phase = r() * TAU;
-          puff.castShadow = false;
-          puff.receiveShadow = false;
-          puff.userData.pick = { type: 'island', id: island.id };
-          pickables.push(puff);
-          fog.add(puff);
-          puffs.push(puff);
-        });
-      }
-    }
-    scene.add(fog);
-    return { group: fog, material, puffs, clearing: -1 };
+  // ---------- 施工中：還沒開放的島用柵欄圍起來，裡面是灰灰的工地，看不出來是什麼島 ----------
+  // 柵欄在環島步道的裡面，外圍的草地、步道和橋照樣可以走（要去別的島不用繞路）；開放的時候柵欄和工地沉到地下
+  const sites = new Map();
+  const siteMats = {
+    post: mat(0xf7f7f2),
+    red: mat(0xe8622a),
+    white: mat(0xf7f7f2),
+    cone: mat(0xf08a24),
+    block: mat(0x9c9c96),
+    blockDark: mat(0x85857f),
+    stripeY: mat(0xf2c230),
+    stripeK: mat(0x3a3a3a),
+  };
+  function makeCone() {
+    const cone = new THREE.Group();
+    put(cone, makeMesh(new THREE.BoxGeometry(0.28, 0.04, 0.28), siteMats.cone), 0, 0.02, 0);
+    put(cone, makeMesh(new THREE.ConeGeometry(0.11, 0.38, 10), siteMats.cone), 0, 0.23, 0);
+    put(cone, makeMesh(new THREE.CylinderGeometry(0.068, 0.082, 0.07, 10), siteMats.white, false), 0, 0.22, 0);
+    return cone;
   }
-  function stepFog(dt, t) {
-    fogs.forEach((fog, id) => {
-      if (fog.clearing < 0) {
-        if (!reducedMotion) fog.puffs.forEach((p) => { p.position.y = p.userData.base + Math.sin(t * 0.6 + p.userData.phase) * 0.06; });
-        return;
-      }
-      // 散開：雲往外飄、變大、變透明，兩秒半後拿掉
-      fog.clearing += dt;
-      const k = Math.min(1, fog.clearing / 2.5);
-      fog.material.opacity = 0.97 * (1 - k);
-      fog.group.scale.setScalar(1 + k * 0.6);
-      fog.group.position.y = k * 1.2;
-      if (k >= 1) {
-        scene.remove(fog.group);
-        fog.puffs.forEach((p) => {
-          const i = pickables.indexOf(p);
-          if (i >= 0) pickables.splice(i, 1);
+  // 黃黑斜紋的路障
+  function makeBarrier() {
+    const barrier = new THREE.Group();
+    [-0.36, 0.36].forEach((x) => put(barrier, makeMesh(new THREE.BoxGeometry(0.06, 0.5, 0.06), siteMats.post), x, 0.25, 0));
+    for (let i = 0; i < 6; i++) {
+      put(barrier, makeMesh(new THREE.BoxGeometry(0.14, 0.16, 0.05), i % 2 ? siteMats.stripeK : siteMats.stripeY, false), -0.35 + i * 0.14, 0.4, 0);
+    }
+    return barrier;
+  }
+  function makeSite(island) {
+    const site = new THREE.Group();
+    site.position.set(island.cx, 0, island.cz);
+    const pick = { type: 'island', id: island.id };
+    const r = mulberry32(island.index * 977 + 31);
+    // 灰灰的工地地面
+    const ground = flatMesh(shapeOf(scalePts(island.fence, 0.99)), 0xa7a7a1, TOP + 0.016);
+    site.add(ground);
+    // 柵欄：白色柱子、紅白相間的兩條橫桿
+    const pts = island.fence;
+    let k = 0;
+    pts.forEach((p, i) => {
+      const q = pts[(i + 1) % pts.length];
+      const len = Math.hypot(q.x - p.x, q.z - p.z);
+      const n = Math.max(1, Math.round(len / 0.55));
+      for (let j = 0; j < n; j++) {
+        const ax = p.x + ((q.x - p.x) * j) / n;
+        const az = p.z + ((q.z - p.z) * j) / n;
+        const bx = p.x + ((q.x - p.x) * (j + 1)) / n;
+        const bz = p.z + ((q.z - p.z) * (j + 1)) / n;
+        put(site, makeMesh(new THREE.BoxGeometry(0.07, 0.62, 0.07), siteMats.post), ax, TOP + 0.31, az);
+        const seg = Math.hypot(bx - ax, bz - az);
+        const angle = Math.atan2(bz - az, bx - ax);
+        [0.27, 0.5].forEach((y, row) => {
+          const rail = put(site, makeMesh(new THREE.BoxGeometry(seg, 0.08, 0.035), (k + row) % 2 ? siteMats.white : siteMats.red, false), (ax + bx) / 2, TOP + y, (az + bz) / 2);
+          rail.rotation.y = -angle;
         });
-        fog.material.dispose();
-        fogs.delete(id);
+        k++;
+      }
+    });
+    // 工地裡的東西：三角錐、一堆灰磚、路障
+    const inside = (x, z, pad) => insidePoly(island.fence, x, z) && edgeDist(island.fence, x, z) > pad;
+    const spotAt = (pad) => {
+      for (let t = 0; t < 40; t++) {
+        const x = (r() - 0.5) * island.radius * 1.4;
+        const z = (r() - 0.5) * island.radius * 1.4;
+        if (inside(x, z, pad)) return [x, z];
+      }
+      return [0, 0];
+    };
+    const cones = Math.max(3, Math.round(island.radius * 1.2));
+    for (let i = 0; i < cones; i++) {
+      const [x, z] = spotAt(0.3);
+      put(site, makeCone(), x, TOP, z);
+    }
+    const [bx, bz] = spotAt(0.7);
+    const pile = new THREE.Group();
+    [[0, 0, 0], [0.3, 0, 0.05], [-0.28, 0, -0.04], [0.02, 1, 0.02], [0.3, 1, 0], [0.15, 2, 0.02]].forEach(([x, layer, z], i) => {
+      put(pile, makeMesh(new THREE.BoxGeometry(0.28, 0.16, 0.2), i % 2 ? siteMats.block : siteMats.blockDark), x, 0.08 + layer * 0.16, z);
+    });
+    pile.rotation.y = r() * TAU;
+    put(site, pile, bx, TOP, bz);
+    const [rx, rz] = spotAt(0.6);
+    const barrier = put(site, makeBarrier(), rx, TOP, rz);
+    barrier.rotation.y = r() * TAU;
+    pickable(site, pick);
+    scene.add(site);
+    return { group: site, opening: -1 };
+  }
+  // 開放的動畫：柵欄和工地慢慢沉下去，兩秒後拿掉
+  function stepSites(dt) {
+    sites.forEach((site, id) => {
+      if (site.opening < 0) return;
+      site.opening += dt;
+      const k = Math.min(1, site.opening / 2);
+      site.group.position.y = -k * 0.9;
+      if (k >= 1) {
+        scene.remove(site.group);
+        site.group.traverse((o) => {
+          const i = pickables.indexOf(o);
+          if (i >= 0) pickables.splice(i, 1);
+          if (o.isMesh) o.geometry.dispose();
+        });
+        sites.delete(id);
       }
     });
   }
+  // 柵欄裡面（還沒開放的島）不能走進去
+  function fenced(island, lx, lz) {
+    return !isOpen(island.id) && insidePoly(island.fence, lx, lz);
+  }
 
   // 開放的島：need 是 { 島 id: 還要幾隻貓 }，0 或沒寫就是開了。
-  // 沒開的島被雲霧包住，名牌只寫「？？？」和還要幾隻貓；開了雲霧才散開、名字才出現
+  // 沒開的島圍著柵欄、在施工，名牌只寫「？？？」，下面用貓的圖示和數字（現在幾隻／要幾隻）；開了才看得到名字
   function setOpen(need) {
     openIds = new Set(islands.filter((island) => !(need[island.id] > 0)).map((island) => island.id));
     islands.forEach((island) => {
       const left = need[island.id] > 0 ? need[island.id] : 0;
+      const goal = UNLOCK[island.id] || 0;
       island.pill.classList.toggle('island-pill--locked', !!left);
       island.pillName.textContent = left ? '？？？' : island.name;
       if (island.pillStars) island.pillStars.textContent = left ? '' : '★'.repeat(LEVELS[island.def.level].stars);
-      island.pill.setAttribute('aria-label', left ? `被雲霧包住的島，還要 ${left} 隻貓` : island.name);
+      island.pill.setAttribute('aria-label', left ? `施工中的島，島上有 ${goal - left} 隻貓，要 ${goal} 隻才開放` : island.name);
       island.pillNeed.hidden = !left;
-      island.pillNeed.textContent = left ? `還要 ${left} 隻貓` : '';
-      // 島上的設施：還沒開放就藏起來（高的跳臺、看板才不會從雲裡穿出來），名牌留著
+      if (left) island.pillNeed.innerHTML = needBadge(goal - left, goal);
+      else island.pillNeed.replaceChildren();
+      // 島上的設施：還沒開放就藏起來，名牌留著
       island.group.children.forEach((child) => {
         if (island.terrain.has(child) || child.isCSS2DObject) return;
         child.visible = !left;
@@ -5429,11 +5498,11 @@ export function createScene(container, { cats: catData, present = null, open = n
           if (o.isCSS2DObject) o.visible = !left;
         });
       });
-      const fog = fogs.get(island.id);
-      if (left && !fog) fogs.set(island.id, makeFog(island));
-      else if (!left && fog && fog.clearing < 0) {
-        // 剛開的島要有散開的動畫；一打開網頁就已經開的島直接拿掉
-        fog.clearing = setOpen.ready && !reducedMotion ? 0 : 2.5;
+      const site = sites.get(island.id);
+      if (left && !site) sites.set(island.id, makeSite(island));
+      else if (!left && site && site.opening < 0) {
+        // 剛開的島要有拆柵欄的動畫；一打開網頁就已經開的島直接拿掉
+        site.opening = setOpen.ready && !reducedMotion ? 0 : 2;
       }
     });
     setOpen.ready = true;
@@ -5522,6 +5591,19 @@ export function createScene(container, { cats: catData, present = null, open = n
     },
     setClass(indices) {
       learn.classCats = new Set(indices);
+    },
+    // 講桌上還沒改的作業張數；學習數學島還沒開放就不顯示
+    setPile(n) {
+      const el = learn.pileEl;
+      if (!el) return;
+      const show = n > 0 && isOpen('learn');
+      if (el.hidden !== !show) el.hidden = !show;
+      const html = `${PAPER_ICON}<b>${n}</b>`;
+      if (show && el.dataset.n !== String(n)) {
+        el.dataset.n = String(n);
+        el.innerHTML = html;
+        el.setAttribute('aria-label', `講桌上有 ${n} 張作業可以改`);
+      }
     },
     onPick(cb) {
       pickHandlers.push(cb);

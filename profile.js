@@ -77,7 +77,7 @@ export const BADGES = [
   { id: 'graded1', group: 'teach', title: '小老師上任', text: '改好第一張作業', stat: 'graded', goal: 1 },
   { id: 'graded20', group: 'teach', title: '認真的小老師', text: '改好 20 張作業', stat: 'graded', goal: 20 },
   { id: 'graded100', group: 'teach', title: '資深老師', text: '改好 100 張作業', stat: 'graded', goal: 100 },
-  { id: 'allRight', group: 'teach', title: '滿分老師', text: '一天 20 張全部一次就改對', stat: 'daysAllRight', goal: 1 },
+  { id: 'allRight', group: 'teach', title: '滿分老師', text: '一疊 10 張全部一次就改對', stat: 'daysAllRight', goal: 1 },
   { id: 'units9', group: 'teach', title: '九個單元都上完', text: '黑板課 9 個單元都看到最後一頁', stat: 'units', goal: UNIT_COUNT },
   { id: 'islands', group: 'explore', title: '全島走透透', text: `${ISLAND_IDS.length} 座島都去過`, stat: 'islands', goal: ISLAND_IDS.length },
   { id: 'cats10', group: 'explore', title: '貓貓好夥伴', text: '點過 10 隻不一樣的貓', stat: 'cats', goal: 10 },
