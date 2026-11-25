@@ -23,6 +23,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bpmf+Huninn&display=swap">
+<link rel="stylesheet" href="board-island.css">
 <style>
   /* 桐桐貓貓島：滿版 3D 群島，介面像貼紙一樣浮在上面（粗墨線、圓角、底下一條實心陰影）。
      主色是桐桐印章的藍紫墨色，成績用陽光黃，三座跳臺綠、橘、珊瑚紅。
@@ -1037,6 +1038,7 @@
       <li data-need="diary"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>日記區</b>貓貓會把今天做的事寫成日記。按貓掌幫日記蓋掌印，按「唸給我聽」就會唸出來。</span></li>
       <li data-need="track"><span class="help-icon" aria-hidden="true">7</span><span><b>跑步田徑場島</b>七隻貓各站一條跑道，到齊後按「開始比賽」，跑一圈看誰第一名。跑道外面的草場，也常有貓跑來跑去。</span></li>
       <li data-need="learn"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 3.4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.4 19.6 4 21l1.4-5.4z"/></svg></span><span><b>學習數學島</b>點黑板，戴眼鏡的貓貓老師會上課，教一年級上學期的 9 個單元。島上的貓會自己一直來寫作業，寫好的放在講桌上，貓越多寫越快。點老師或講台就改作業，一次最多改 10 張，你當老師按「寫對了」或「寫錯了」，改錯了老師會提醒你。</span></li>
+      <li data-need="go"><span class="help-icon" aria-hidden="true">棋</span><span><b>圍棋島</b>挑一隻領養的貓貓下圍棋，先累計吃到 5 顆就贏。一場用 5 個電，贏了拿 15 個小魚金幣。小熊老師也會免費教圍棋：氣、吃子、禁著點和打劫。</span></li>
       <li><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="currentColor"><ellipse cx="24" cy="31" rx="10" ry="8.5"/><ellipse cx="11.5" cy="20" rx="4.3" ry="5.3"/><ellipse cx="19.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="28.5" cy="12.5" rx="4.3" ry="5.5"/><ellipse cx="36.5" cy="20" rx="4.3" ry="5.3"/></svg></span><span><b>島主卡</b>取一個自己的名字。玩過的東西都會一直累積，下次來還在，還可以收集徽章。記下島主暗號，換裝置也找得回來。</span></li>
       <li data-need="low"><span class="help-icon" aria-hidden="true">？</span><span><b>貓貓教練</b>頭上綁頭帶、用兩隻腳走路。看到晃來晃去、頭上冒「？」的貓，就會叫牠去跳臺跳。</span></li>
       <li data-need="home"><span class="help-icon" aria-hidden="true">z</span><span><b>累了就休息</b>貓貓累了會回貓貓之家睡覺<span data-need="combo park2">，也會去公園休息</span><span data-need="boxes">，還會躲進多多紙箱區的紙箱</span>。點一下貓貓<span data-need="boxes">或紙箱</span>，牠會跟你打招呼。</span></li>
@@ -1521,6 +1523,53 @@
       <button class="sticker sticker--solid" id="bridge-go" type="button">去貓貓領養島</button>
     </div>
   </article>
+
+  <article class="card" id="board-card" hidden aria-labelledby="board-title">
+    <div class="card__head">
+      <div>
+        <p class="card__label" id="board-island-label">圍棋島</p>
+        <h2 class="card__title" id="board-title">圍棋島</h2>
+      </div>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <div class="card__actions board-menu" aria-label="圍棋島的玩法">
+      <button class="sticker" id="board-play" type="button" aria-pressed="false">跟貓貓下圍棋</button>
+      <button class="sticker" id="board-learn" type="button" aria-pressed="false">跟小熊學圍棋</button>
+    </div>
+    <p class="card__text" id="board-home">挑一隻你領養的貓貓下棋，或跟小熊老師學圍棋。</p>
+    <section id="board-pick" hidden aria-label="選對手">
+      <p class="card__text">選一隻貓貓。先吃到 5 顆就贏，每場用 5 個電，贏了拿 15 個小魚金幣。</p>
+      <ul class="board-cats" id="board-cats"></ul>
+      <button class="sticker sticker--solid" id="board-start" type="button" disabled>開始一局</button>
+      <p class="board-status" id="board-pick-error" aria-live="polite"></p>
+    </section>
+    <div id="board-lessons" class="board-menu" hidden aria-label="圍棋課程"></div>
+    <div class="board-layout" id="board-layout" hidden>
+      <div id="board-grid" class="board-grid" role="group" aria-label="九路棋盤"></div>
+      <div class="board-notes">
+        <p class="card__lede" id="board-caption"></p>
+        <p class="card__text" id="board-hint"></p>
+        <p class="board-score" id="board-score" hidden></p>
+        <p class="board-status" id="board-status" aria-live="polite"></p>
+        <div class="card__actions" id="board-turn-actions" hidden>
+          <button class="sticker" id="board-pass" type="button">過手</button>
+        </div>
+        <div id="board-result" class="card__actions" hidden>
+          <button class="sticker sticker--solid" id="board-rematch" type="button">再玩一場（5 個電）</button>
+          <button class="sticker" id="board-change" type="button">換一隻貓貓</button>
+        </div>
+        <div id="board-lesson-actions" class="card__actions" hidden>
+          <button class="sticker sticker--solid" id="board-next" type="button" hidden>下一步</button>
+          <button class="sticker" id="board-retry" type="button">再練一次</button>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <aside id="island-other-tab" class="card" role="status" hidden>
+    <p class="card__lede">這個瀏覽器有另一個分頁正在玩。</p>
+    <p class="card__text">關閉原本的遊戲分頁，就可以從這裡繼續。</p>
+  </aside>
 
   <article class="card" id="chat-card" hidden aria-labelledby="chat-name">
     <div class="card__head">

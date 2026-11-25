@@ -21,7 +21,7 @@ export const AVATARS = [
 const AVATAR_IDS = AVATARS.map((a) => a.id);
 
 // 算「全島走透透」的島，id 跟 app.js 的 NAV 一樣（「看全島」和「貓貓教練」不是島）
-export const ISLAND_IDS = ['home', 'low', 'mid', 'high', 'stage', 'track', 'diary', 'learn', 'boxes', 'combo', 'park1', 'park2', 'rank', 'shop', 'adopt', 'exam'];
+export const ISLAND_IDS = ['home', 'low', 'mid', 'high', 'stage', 'track', 'diary', 'learn', 'boxes', 'combo', 'park1', 'park2', 'rank', 'shop', 'adopt', 'exam', 'go'];
 // 島上最多住幾隻貓（跟 adopt.js 的 ISLAND_MAX 一樣）
 const ADOPTED_MAX = 100;
 const UNIT_COUNT = 9;
@@ -36,7 +36,7 @@ const COUNT_KEYS = ['jumps', 'perfect', 'perfectHigh', 'records', 'graded', 'rig
 // ---------- 島主的電和小魚金幣（照桐桐寫的規則） ----------
 export const POWER_MAX = 30;
 // 玩一次要用掉幾個電：跑步田徑場、三座跳臺；改作業不用電
-export const POWER_COST = { track: 20, high: 10, mid: 5, low: 3 };
+export const POWER_COST = { track: 20, high: 10, mid: 5, low: 3, go: 5 };
 // 跳一次拿到的小魚金幣：破紀錄、完美跳、其他，只拿最高的那一種
 export const JUMP_REWARD = {
   high: { record: 20, perfect: 10, other: 3 },

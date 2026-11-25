@@ -10,6 +10,7 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ISLANDS, BRIDGES, LEVELS, UNLOCK, needBadge, PAPER_ICON, SKETCH, PERFECT, TRICKS, TRICK_KEYS, TRACK, fromSketch, meterAt, peakHeight, toCm, autoPower, maxCm, mulberry32, laneRadius, trackOuter, insideTrack, trackPoint } from './logic.js';
 import { buildHuman, animateHuman, disposeModel } from './avatar.js';
+import { BOARD_SIZE } from './go-rules.js';
 
 const TAU = Math.PI * 2;
 const TOP = 0.8;
@@ -1050,37 +1051,59 @@ export function createScene(container, { cats: catData, present = null, open = n
     say(adopt.person, text, 2.6);
   }
 
-  // ---------- 貓貓考試島：桐桐還在想要考什麼，先蓋一間小教室和幾張考試桌 ----------
-  function buildExam(island) {
+  // ---------- 圍棋島：手稿上的棋桌、入口和小熊老師 ----------
+  function buildGoIsland(island) {
     const g = island.group;
-    const hz = -0.75;
-    const house = makeCottage({ w: 2.0, d: 1.05, h: 0.95, wall: 0xf3f5ff, roof: 0x5c6ad6 });
-    house.position.set(0, TOP, hz);
-    g.add(house);
-    const sign = signBoard('貓貓考試島', { width: 1.5, height: 0.38, edge: '#5C6AD6' });
-    sign.position.set(0, 1.86, 0.58);
-    house.add(sign);
-    island.obstacles.push({ x: 0, z: hz, w: 2.4, d: 1.4 });
-    // 門口的看板：還在準備
-    const board = signBoard('考試準備中', { width: 0.95, height: 0.3, edge: '#E8922A', color: '#5B4435' });
-    board.position.set(-1.35, TOP + 0.75, 0.1);
-    board.rotation.y = 0.35;
-    g.add(board);
-    put(g, makeMesh(new THREE.CylinderGeometry(0.03, 0.035, 0.75, 8), mat(C.woodDark)), -1.35, TOP + 0.37, 0.08);
-    island.obstacles.push({ x: -1.35, z: 0.1, r: 0.2 });
-    // 四張考試桌，貓貓會先來坐坐看
-    [[-0.45, 0.55], [0.45, 0.55], [-0.45, 1.25], [0.45, 1.25]].forEach(([x, z]) => {
-      const desk = makeDesk();
-      desk.position.set(x, TOP, z);
-      g.add(desk);
-      island.obstacles.push({ x, z, w: 0.6, d: 0.4 });
-      addSpot(island, { approach: [x, z + 0.5], pos: [x, TOP + 0.005, z + 0.3], face: Math.PI, poses: ['sit', 'loaf'], kind: 'rest', doing: '在貓貓考試島坐著等考試', draw: false });
-    });
-    [[1.5, 0.9], [-1.6, 1.0], [1.3, -1.3]].forEach(([x, z]) => flowerSpot(island, x, z));
-    island.extraTrees = [[1.6, -0.2], [-1.75, -0.9]];
-    island.treeLimit = 2;
-    island.labelY = TOP + 2.6;
-    island.labelZ = hz;
+    const table = new THREE.Group();
+    const boardWidth = 1.48;
+    const wood = mat(0xf2c689);
+    const legs = mat(0xa86345);
+    const ink = mat(0x68462f);
+    put(g, table, -0.65, TOP, -0.45);
+    put(table, makeMesh(new THREE.BoxGeometry(1.7, 0.16, 1.7), wood), 0, 0.69, 0);
+    for (const x of [-0.6, 0.6]) for (const z of [-0.6, 0.6]) {
+      put(table, makeMesh(new THREE.BoxGeometry(0.14, 0.63, 0.14), legs), x, 0.31, z);
+    }
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      const at = (i / (BOARD_SIZE - 1) - 0.5) * boardWidth;
+      put(table, makeMesh(new THREE.BoxGeometry(boardWidth, 0.006, 0.014), ink), 0, 0.772, at);
+      put(table, makeMesh(new THREE.BoxGeometry(0.014, 0.006, boardWidth), ink), at, 0.772, 0);
+    }
+    pickable(table, { type: 'goMatch' });
+    island.obstacles.push({ x: -0.65, z: -0.45, w: 1.7, d: 1.7 });
+
+    const bear = new THREE.Group();
+    put(g, bear, 0.95, TOP, -0.36);
+    const fur = mat(0xb77951);
+    const cream = mat(0xffe4bc);
+    const scarf = mat(0x3d8290);
+    function oval(material, x, y, z, sx, sy, sz) {
+      const mesh = put(bear, makeMesh(new THREE.SphereGeometry(1, 16, 12), material), x, y, z);
+      mesh.scale.set(sx, sy, sz);
+    }
+    oval(scarf, 0, 0.57, 0, 0.32, 0.45, 0.23);
+    oval(fur, 0, 1.14, 0, 0.4, 0.34, 0.33);
+    for (const side of [-1, 1]) {
+      oval(fur, side * 0.31, 1.4, 0, 0.135, 0.14, 0.10);
+      oval(cream, side * 0.31, 1.4, 0.08, 0.077, 0.08, 0.035);
+      oval(fur, side * 0.37, 0.65, 0.01, 0.15, 0.12, 0.12);
+      oval(fur, side * 0.16, 0.13, 0.08, 0.11, 0.15, 0.15);
+      oval(ink, side * 0.145, 1.19, 0.303, 0.035, 0.04, 0.018);
+    }
+    oval(cream, 0, 1.062, 0.274, 0.2, 0.135, 0.11);
+    oval(ink, 0, 1.105, 0.375, 0.076, 0.043, 0.018);
+    pickable(bear, { type: 'goTeacher' });
+    island.obstacles.push({ x: 0.95, z: -0.36, r: 0.42 });
+
+    const sign = signBoard('圍棋島', { width: 1.22, height: 0.36, edge: '#3D8290' });
+    put(g, sign, 0.67, TOP + 1.02, 1.40);
+    for (const x of [-0.04, 1.38]) {
+      put(g, makeMesh(new THREE.BoxGeometry(0.1, 1.2, 0.1), legs), x, TOP + 0.6, 1.40);
+      island.obstacles.push({ x, z: 1.40, r: 0.09 });
+    }
+    flowerSpot(island, 1.25, 0.72);
+    island.treeLimit = 1;
+    island.labelY = TOP + 2.3;
   }
 
   // ---------- 貓貓之家：藍屋頂房子，屋頂上掛桐桐的印章招牌 ----------
@@ -2311,7 +2334,7 @@ export function createScene(container, { cats: catData, present = null, open = n
     else if (island.kind === 'owner') buildOwnerHome(island);
     else if (island.kind === 'shop') buildShop(island);
     else if (island.kind === 'adopt') buildAdopt(island);
-    else if (island.kind === 'exam') buildExam(island);
+    else if (island.kind === 'go') buildGoIsland(island);
     else if (island.id === 'park2') buildPark2(island);
   });
   const platformById = Object.fromEntries(platforms.map((p) => [p.id, p]));
@@ -3565,7 +3588,9 @@ export function createScene(container, { cats: catData, present = null, open = n
     const fromX = owner.pos.x - island.cx;
     const fromZ = owner.pos.z - island.cz;
     const onGround = Math.abs(owner.pos.y - (TOP + 0.005)) < 0.05;
-    if (dest && owner.islandId === island.id && onGround && segmentClear(island, fromX, fromZ, lx, lz, 0.12)) {
+    if (dest && owner.islandId === island.id && onGround
+        && segmentClear(island, fromX, fromZ, lx, lz, 0.12)
+        && lineWalkable(owner.pos.x, owner.pos.z, point.x, point.z)) {
       owner.node = ring;
       ownerPath([dest], OWNER_WALK, done);
       return true;
@@ -4904,7 +4929,7 @@ export function createScene(container, { cats: catData, present = null, open = n
       const distance = Math.max(10.5 / Math.tan(halfH), 6.6 / Math.tan(halfVv)) * 1.05;
       offset = new THREE.Vector3(0, 0.95, 1).normalize().multiplyScalar(distance);
       target = W(island, TRACK.center.x, TOP + 0.3, TRACK.center.z);
-    } else if (island.kind === 'adopt' || island.kind === 'exam') {
+    } else if (['adopt', 'exam', 'go'].includes(island.kind)) {
       // 從門前看小房子、門口的人和廣場
       const distance = Math.max(3.4 / Math.tan(halfH), 2.6 / Math.tan(halfVv)) * 1.05;
       offset = new THREE.Vector3(0.12, 0.55, 1).normalize().multiplyScalar(distance);
@@ -4966,10 +4991,12 @@ export function createScene(container, { cats: catData, present = null, open = n
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(pickables, false).find((h) => h.object.visible && (h.object.userData.pick.type !== 'cat' || cats[h.object.userData.pick.index].model.root.visible)
-      && (h.object.userData.pick.type !== 'owner' || owner.model.root.visible));
+    const hit = raycaster.intersectObjects(pickables, false).find(({ object }) => {
+      for (let node = object; node; node = node.parent) if (!node.visible) return false;
+      return true;
+    });
     // 直接點到貓、教練、老師、黑板或講台就算數；黑板、講台不用讓給旁邊的貓
-    if (hit && ['cat', 'coach', 'teacher', 'owner', 'ownerHome', 'shop', 'board', 'podium'].includes(hit.object.userData.pick.type)) {
+    if (hit && ['cat', 'coach', 'teacher', 'owner', 'ownerHome', 'shop', 'board', 'podium', 'goMatch', 'goTeacher'].includes(hit.object.userData.pick.type)) {
       pickHandlers.forEach((cb) => cb(hit.object.userData.pick));
       return;
     }
@@ -5472,7 +5499,7 @@ export function createScene(container, { cats: catData, present = null, open = n
   }
   // 柵欄裡面（還沒開放的島）不能走進去
   function fenced(island, lx, lz) {
-    return !isOpen(island.id) && insidePoly(island.fence, lx, lz);
+    return (!isOpen(island.id) || island.def.construction) && insidePoly(island.fence, lx, lz);
   }
 
   // 開放的島：need 是 { 島 id: 還要幾隻貓 }，0 或沒寫就是開了。
@@ -5483,24 +5510,25 @@ export function createScene(container, { cats: catData, present = null, open = n
       const left = need[island.id] > 0 ? need[island.id] : 0;
       const goal = UNLOCK[island.id] || 0;
       island.pill.classList.toggle('island-pill--locked', !!left);
-      island.pillName.textContent = left ? '？？？' : island.name;
+      const construction = !!island.def.construction;
+      island.pillName.textContent = left ? '？？？' : construction ? `${island.name}・施工中` : island.name;
       if (island.pillStars) island.pillStars.textContent = left ? '' : '★'.repeat(LEVELS[island.def.level].stars);
-      island.pill.setAttribute('aria-label', left ? `施工中的島，島上有 ${goal - left} 隻貓，要 ${goal} 隻才開放` : island.name);
+      island.pill.setAttribute('aria-label', left ? `施工中的島，島上有 ${goal - left} 隻貓` + (construction ? `，${goal} 隻可以到外圍看看` : `，要 ${goal} 隻才開放`) : island.pillName.textContent);
       island.pillNeed.hidden = !left;
       if (left) island.pillNeed.innerHTML = needBadge(goal - left, goal);
       else island.pillNeed.replaceChildren();
       // 島上的設施：還沒開放就藏起來，名牌留著
       island.group.children.forEach((child) => {
         if (island.terrain.has(child) || child.isCSS2DObject) return;
-        child.visible = !left;
+        child.visible = !left && !construction;
         // 網頁做的小標籤（身高尺上的高度）不會跟著上一層藏起來，要自己藏
         child.traverse((o) => {
-          if (o.isCSS2DObject) o.visible = !left;
+          if (o.isCSS2DObject) o.visible = !left && !construction;
         });
       });
       const site = sites.get(island.id);
-      if (left && !site) sites.set(island.id, makeSite(island));
-      else if (!left && site && site.opening < 0) {
+      if ((left || construction) && !site) sites.set(island.id, makeSite(island));
+      else if (!left && !construction && site && site.opening < 0) {
         // 剛開的島要有拆柵欄的動畫；一打開網頁就已經開的島直接拿掉
         site.opening = setOpen.ready && !reducedMotion ? 0 : 2;
       }
