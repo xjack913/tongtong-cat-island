@@ -19,8 +19,15 @@ import {
 } from './profile.js';
 import { composeNews, sanitizeNews, recordNews, recordJumpNews, recordRaceNews, chatGreeting, chatPet, chatDoing, chatBest, chatDiary, chatBusy } from './talk.js';
 import { createScene } from './scene.js';
+import { WIN_COINS, addMove, catMove, readMatch } from './go-match.js';
+import { createBoardIsland } from './board-island.js';
 
-const STORE_KEY = 'tong-cat-island-v1';
+const LOCAL_HOST = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
+const PREVIEW_CASE = ['rawcdn.githack.com', 'raw.githack.com'].includes(location.hostname) || LOCAL_HOST
+  ? new URLSearchParams(location.search).get('go-preview') : null;
+const PREVIEW_CATS = { '7': 7, '8': 8, '40': 40, win: 8 };
+const PREVIEW = Object.hasOwn(PREVIEW_CATS, PREVIEW_CASE);
+const STORE_KEY = PREVIEW ? 'tong-go-preview-v1:' + location.pathname + ':' + PREVIEW_CASE : 'tong-cat-island-v1';
 const RING = 2 * Math.PI * 54;
 const NAV = [
   { id: 'park1', label: '島主之家' },
@@ -28,6 +35,7 @@ const NAV = [
   { id: 'adopt', label: '貓貓領養島' },
   { id: 'shop', label: '貓貓商店' },
   { id: 'exam', label: '貓貓考試島' },
+  { id: 'go', label: '圍棋島' },
   { id: 'home', label: '貓貓之家' },
   { id: 'low', label: '低階跳臺', level: 'low' },
   { id: 'mid', label: '中階跳臺', level: 'mid' },
@@ -45,7 +53,7 @@ const NAV = [
 ];
 const ISLAND_COPY = {
   home: { label: '島的中間', title: '貓貓之家', lede: '島上貓貓的家。屋頂上的招牌，是設計師桐桐的印章。', text: '跳累的貓會回來睡貓床、吃飯喝水，有時候還會躲進屋子裡。' },
-  exam: { label: '考試的島', title: '貓貓考試島', lede: '教室和考試桌都準備好了。', text: '要考什麼，設計師桐桐還在想，請大家等一等。貓貓已經先來坐坐看了。' },
+  exam: { label: '施工中', title: '貓貓考試島', lede: '島上還在施工。', text: '要考什麼，設計師桐桐還在想。外圍的步道和橋可以走。' },
   boxes: { label: '躲貓貓的島', title: '多多紙箱區', lede: '滿地都是紙箱，貓貓最愛鑽進去躲起來。', text: '有的貓只露出耳朵，有的整隻躲起來，紙箱還會晃來晃去。點一下紙箱，看看誰躲在裡面！' },
   combo: { label: '休息的島', title: '合體公園', lede: '紙箱、魚池、水和飼料，全部合在一起的公園。', text: '貓貓可以躲紙箱、坐在池邊看魚，渴了喝水、餓了吃飼料。' },
   park2: { label: '休息的島', title: '魚池公園', lede: '跳累了就來這裡休息。', text: '池子裡有三條錦鯉游來游去，貓貓最愛坐在旁邊看。' },
@@ -57,7 +65,7 @@ const ISLAND_INTRO = {
   learn: '貓貓會自己來寫數學作業，寫好的放在講桌上。點老師或講台，你就可以當老師改作業，一次最多改 10 張，改對了就有小魚金幣！點黑板，戴眼鏡的貓貓老師還會上課。',
   low: '按住大按鈕蓄力，能量滿了就放開，貓貓就會跳起來。完美跳的時候貓會在空中翻跟斗！玩一次要 3 個電。',
   shop: '可以用小魚金幣買水果、水和果汁，買了馬上吃掉、喝掉，就會補電。',
-  exam: '教室和考試桌都準備好了。要考什麼，設計師桐桐還在想，請大家等一等。',
+  go: '挑一隻你領養的貓貓下圍棋，先吃到 5 顆棋子就贏。每場用 5 個電，贏了拿 15 個小魚金幣。也可以跟小熊老師學圍棋！',
   combo: '紙箱、魚池、水和飼料全部合在一起的公園。貓貓可以躲紙箱、看魚，渴了喝水、餓了吃飼料。',
   mid: '能量條會上上下下，要在最滿的時候放開，貓貓才跳得高。玩一次要 5 個電。',
   diary: '貓貓會把今天做的事寫成日記。你可以幫日記蓋貓掌印，也可以按「唸給我聽」。',
@@ -69,6 +77,7 @@ const ISLAND_INTRO = {
   track: '七隻貓各站一條跑道，到齊了按「開始比賽」就開跑。島主也可以一起跑！',
 };
 const ISLAND_NAME = Object.fromEntries(ISLANDS.map((island) => [island.id, island.name]));
+const CONSTRUCTION = new Set(ISLANDS.filter((island) => island.construction).map((island) => island.id));
 
 const LEVEL_HINT = {
   low: '一直按住，能量滿了就放開。',
@@ -86,7 +95,7 @@ function el(tag, className, text) {
 }
 
 // 島主卡的雲端存檔：本機預覽接 wrangler dev，其他都接正式的
-const CLOUD_API = /^(127\.0\.0\.1|localhost)$/.test(location.hostname) ? 'http://127.0.0.1:8787' : 'https://tong-api.xjack.tw';
+const CLOUD_API = PREVIEW ? '' : LOCAL_HOST ? 'http://127.0.0.1:8787' : 'https://tong-api.xjack.tw';
 const SYNC_DELAY = 20000;
 
 // GA4 玩法事件：只有 tong.xjack.tw 會載 GA（ga.js），其他地方沒有 gtag 就什麼都不做
@@ -96,17 +105,34 @@ function track(name, params = {}) {
 
 function readStore() {
   try {
-    return JSON.parse(localStorage.getItem(STORE_KEY) || '{}') || {};
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (saved) return saved;
   } catch {
-    return {};
+    // 預覽在無法寫入存檔時仍可以看地圖、上課。
   }
+  if (!PREVIEW) return {};
+  const cats = PREVIEW_CATS[PREVIEW_CASE];
+  const win = PREVIEW_CASE === 'win';
+  const fixture = {
+    adoptV: 1, storySeen: true, bridgeSeen: true, sound: false,
+    introduced: Object.keys(UNLOCK).filter((id) => UNLOCK[id] <= cats),
+    profile: { asked: true, avatar: 'girl', adopted: Array.from({ length: cats }, (_, i) => i), counts: { powerOut: win ? 5 : 0 } },
+  };
+  // 末手是第九橫排第三直排，會從已吃三顆到五顆。
+  if (win) fixture.goMatch = {
+    id: 'preview-go-win', cat: 0,
+    moves: [19, 18, 9, 27, 28, 0, 10, 29, 36, 37, 1, 30, 39, 27, 45, 21, 54, 31, 55, 46, 48, 32, 20, 12, 11, 13, 3, 38, 41, 33, 24, 47, 56, 40, 23, 63, 64, 72, 50, 65, 59, 73, 57, 68],
+  };
+  return fixture;
 }
 
 function writeStore(data) {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    return true;
   } catch {
     // 私密視窗或封鎖網站資料時存不了，這一輪的成績就只留在畫面上
+    return false;
   }
 }
 
@@ -277,7 +303,7 @@ function createSound(enabled) {
   };
 }
 
-function start(hotData = {}) {
+function start(hotData = {}, ownsStore = false) {
   const cats = makeCats();
   const stored = readStore();
   // 貓貓領養島改版：玩過舊版的人（島上本來就有 50 隻貓）第一次打開新版，島上清空、重新領養。
@@ -328,6 +354,8 @@ function start(hotData = {}) {
     ...sanitizeLearnStats(stored.learn),
     stamps: diaries.reduce((sum, d) => sum + d.paws, 0),
   });
+  let match = readMatch(stored.goMatch, cats.length);
+  if (match && !match.result && match.moves.length % 2) match = null;
   // 升級前就達標的徽章直接給，不用一次跳一大串提示
   if (!hadProfile) award(profile, dayKey());
   // 上次來是哪一天，回到島主之家時才知道有哪些新公告；markDay 會把它換成今天，要先記下來
@@ -377,9 +405,10 @@ function start(hotData = {}) {
     return Object.fromEntries(Object.keys(UNLOCK).map((id) => [id, Math.max(0, UNLOCK[id] - n)]));
   }
 
-  function save() {
-    writeStore({
-      records, race: raceBoard, sound: sound.on, diaries, diarySeeded: true, storySeen, hw: homework, profile, news: newsLog, stayHome: atHome, sleepAt,
+  function save(chess = match, ownerProfile = profile) {
+    const goMatch = chess ? { id: chess.id, cat: chess.cat, moves: chess.moves } : null;
+    return writeStore({
+      records, race: raceBoard, sound: sound.on, diaries, diarySeeded: true, storySeen, hw: homework, profile: ownerProfile, news: newsLog, stayHome: atHome, sleepAt, goMatch,
       adoptV: 1, bridgeSeen, before: stored.before, starter, pending, offer, introduced,
     });
   }
@@ -621,6 +650,53 @@ function start(hotData = {}) {
     walletPop(`⚡ −${cost}`, true);
     tallied();
   }
+
+  function currentMatch() {
+    return opened('go') && match && owned().includes(match.cat) ? match : null;
+  }
+
+  function commitMatch(next, { cost = 0, reward = 0 } = {}) {
+    // 棋局與錢包用同一份存檔。失敗時繼續顯示上一個成功存下來的盤面。
+    const nextProfile = { ...profile, counts: { ...profile.counts }, earned: { ...profile.earned } };
+    if (cost && !usePower(nextProfile, cost)) return '電不夠了，去商店買吃的，或回家睡覺。';
+    if (reward) earnCoins(nextProfile, reward);
+    const today = dayKey();
+    markDay(nextProfile, today);
+    const badges = award(nextProfile, today);
+    if (!save(next, nextProfile)) return '這一步存不下來，請允許網站儲存資料後再試一次。';
+    match = next;
+    Object.assign(profile, nextProfile);
+    if (cost) walletPop('⚡ −' + cost, true);
+    if (reward) walletPop('小魚金幣 ＋' + reward);
+    if (badges.length) announceBadges(badges);
+    renderWallet();
+    scheduleSync();
+    return '';
+  }
+
+  function startBoardMatch(cat) {
+    if (!opened('go') || !owned().includes(cat)) return '請選一隻你已領養的貓貓。';
+    if (!ownsStore) return '這個瀏覽器目前不能安全儲存對局。圍棋課仍然可以上。';
+    if (asleep()) return '島主正在睡覺，起床後再來下棋。';
+    if (currentMatch() && !currentMatch().result) return '這一局還沒下完。';
+    const next = readMatch({ id: crypto.randomUUID(), cat, moves: [] }, cats.length);
+    return commitMatch(next, { cost: costOf('go') });
+  }
+
+  function playBoardMove(id, point) {
+    const active = currentMatch();
+    if (!ownsStore || !active || active.id !== id || active.result) return '這一局已經結束。';
+    if (asleep()) return '島主正在睡覺，起床後可以繼續下棋。';
+    let next = addMove(active, point);
+    if (next.error) return {
+      occupied: '這裡下不了，請選一個空點。',
+      suicide: '這個位置沒有氣，也吃不到對手的棋子。',
+      ko: '這一步會重現剛才的棋盤，請先下在其他地方。',
+    }[next.error];
+    // 島主和貓的回合同時存下，切到別的島也不會留下正在等待的動作。
+    if (!next.result) next = addMove(next, catMove(next));
+    return commitMatch(next, { reward: next.result === 'win' ? WIN_COINS : 0 });
+  }
   wallet.addEventListener('click', () => {
     if (focus === 'shop' && $('shop-card').hidden) openShop();
     else if (focus !== 'shop') goIsland('shop');
@@ -805,7 +881,8 @@ function start(hotData = {}) {
   // 名字會出現在哪裡都由這裡換：工具列、招牌下面、改作業的標題、排行榜的說明
   function applyName() {
     $('profile-label').textContent = profile.name || '島主卡';
-    $('plate-sub').textContent = profile.name ? `島主：${profile.name}` : '領養貓貓，一起玩的島';
+    $('plate-sub').textContent = PREVIEW ? '圍棋測試・' + PREVIEW_CATS[PREVIEW_CASE] + ' 隻貓'
+      : profile.name ? `島主：${profile.name}` : '領養貓貓，一起玩的島';
     scene.setOwnerName(who());
     scene.setOwnerLook(profile.avatar);
     markLooks();
@@ -979,6 +1056,7 @@ function start(hotData = {}) {
 
   // 用 text/plain 送，瀏覽器不用先問一次 CORS，關分頁時也送得出去。連不上回 status 0
   async function cloudPost(path, body, keepalive = false) {
+    if (!CLOUD_API) return { status: 0, body: {} };
     try {
       const res = await fetch(`${CLOUD_API}${path}`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body), keepalive });
       return { status: res.status, body: await res.json().catch(() => ({})) };
@@ -1123,6 +1201,8 @@ function start(hotData = {}) {
     if (switching) {
       await syncNow({ force: true });
       const today = dayKey();
+      if (!$('board-card').hidden) closeCards();
+      match = null;
       Object.assign(profile, sanitizeProfile({ firstDay: today, lastDay: today }, cats.length));
     }
     profile.asked = true;
@@ -1131,6 +1211,10 @@ function start(hotData = {}) {
     profileEditing = false;
     closeRestore();
     receiveOthers(res.body.others);
+    if (switching) {
+      scene.setOpen(needMap());
+      updateNav();
+    }
     applyName();
     syncOwnerButtons();
     setCloudState('saving');
@@ -1253,7 +1337,9 @@ function start(hotData = {}) {
       const left = need[button.dataset.island] || 0;
       button.classList.toggle('is-locked', left > 0);
       // 還沒開的島不給看名字，開了才知道是什麼島
-      button.querySelector('.nav-chip__name').textContent = left ? '？？？' : NAV.find((n) => n.id === button.dataset.island).label;
+      const label = NAV.find((n) => n.id === button.dataset.island).label;
+      const construction = CONSTRUCTION.has(button.dataset.island);
+      button.querySelector('.nav-chip__name').textContent = left ? '？？？' : construction ? label + '・施工中' : label;
       const stars = button.querySelector('.nav-chip__stars');
       if (stars) stars.textContent = left ? '' : starsText(button.dataset.island);
       small.hidden = !left;
@@ -1264,7 +1350,7 @@ function start(hotData = {}) {
         small.dataset.html = html;
         small.innerHTML = html;
       }
-      if (left) button.setAttribute('aria-label', `施工中的島，島上有 ${goal - left} 隻貓，要 ${goal} 隻才開放`);
+      if (left) button.setAttribute('aria-label', `施工中的島，島上有 ${goal - left} 隻貓` + (construction ? `，${goal} 隻可以到外圍看看` : `，要 ${goal} 隻才開放`));
       else button.removeAttribute('aria-label');
     });
     syncStick();
@@ -1343,6 +1429,8 @@ function start(hotData = {}) {
       openShop();
     } else if (id === 'adopt') {
       openAdopt();
+    } else if (id === 'go' && !quiet) {
+      boardIsland.open();
     } else if (id === 'rank') {
       openRank();
     } else if (id === 'diary') {
@@ -1614,7 +1702,7 @@ function start(hotData = {}) {
     if (c.type === 'characterData') markZhuyin(c.target);
     else c.addedNodes.forEach(markZhuyin);
   }));
-  ['diary-card', 'learn-card', 'lesson-card', 'story-card', 'report-card', 'profile-card', 'home-card', 'chat-card', 'shop-card', 'adopt-card', 'unlock-card', 'bridge-card'].forEach((id) => {
+  ['diary-card', 'learn-card', 'lesson-card', 'story-card', 'report-card', 'profile-card', 'home-card', 'chat-card', 'shop-card', 'adopt-card', 'unlock-card', 'bridge-card', 'board-card'].forEach((id) => {
     markZhuyin($(id));
     zhuyinWatch.observe($(id), { childList: true, characterData: true, subtree: true });
   });
@@ -2420,13 +2508,20 @@ function start(hotData = {}) {
     writeSheets();
     refreshBoards();
     if (!$('adopt-card').hidden) renderAdopt();
-    const fresh = Object.keys(UNLOCK).filter((id) => UNLOCK[id] > 0 && opened(id) && !introduced.includes(id))
+    introduceIslands(owned().length > before ? 1400 : 0);
+  }
+
+  function introduceIslands(delay) {
+    const fresh = Object.keys(UNLOCK).filter((id) => UNLOCK[id] > 0 && opened(id) && !introduced.includes(id) && !CONSTRUCTION.has(id))
       .sort((a, b) => UNLOCK[a] - UNLOCK[b]);
     if (!fresh.length) return;
     introduced.push(...fresh);
     save();
     // 先讓新來的貓走出來，再跳出介紹
-    setTimeout(() => openUnlock(fresh), owned().length > before ? 1400 : 0);
+    setTimeout(() => {
+      const available = fresh.filter(opened);
+      if (available.length) openUnlock(available);
+    }, delay);
   }
 
   let unlockIds = [];
@@ -2472,7 +2567,9 @@ function start(hotData = {}) {
     const left = Math.max(0, UNLOCK[id] - owned().length);
     $('island-label').textContent = '還沒開放';
     $('island-title').textContent = '施工中的島';
-    $('island-lede').textContent = `柵欄圍起來了，裡面還在施工，看不出來是什麼島。島上要有 ${UNLOCK[id]} 隻貓才會開放。`;
+    $('island-lede').textContent = CONSTRUCTION.has(id)
+      ? `柵欄裡還在施工。島上有 ${UNLOCK[id]} 隻貓時，可以到外圍看看。`
+      : `柵欄圍起來了，裡面還在施工，看不出來是什麼島。島上要有 ${UNLOCK[id]} 隻貓才會開放。`;
     $('island-text').textContent = `現在島上有 ${owned().length} 隻貓，還差 ${left} 隻。`;
     $('island-count').textContent = '到貓貓領養島領養更多貓吧！';
     // 跟名牌一樣的圖示，放大一點
@@ -3119,6 +3216,10 @@ function start(hotData = {}) {
   });
 
   const foundInBox = new Map();
+  const boardIsland = createBoardIsland({
+    $, el, cats, owned, catIcon: CAT_ICON,
+    getMatch: currentMatch, startMatch: startBoardMatch, playMove: playBoardMove,
+  });
 
   // 3D 場景裡點到的東西
   scene.onPick((pick) => {
@@ -3137,6 +3238,10 @@ function start(hotData = {}) {
     } else if (pick.type === 'adopt') {
       if (focus === 'adopt') openAdopt();
       else goIsland('adopt');
+    } else if (pick.type === 'goMatch' || pick.type === 'goTeacher') {
+      if (!opened('go')) return goIsland('go');
+      goIsland('go', true);
+      boardIsland.open(pick.type === 'goTeacher' ? 'go' : 'play');
     } else if (pick.type === 'cat') meetCat(pick.index, '3d');
     else if (pick.type === 'coach') openCoach();
     else if (!opened('learn') && ['teacher', 'podium', 'board'].includes(pick.type)) goIsland('learn');
@@ -3214,6 +3319,7 @@ function start(hotData = {}) {
     homeAfterProfile = true;
   } else {
     goIsland('park1', true, true);
+    if (opened('go') && !introduced.includes('go')) introduceIslands(0);
   }
   tallied();
   // 有暗號就先對一次雲端；有名字還沒有暗號（連不上或舊版取的名字）就補開一張
@@ -3221,6 +3327,36 @@ function start(hotData = {}) {
   else if (profile.name) linkCloud();
 }
 
+// 一個存檔只有一個遊戲分頁寫入。第二個分頁等待，取得鎖後才讀取當下的存檔。
+function boot(hotData) {
+  if (!navigator.locks) {
+    start(hotData);
+    return;
+  }
+  const wait = $('island-other-tab');
+  const controller = new AbortController();
+  const ended = new Promise((resolve) => window.addEventListener('pagehide', () => {
+    controller.abort();
+    resolve();
+  }, { once: true }));
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) location.reload();
+  });
+  wait.hidden = false;
+  let granted = false;
+  navigator.locks.request(STORE_KEY, { signal: controller.signal }, async () => {
+    granted = true;
+    wait.hidden = true;
+    start(hotData, true);
+    await ended;
+  }).catch((error) => {
+    if (error.name === 'AbortError') return;
+    if (granted) throw error;
+    wait.hidden = true;
+    start(hotData);
+  });
+}
+
 const hot = window.claude?.hot;
-if (hot?.ready) hot.ready(start);
-else start(hot?.data ?? {});
+if (hot?.ready) hot.ready(boot);
+else boot(hot?.data ?? {});
