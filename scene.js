@@ -11,6 +11,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ISLANDS, BRIDGES, LEVELS, UNLOCK, needBadge, PAPER_ICON, SKETCH, PERFECT, TRICKS, TRICK_KEYS, TRACK, fromSketch, meterAt, peakHeight, toCm, autoPower, maxCm, mulberry32, laneRadius, trackOuter, insideTrack, trackPoint } from './logic.js';
 import { buildHuman, animateHuman, disposeModel } from './avatar.js';
 import { BOARD_SIZE, STAR_POINTS } from './go-rules.js';
+import { createWeatherScene } from './weather-scene.js';
 
 const TAU = Math.PI * 2;
 const TOP = 0.8;
@@ -588,7 +589,8 @@ export function createScene(container, { cats: catData, present = null, open = n
   controls.minDistance = 2.5;
   controls.maxDistance = Math.max(110, overview.distance * 1.15);
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xbcae94, 1.25));
+  const ambient = new THREE.HemisphereLight(0xffffff, 0xbcae94, 1.25);
+  scene.add(ambient);
   const sun = new THREE.DirectionalLight(0xfff1dd, 2.5);
   sun.target.position.set(1.6, 0, 5.7);
   sun.position.set(1.6 + 12, 24, 5.7 + 14);
@@ -2500,6 +2502,7 @@ export function createScene(container, { cats: catData, present = null, open = n
     scene.add(cloud);
     clouds.push(cloud);
   }
+  const weather = createWeatherScene({ scene, camera, water, sun, ambient, fill, clouds, reducedMotion });
 
   // 偶爾有魚跳出海面
   const jumper = makeFish(0xff8a3d);
@@ -5115,6 +5118,7 @@ export function createScene(container, { cats: catData, present = null, open = n
       stepSeaFish(dt);
     }
     controls.update();
+    weather.step(dt);
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
   }
@@ -5561,6 +5565,7 @@ export function createScene(container, { cats: catData, present = null, open = n
 
   function dispose() {
     cancelAnimationFrame(frame);
+    weather.dispose();
     renderer.domElement.removeEventListener('pointerdown', onPointerDown);
     renderer.domElement.removeEventListener('pointerup', onPointerUp);
     controls.dispose();
@@ -5570,6 +5575,7 @@ export function createScene(container, { cats: catData, present = null, open = n
 
   return {
     focus,
+    setWeather: weather.setWeather,
     follow,
     clearFollow,
     press,

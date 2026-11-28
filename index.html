@@ -24,6 +24,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bpmf+Huninn&display=swap">
 <link rel="stylesheet" href="board-island.css">
+<link rel="stylesheet" href="weather.css">
 <style>
   /* 桐桐貓貓島：滿版 3D 群島，介面像貼紙一樣浮在上面（粗墨線、圓角、底下一條實心陰影）。
      主色是桐桐印章的藍紫墨色，成績用陽光黃，三座跳臺綠、橘、珊瑚紅。
@@ -889,6 +890,12 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path id="sound-wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
         <span class="tool__label" id="sound-label">聲音開</span>
       </button>
+      <button class="sticker" id="weather-open" type="button" aria-label="島上天氣" aria-controls="weather-card" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M13 3v2M6 6l1.5 1.5M19 6l-1.5 1.5M4 13h2m13 0h2"/><path d="M8.5 12a4.5 4.5 0 1 1 9 0M6 20h11a3.5 3.5 0 0 0 0-7c-.3 0-.7 0-1 .1a5 5 0 0 0-9.1 1.9A2.6 2.6 0 1 0 6 20Z"/>
+        </svg>
+        <span class="tool__label">天氣</span>
+      </button>
       <button class="sticker" id="report-open" type="button" aria-label="回報問題">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4.5L17 13H5"/></svg>
         <span class="tool__label">回報問題</span>
@@ -1522,6 +1529,31 @@
       <button class="sticker" id="bridge-read" type="button" aria-pressed="false"><span id="bridge-read-label">唸給我聽</span></button>
       <button class="sticker sticker--solid" id="bridge-go" type="button">去貓貓領養島</button>
     </div>
+  </article>
+
+  <article class="card" id="weather-card" hidden aria-labelledby="weather-title">
+    <div class="card__head">
+      <h2 class="card__title" id="weather-title">島上的天氣</h2>
+      <button class="card__close" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <label class="weather-city-label" for="weather-city">選一座城市</label>
+    <select class="weather-city" id="weather-city"></select>
+    <div class="weather-reading">
+      <p id="weather-local"></p>
+      <p id="weather-condition"></p>
+    </div>
+    <p class="weather-feedback" id="weather-feedback" role="status"></p>
+    <button class="sticker" id="weather-retry" type="button" hidden>重新讀取</button>
+    <div id="weather-demo" class="weather-demo" hidden>
+      <p>試看島上的天氣</p>
+      <div class="weather-demo__options">
+        <button class="sticker" type="button" data-weather-demo="day" aria-pressed="false">晴天</button>
+        <button class="sticker" type="button" data-weather-demo="night" aria-pressed="false">晚上</button>
+        <button class="sticker" type="button" data-weather-demo="rain" aria-pressed="false">下雨</button>
+      </div>
+      <button class="sticker" id="weather-live" type="button" hidden>回到城市天氣</button>
+    </div>
+    <p class="weather-credit">天氣資料由 <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> 提供。</p>
   </article>
 
   <article class="card" id="board-card" hidden aria-labelledby="board-title">

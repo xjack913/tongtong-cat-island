@@ -1,0 +1,31 @@
+#weather-card .card__head { justify-content: space-between; align-items: center; }
+#weather-card .card__close { min-width: 44px; min-height: 44px; }
+.weather-city-label { display: block; margin: 14px 0 5px; color: var(--ink-deep); }
+.weather-city {
+  width: 100%;
+  min-height: 46px;
+  padding: 6px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  color: var(--ink-deep);
+  background: var(--paper);
+  font: inherit;
+}
+.weather-reading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 12px;
+  color: var(--ink-deep);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.weather-feedback { margin: 5px 0; color: var(--text-2); }
+.weather-feedback:empty { margin: 0; }
+.weather-demo { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.weather-demo__options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.weather-demo .sticker { min-height: 44px; padding-inline: 12px; }
+#weather-live { margin-top: 12px; }
+.weather-credit { margin-top: 14px; color: var(--text-2); font-size: 14px; }
+.weather-credit a { color: var(--ink-deep); text-underline-offset: 2px; }

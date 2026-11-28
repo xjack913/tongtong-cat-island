@@ -21,6 +21,7 @@ import { composeNews, sanitizeNews, recordNews, recordJumpNews, recordRaceNews, 
 import { createScene } from './scene.js';
 import { WIN_COINS, addMove, catMove, readMatch } from './go-match.js';
 import { createBoardIsland } from './board-island.js';
+import { initWeatherControls } from './weather-controls.js';
 
 const LOCAL_HOST = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
 const PREVIEW_CASE = ['rawcdn.githack.com', 'raw.githack.com'].includes(location.hostname) || LOCAL_HOST
@@ -2636,6 +2637,7 @@ function start(hotData = {}, ownsStore = false) {
   }
 
   function openReport(via) {
+    if (PREVIEW) return;
     sound.unlock();
     stopSpeaking();
     reportWhere = reportContext();
@@ -2740,6 +2742,7 @@ function start(hotData = {}, ownsStore = false) {
     document.querySelectorAll('.card').forEach((card) => {
       card.hidden = true;
     });
+    $('weather-open').setAttribute('aria-expanded', 'false');
     // 卡片打開時搖桿會被蓋住，先放開，島主才不會一直走
     if (stickHold.id !== null) releaseStick();
     stopSpeaking();
@@ -3322,6 +3325,8 @@ function start(hotData = {}, ownsStore = false) {
     if (opened('go') && !introduced.includes('go')) introduceIslands(0);
   }
   tallied();
+  $('report-open').hidden = PREVIEW;
+  initWeatherControls({ $, scene, closeCards, preview: PREVIEW, storeKey: STORE_KEY + ':weather-city' });
   // 有暗號就先對一次雲端；有名字還沒有暗號（連不上或舊版取的名字）就補開一張
   if (profile.cloud.code) syncNow({ force: true });
   else if (profile.name) linkCloud();
