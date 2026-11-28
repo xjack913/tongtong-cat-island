@@ -10,7 +10,7 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ISLANDS, BRIDGES, LEVELS, UNLOCK, needBadge, PAPER_ICON, SKETCH, PERFECT, TRICKS, TRICK_KEYS, TRACK, fromSketch, meterAt, peakHeight, toCm, autoPower, maxCm, mulberry32, laneRadius, trackOuter, insideTrack, trackPoint } from './logic.js';
 import { buildHuman, animateHuman, disposeModel } from './avatar.js';
-import { BOARD_SIZE } from './go-rules.js';
+import { BOARD_SIZE, STAR_POINTS } from './go-rules.js';
 
 const TAU = Math.PI * 2;
 const TOP = 0.8;
@@ -1068,6 +1068,12 @@ export function createScene(container, { cats: catData, present = null, open = n
       const at = (i / (BOARD_SIZE - 1) - 0.5) * boardWidth;
       put(table, makeMesh(new THREE.BoxGeometry(boardWidth, 0.006, 0.014), ink), 0, 0.772, at);
       put(table, makeMesh(new THREE.BoxGeometry(0.014, 0.006, boardWidth), ink), at, 0.772, 0);
+    }
+    for (const point of STAR_POINTS) {
+      const spacing = boardWidth / (BOARD_SIZE - 1);
+      const x = (point % BOARD_SIZE) * spacing - boardWidth / 2;
+      const z = Math.floor(point / BOARD_SIZE) * spacing - boardWidth / 2;
+      put(table, makeMesh(new THREE.CylinderGeometry(0.025, 0.025, 0.009, 12), ink), x, 0.777, z);
     }
     pickable(table, { type: 'goMatch' });
     island.obstacles.push({ x: -0.65, z: -0.45, w: 1.7, d: 1.7 });

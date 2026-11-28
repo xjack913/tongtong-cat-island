@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BLACK, WHITE, PASS, CELLS, groupAt, placeGo } from '../go-rules.js';
+import { BLACK, WHITE, PASS, CELLS, STAR_POINTS, groupAt, placeGo } from '../go-rules.js';
 import { addMove, catMove, readMatch } from '../go-match.js';
 import { GO_LESSONS } from '../go-lessons.js';
 
@@ -67,15 +67,28 @@ test('saved replays reconstruct score and refuse occupied points, invalid cats a
   assert.deepEqual(replay.captures, [0, 1, 0]);
 });
 
-test('every teaching exercise reaches its expected result in the shared rules', () => {
-  for (const lesson of GO_LESSONS) for (const step of lesson.steps) {
-    if (!step.stone) {
-      assert.deepEqual(new Set(groupAt(step.board, 40).breaths), new Set(step.targets));
-      continue;
-    }
-    for (const point of step.targets) {
-      const result = placeGo(step.board, point, step.stone, step.previous);
-      assert.equal(result.error, step.expected, lesson.title);
+test('the board has four 3-3 marks and the center star point', () => {
+  assert.deepEqual(STAR_POINTS, [20, 24, 40, 56, 60]);
+});
+
+test('all demonstrations and 32 different exercises agree with the shared rules', () => {
+  for (const lesson of GO_LESSONS) {
+    assert.equal(lesson.exercises.length, 8);
+    const questions = [lesson.steps, ...lesson.exercises];
+    assert.equal(new Set(questions.map(([first]) => first.board.join(''))).size, questions.length);
+    for (const steps of questions) for (const step of steps) {
+      if (step.selectAll) {
+        const group = groupAt(step.board, step.group[0]);
+        assert.ok(group.breaths.length > 0);
+        assert.deepEqual(new Set(group.breaths), new Set(step.targets));
+        assert.deepEqual(new Set(group.stones), new Set(step.group));
+        continue;
+      }
+      for (const point of step.targets) {
+        const result = placeGo(step.board, point, step.stone, step.previous);
+        assert.equal(result.error, step.expected, lesson.title);
+        if (lesson.title === '吃子') assert.ok(result.captured.length > 0);
+      }
     }
   }
 });

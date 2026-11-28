@@ -1,4 +1,4 @@
-import { BOARD_SIZE, CELLS, BLACK, WHITE, PASS, placeGo } from './go-rules.js';
+import { BOARD_SIZE, CELLS, BLACK, WHITE, PASS, STAR_POINTS, placeGo } from './go-rules.js';
 import { CAT_LEVEL, CAPTURE_GOAL, WIN_COINS } from './go-match.js';
 import { GO_LESSONS } from './go-lessons.js';
 
@@ -13,13 +13,16 @@ export function createBoardIsland({ $, el, cats, owned, catIcon, getMatch, start
   let selected = null;
   let lesson = 0;
   let step = 0;
+  let exercise = null;
   let answer = null;
+  const found = new Set();
   let cursor = Math.floor(CELLS / 2);
 
   const cells = Array.from({ length: CELLS }, (_, point) => {
     const button = el('button', 'board-point');
     button.type = 'button';
     button.tabIndex = point === cursor ? 0 : -1;
+    if (STAR_POINTS.includes(point)) button.classList.add('is-star');
     button.append(el('i'));
     button.addEventListener('focus', () => {
       cells[cursor].tabIndex = -1;
@@ -39,15 +42,18 @@ export function createBoardIsland({ $, el, cats, owned, catIcon, getMatch, start
     cells[row * BOARD_SIZE + col].focus();
   });
 
-  function draw(board, { last, cue = [] } = {}) {
+  function draw(board, { last, cue = [], group = [], selected = [] } = {}) {
     cells.forEach((cell, point) => {
       const stone = board[point];
       cell.dataset.stone = stone;
       cell.classList.toggle('is-last', last === point);
       cell.classList.toggle('is-answer', cue.includes(point));
+      cell.classList.toggle('is-target-group', group.includes(point));
+      cell.classList.toggle('is-found', selected.includes(point));
       const row = Math.floor(point / BOARD_SIZE) + 1;
       const col = point % BOARD_SIZE + 1;
-      cell.setAttribute('aria-label', '第 ' + row + ' 橫排第 ' + col + ' 直排，' + COLORS[stone] + (cue.includes(point) ? '，有圈提示' : ''));
+      const mark = selected.includes(point) ? '，已找到的氣' : group.includes(point) ? '，這串棋' : cue.includes(point) ? '，有圈提示' : '';
+      cell.setAttribute('aria-label', '第 ' + row + ' 橫排第 ' + col + ' 直排，' + COLORS[stone] + (STAR_POINTS.includes(point) ? '，星位' : '') + mark);
     });
   }
 
@@ -98,15 +104,32 @@ export function createBoardIsland({ $, el, cats, owned, catIcon, getMatch, start
   });
   $('board-lessons').replaceChildren(...lessonButtons);
 
-  function renderLesson() {
+  function lessonSteps(topic) {
+    return exercise === null ? topic.steps : topic.exercises[exercise];
+  }
+
+  function progressLabel(topic, steps) {
+    const activity = exercise === null ? '示範' : '練習 ' + (exercise + 1) + '／' + topic.exercises.length;
+    return steps.length > 1 ? activity + ' · 第 ' + (step + 1) + ' 步' : activity;
+  }
+
+  function renderLesson(feedback = '', tone = '') {
     const topic = GO_LESSONS[lesson];
-    const action = topic.steps[step];
+    const steps = lessonSteps(topic);
+    const action = steps[step];
     lessonButtons.forEach((button, index) => button.setAttribute('aria-pressed', String(index === lesson)));
+    $('board-progress').textContent = progressLabel(topic, steps);
     $('board-caption').textContent = topic.intro;
     $('board-hint').textContent = action.prompt;
-    status.textContent = answer ? action.success : '';
-    $('board-next').hidden = !answer || step + 1 >= topic.steps.length;
-    draw(answer?.board || action.board, { last: answer?.last, cue: answer?.cue || action.cue });
+    status.dataset.tone = tone || (answer ? 'correct' : '');
+    status.textContent = feedback || (answer ? action.success : '');
+    const next = $('board-next');
+    next.hidden = !answer;
+    const hasStep = step + 1 < steps.length;
+    next.textContent = hasStep ? '下一步' : exercise === null ? '開始練習'
+      : exercise + 1 < topic.exercises.length ? '下一題' : '再練一輪';
+    if (answer && !hasStep && exercise === topic.exercises.length - 1) status.textContent += ' 這一輪的 ' + topic.exercises.length + ' 題都完成了！';
+    draw(answer?.board || action.board, { last: answer?.last, cue: answer?.cue || action.cue, group: action.group, selected: [...found] });
   }
 
   function choosePoint(point) {
@@ -119,20 +142,31 @@ export function createBoardIsland({ $, el, cats, owned, catIcon, getMatch, start
       return;
     }
     if (view !== 'go' || answer) return;
-    const action = GO_LESSONS[lesson].steps[step];
+    const action = lessonSteps(GO_LESSONS[lesson])[step];
+    if (found.has(point)) {
+      renderLesson('這口氣已經找到囉，找找其他的。');
+      return;
+    }
     if (!action.targets.includes(point)) {
-      status.textContent = action.hint || '再看一下題目，選一個位置試試看。';
+      renderLesson(action.hint || '再看一下題目，選一個位置試試看。', 'retry');
+      return;
+    }
+    if (action.selectAll) {
+      found.add(point);
+      if (found.size === action.targets.length) answer = { board: action.board };
+      const count = '已找到 ' + found.size + '／' + action.targets.length + ' 口氣。';
+      renderLesson(answer ? action.success + ' ' + count : '答對了！' + count, 'correct');
       return;
     }
     const move = action.stone ? placeGo(action.board, point, action.stone, action.previous) : null;
     if (move?.error !== action.expected) {
-      status.textContent = '這個位置不能這樣下，再試試看。';
+      renderLesson('這個位置不能這樣下，再試試看。', 'retry');
       return;
     }
     answer = {
       board: move?.board || action.board,
       last: move?.board ? point : undefined,
-      cue: !action.stone ? action.targets : action.expected ? [point] : [],
+      cue: action.expected ? [point] : [],
     };
     renderLesson();
   }
@@ -146,8 +180,9 @@ export function createBoardIsland({ $, el, cats, owned, catIcon, getMatch, start
     $('board-layout').hidden = view !== 'go' && view !== 'match';
     $('board-result').hidden = true;
     $('board-score').hidden = view !== 'match';
+    $('board-progress').hidden = view !== 'go';
     $('board-turn-actions').hidden = true;
-    $('board-island-label').hidden = view === 'home';
+    status.dataset.tone = '';
     $('board-title').textContent = { home: '圍棋島', pick: '挑一隻貓貓', match: '來下圍棋', go: '小熊老師的圍棋課（G1）' }[view];
     $('board-play').setAttribute('aria-pressed', String(view === 'pick' || view === 'match'));
     $('board-learn').setAttribute('aria-pressed', String(view === 'go'));
@@ -162,7 +197,9 @@ export function createBoardIsland({ $, el, cats, owned, catIcon, getMatch, start
   function openLesson(index) {
     lesson = index;
     step = 0;
+    exercise = null;
     answer = null;
+    found.clear();
     show('go');
   }
 
@@ -188,12 +225,24 @@ export function createBoardIsland({ $, el, cats, owned, catIcon, getMatch, start
     selected = null;
     show('pick');
   });
-  $('board-retry').addEventListener('click', () => openLesson(lesson));
+  $('board-retry').addEventListener('click', () => {
+    step = 0;
+    answer = null;
+    found.clear();
+    renderLesson();
+  });
   $('board-pass').addEventListener('click', () => choosePoint(PASS));
   $('board-next').addEventListener('click', () => {
-    if (!answer || step + 1 >= GO_LESSONS[lesson].steps.length) return;
-    step += 1;
+    if (!answer) return;
+    const topic = GO_LESSONS[lesson];
+    if (step + 1 < lessonSteps(topic).length) {
+      step += 1;
+    } else {
+      step = 0;
+      exercise = exercise === null ? 0 : (exercise + 1) % topic.exercises.length;
+    }
     answer = null;
+    found.clear();
     renderLesson();
   });
 

@@ -1527,14 +1527,13 @@
   <article class="card" id="board-card" hidden aria-labelledby="board-title">
     <div class="card__head">
       <div>
-        <p class="card__label" id="board-island-label">圍棋島</p>
         <h2 class="card__title" id="board-title">圍棋島</h2>
       </div>
       <button class="card__close" type="button" data-close aria-label="關閉">×</button>
     </div>
     <div class="card__actions board-menu" aria-label="圍棋島的玩法">
       <button class="sticker" id="board-play" type="button" aria-pressed="false">跟貓貓下圍棋</button>
-      <button class="sticker" id="board-learn" type="button" aria-pressed="false">跟小熊學圍棋</button>
+      <button class="sticker" id="board-learn" type="button" aria-pressed="false">跟小熊老師學圍棋</button>
     </div>
     <p class="card__text" id="board-home">挑一隻你領養的貓貓下棋，或跟小熊老師學圍棋。</p>
     <section id="board-pick" hidden aria-label="選對手">
@@ -1545,8 +1544,12 @@
     </section>
     <div id="board-lessons" class="board-menu" hidden aria-label="圍棋課程"></div>
     <div class="board-layout" id="board-layout" hidden>
-      <div id="board-grid" class="board-grid" role="group" aria-label="九路棋盤"></div>
+      <figure class="board-figure">
+        <div id="board-grid" class="board-grid" role="group" aria-label="九路棋盤" aria-describedby="board-regions"></div>
+        <figcaption id="board-regions">金角在四角，銀邊沿棋盤外側，草肚皮在中央。正中的星位叫天元。</figcaption>
+      </figure>
       <div class="board-notes">
+        <p class="board-progress" id="board-progress" hidden></p>
         <p class="card__lede" id="board-caption"></p>
         <p class="card__text" id="board-hint"></p>
         <p class="board-score" id="board-score" hidden></p>
@@ -1560,7 +1563,7 @@
         </div>
         <div id="board-lesson-actions" class="card__actions" hidden>
           <button class="sticker sticker--solid" id="board-next" type="button" hidden>下一步</button>
-          <button class="sticker" id="board-retry" type="button">再練一次</button>
+          <button class="sticker" id="board-retry" type="button">重做這一題</button>
         </div>
       </div>
     </div>

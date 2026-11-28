@@ -3,6 +3,7 @@ export const BLACK = 1;
 export const WHITE = 2;
 export const PASS = -1;
 export const CELLS = BOARD_SIZE ** 2;
+export const STAR_POINTS = [20, 24, 40, 56, 60];
 
 export function neighbors(index) {
   const adjacent = [];
